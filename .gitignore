@@ -14,6 +14,9 @@ engine/
 # 隔离的 DSH_HOME：本地验证官方安装链路用，绝不入库
 .dsh-test/
 
+# 集成测试产物
+test/integration/.out/
+
 # 编辑器 / 系统
 .DS_Store
 Thumbs.db

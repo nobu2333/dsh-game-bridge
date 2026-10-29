@@ -26,7 +26,8 @@
   ],
   "license": "MIT",
   "scripts": {
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:session": "node test/integration/m0-session.mjs"
   },
   "engines": {
     "node": ">=22",

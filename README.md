@@ -2,7 +2,7 @@
 
 **给 DeepSeek Harness 装上眼睛和手：让 DSH 看得懂游戏、也能替你玩。**
 
-> 状态：**M0 脚手架（未发布）**。本版本只有两个只读工具，截图是合成帧，
+> 状态：**M0 已通过（未发布）**。本版本只有两个只读工具，截图是合成帧，
 > **还不会抓屏、也还不会按键**。装上去只能验证插件链路是否通，不能玩游戏。
 
 ## 这是什么
@@ -46,6 +46,23 @@ dsh plugin --profile web add file:F:/dsh-game-bridge
 # 卸载
 dsh plugin --profile web remove dsh-game-bridge
 ```
+
+### 验证
+
+```bash
+# 1) 契约测试：用宿主里那份真实的 @deepseek-ai/dsh-tools 校验 defineTool / 图片块
+npm test
+
+# 2) 会话级集成测试：隔离 DSH_HOME + 假模型，不联网、不碰真实屏幕与键鼠
+$env:DSH_HOME='<repo>/.dsh-test'
+dsh --profile headless --dump-config          # 初始化隔离 profile
+dsh plugin --profile headless add file:<repo> # 官方安装方式（会顺手选中 bundle）
+npm run test:session
+```
+
+`test:session` 会起一个本地假模型服务器，让模型调用 `game_snapshot`，再从
+**harness 实际发出的请求体**里断言：工具确实出现在 `tools` 数组里、工具结果确实
+回来了、图片确实以 `data:image/png` 送到了模型。产物落在 `test/integration/.out/`。
 
 ## 路线图
 
