@@ -105,8 +105,11 @@ class GameSession:
         else:
             # 不指定窗口时退回整屏（仍是有用的兜底，但模型应优先 attach 具体窗口）。
             self.attached = {"window": "unspecified", "attached_at_ms": int(time.time() * 1000)}
-        # 重新 attach 视为用户重新授权：清掉夺权闩锁。
+        # 重新 attach 视为用户重新授权：清掉夺权闩锁，并丢掉旧的帧差基线。
         self.gate.reset_takeover()
+        reset_diff = getattr(self.engine, "reset_diff", None)
+        if callable(reset_diff):
+            reset_diff()
         safety = self.gate.evaluate().to_dict()
         self.audit.write(
             {
@@ -274,6 +277,10 @@ class GameSession:
             for window in list_windows()[: max(1, limit)]
         ]
         return {"windows": items, "count": len(items)}
+
+    def events(self) -> dict:
+        """帧差分事件：不截图、不做 OCR 的廉价「刚才发生了什么」。"""
+        return self.engine.grab_diff()
 
     def snapshot(self, *, ocr: bool = True, max_width: int | None = None) -> dict:
         region = None

@@ -31,6 +31,8 @@ class GameEngine:
         self._capturer = capturer
         self._ocr = ocr
         self._max_width = max_width
+        self._last_gray = None
+        self._last_grab_at = None
 
     def _ensure(self) -> None:
         if self._capturer is None:
@@ -104,6 +106,68 @@ class GameEngine:
         if lines_error:
             result["ocr_error"] = lines_error
         return result
+
+    def grab_diff(self) -> dict:
+        """抓一帧并和上一帧做差分，返回廉价事件（不跑 OCR）。
+
+        这是观测层最便宜的信号：不调模型、不做识别，只回答「画面刚才变了没有、
+        变得多剧烈」。阈值**未按具体游戏校准**，所以输出原始指标 + 粗分类，
+        由模型自己判断，不假装能识别「掉血」这种语义。
+        """
+        import cv2
+
+        self._ensure()
+        frame = self._capturer.grab()
+        if not isinstance(frame, np.ndarray) or frame.ndim != 3:
+            raise EngineError("BAD_FRAME", f"抓到的不是三通道图像：{type(frame)}")
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        height, width = gray.shape[:2]
+        target_width = 160
+        scale = target_width / float(width) if width > target_width else 1.0
+        small = cv2.resize(
+            gray,
+            (max(1, int(round(width * scale))), max(1, int(round(height * scale)))),
+            interpolation=cv2.INTER_AREA,
+        ).astype(np.int16)
+
+        now = time.time()
+        elapsed_ms = None if self._last_grab_at is None else int((now - self._last_grab_at) * 1000)
+        previous, self._last_gray = self._last_gray, small
+        self._last_grab_at = now
+
+        if previous is None:
+            return {
+                "event": "baseline",
+                "mean_diff": 0.0,
+                "changed_ratio": 0.0,
+                "elapsed_ms": elapsed_ms,
+                "width": int(small.shape[1]),
+                "height": int(small.shape[0]),
+            }
+
+        delta = np.abs(small - previous)
+        mean_diff = float(delta.mean())
+        changed_ratio = float((delta > 12).mean())
+        if changed_ratio >= 0.35:
+            event = "scene_cut"
+        elif changed_ratio >= 0.01:
+            event = "changed"
+        else:
+            event = "static"
+        return {
+            "event": event,
+            "mean_diff": round(mean_diff, 2),
+            "changed_ratio": round(changed_ratio, 4),
+            "elapsed_ms": elapsed_ms,
+            "width": int(small.shape[1]),
+            "height": int(small.shape[0]),
+        }
+
+    def reset_diff(self) -> None:
+        """丢掉差分基线：重新 attach 时调用，避免拿旧画面误判。"""
+        self._last_gray = None
+        self._last_grab_at = None
 
     def close(self) -> None:
         capturer, self._capturer = self._capturer, None

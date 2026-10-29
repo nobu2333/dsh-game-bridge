@@ -44,6 +44,7 @@ dsh plugin --profile web add dsh-game-bridge
 | `game_selftest` | Is the plugin loaded, is the engine ready |
 | `game_snapshot` | One frame as an image + OCR text |
 | `game_windows` | List visible windows (title, process, size) |
+| `game_events` | Cheap frame-difference event (baseline / static / changed / scene_cut) |
 | `game_attach` | Attach to a window (the user-authorization step) |
 | `game_act` | Press one gamepad button (dry-run by default) |
 | `game_plan` | Start a bounded local ~20 Hz loop (hold/tap) |

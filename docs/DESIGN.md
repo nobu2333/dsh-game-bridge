@@ -39,6 +39,7 @@
 | `game_selftest` | 装没装上、引擎在哪一步 | 一次 | M1 ✅ |
 | `game_snapshot` | 看一眼（图 + OCR） | 模型需要时 | M1 ✅ |
 | `game_windows` | 列出可见窗口（标题/进程/尺寸） | 一次/局 | M2 ✅ |
+| `game_events` | 帧差分事件（baseline/static/changed/scene_cut） | 稀疏轮询 | M2 ✅ |
 | `game_attach` | 绑定窗口（用户授权步骤） | 一次 | M2 ✅ |
 | `game_act` | 单步按键（默认 dry-run） | 一次/动作 | M2 ✅ |
 | `game_stop` | 松手 + 解绑 | 随时，越易越好 | M2 ✅ |

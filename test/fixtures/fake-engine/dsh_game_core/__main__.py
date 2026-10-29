@@ -29,6 +29,8 @@ def handle(method, params, state):
                 {"title": "Editor", "process": "editor.exe", "width": 1024, "height": 768},
             ],
         }
+    if method == "events":
+        return {"event": "changed", "mean_diff": 3.25, "changed_ratio": 0.0412, "elapsed_ms": 220, "width": 160, "height": 90}
     if method == "attach":
         state["attached"] = {"window": params.get("window") or "fixture-game"}
         return {"attached": state["attached"], "backend": "dry-run", "safety": SAFETY}

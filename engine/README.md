@@ -20,7 +20,7 @@
 {"id": 1, "ok": false, "error": {"code": "ENCODE_FAILED", "message": "..."}}
 ```
 
-方法：`ping` · `selftest` · `snapshot` · `windows` · `attach` · `act` · `plan` · `status` · `stop`。
+方法：`ping` · `selftest` · `snapshot` · `windows` · `events` · `attach` · `act` · `plan` · `status` · `stop`。
 
 `attach` 接受窗口标题子串（大小写不敏感）：优先后台只截该窗口；找不到时返回
 `WINDOW_NOT_FOUND` 并列出当前可见窗口，便于换关键词。传 `unspecified` 退回整屏。
