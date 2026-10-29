@@ -95,7 +95,11 @@ try {
 
   Write-Host "`n[4/4] 发布到 PyPI" -ForegroundColor Cyan
   if (-not $env:UV_PUBLISH_TOKEN) { throw "UV_PUBLISH_TOKEN is not set" }
-  uv publish $wheel.FullName
+  if ($sdist) {
+    uv publish $wheel.FullName $sdist.FullName
+  } else {
+    uv publish $wheel.FullName
+  }
   if ($LASTEXITCODE -ne 0) { throw "uv publish failed" }
 
   Write-Host "`n[4/4] 发布到 npm" -ForegroundColor Cyan
