@@ -49,8 +49,46 @@ takeover latch.
 
 ## 上架前检查
 
-- [ ] `npm publish` 后，用**真实包名**在干净 profile 里 `dsh plugin add` 装通；
-- [ ] 首次激活自举安装真实引擎（PyPI 上的 `dsh-game-core`）成功；
-- [ ] 无 install/postinstall 脚本（市场硬门槛）；
-- [ ] README 里写明 Windows-only、dry-run 默认、需要 `uv`；
-- [ ] 录一段 30 秒演示：模型看截图 → 给目标 → 本地闭环执行 → F12 停手。
+- [x] `npm publish` 后，用真实产物在隔离 profile 装通（2026-10-29：registry tarball 安装 + M1/M3 PASS）；
+- [x] 首次激活自举安装真实引擎（PyPI 上的 `dsh-game-core==0.0.1`）成功；
+- [x] 无 install/postinstall 脚本（市场硬门槛）；
+- [x] README 写明 Windows-only、dry-run 默认、需要 `uv`；
+- [ ] 录一段 30 秒演示：模型看截图 → 给目标 → 本地闭环执行 → F12 停手；
+- [ ] GitHub 仓库加 topic `dsh-plugin`；
+- [ ] 仓库创建满 1 天（2026-10-29 创建，最早 2026-10-30 可投）。
+
+## 提交方式（2026-10-29 核对官方 contributing.md）
+
+目录数据在 [`awesome-dsh-plugin/awesome-dsh-plugin`](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)，
+**一个插件一个 YAML 文件，向该仓库提 PR 即完成投稿**（不要改 README，README 由脚本生成）。
+
+新增文件 `data/plugins/nobu2333__dsh-game-bridge.yml`：
+
+```yaml
+url: https://github.com/nobu2333/dsh-game-bridge
+name: nobu2333/dsh-game-bridge
+category: fun
+description:
+  en: 'Gives DeepSeek Harness eyes and hands on games: window capture, OCR, and a local 20 Hz closed loop with dry-run defaults.'
+  zh: '给 DSH 装上游戏的眼睛和手：窗口抓屏、OCR、本地 20Hz 闭环，默认只记录不注入。'
+```
+
+注意：`description.en` 里有 `: `（冒号+空格）**必须加引号**，否则 YAML 解析失败。
+分类可用 `fun`（游戏/娱乐）；不确定时按 contributing.md 的类别说明选。
+
+### 审核硬门槛（官方 checklist）
+
+1. `package.json` 声明 **`dsh.bundle`**（我们已声明 `dsh.bundle.patch`；只有 `dsh.client` 会被拒）；
+2. 仓库有真实可用的代码（不是占位/纯 README）；
+3. 仓库创建满 **1 天**；
+4. 仓库带 topic **`dsh-plugin`**；
+5. 在干净环境里 `dsh plugin add` 能装通（审核方会实测）。
+
+### 操作顺序
+
+1. 仓库 About → ⚙ → 加 topic `dsh-plugin`；
+2. 2026-10-30 之后 fork `awesome-dsh-plugin`，在网页里新建上面那个 YAML 文件并提 PR；
+3. PR 描述里一句话说明：Windows-only、默认 dry-run、引擎首次激活自举（需要 uv）。
+   审核会在沙箱里真的装一遍，这段说明能省一轮来回。
+
+> `dshmarketplace.dev` 的目录种子来自这个 awesome 列表；先上 awesome 列表即可。
