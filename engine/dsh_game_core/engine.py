@@ -35,6 +35,7 @@ class GameEngine:
         self._max_width = max_width
         self._last_gray = None
         self._last_grab_at = None
+        self._output_cache: dict[tuple[int, int, bool], int] = {}
 
     def _ensure_ocr(self) -> None:
         if self._ocr is None:
@@ -58,6 +59,10 @@ class GameEngine:
     def _resolve_output(self, monitor: dict | None) -> int:
         if not monitor:
             return 0
+        key = (int(monitor.get("width") or 0), int(monitor.get("height") or 0), bool(monitor.get("primary")))
+        cached = self._output_cache.get(key)
+        if cached is not None:
+            return cached
         from .capture import list_monitors, match_output_index
 
         index = match_output_index(monitor, list_monitors())
@@ -66,6 +71,7 @@ class GameEngine:
                 "MONITOR_UNSUPPORTED",
                 f"没有与窗口所在显示器匹配的抓屏输出（{monitor.get('width')}x{monitor.get('height')}）",
             )
+        self._output_cache[key] = index
         return index
 
     def snapshot(
@@ -195,6 +201,16 @@ class GameEngine:
             "width": int(small.shape[1]),
             "height": int(small.shape[0]),
         }
+
+    def warmup_capture(self, monitor: dict | None = None) -> None:
+        """预热抓屏器（首次 DXcam 初始化实测 ~340ms）。
+
+        放在 attach 阶段做，避免它吃掉闭环第一个窗口；失败不影响 attach。
+        """
+        try:
+            self._capturer_for(self._resolve_output(monitor)).grab()
+        except Exception:  # noqa: BLE001 - 预热失败留给真正的 snapshot 报错
+            pass
 
     def reset_diff(self) -> None:
         """丢掉差分基线：重新 attach 时调用，避免拿旧画面误判。"""

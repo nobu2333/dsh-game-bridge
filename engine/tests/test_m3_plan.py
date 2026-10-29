@@ -20,6 +20,19 @@ class FakeEngine:
         pass
 
 
+class DiffEngine(FakeEngine):
+    """按脚本返回帧差事件，用来测 advance 的撞墙脱困。"""
+
+    def __init__(self, events):
+        self.events = list(events)
+        self.index = 0
+
+    def grab_diff(self, monitor=None):
+        event = self.events[min(self.index, len(self.events) - 1)]
+        self.index += 1
+        return {"event": event}
+
+
 def allowed_gate(*, process_source=None, idle=1.0):
     return SafetyGate(
         unattended_after_s=180,
@@ -106,4 +119,43 @@ def test_stop_mid_plan_releases_and_detaches():
     assert session._controller.actions[-1].get("release_all") or any(
         action.get("release") for action in session._controller.actions
     )
+
+
+def make_diff_session(events):
+    return GameSession(engine=DiffEngine(events), gate=allowed_gate(), control_backend="dry-run")
+
+
+def test_advance_escapes_sideways_when_screen_is_static():
+    session = make_diff_session(["static"] * 60)
+    session.attach({"window": "unspecified"})
+    session.plan(
+        {
+            "mode": "advance",
+            "button": "DPAD_UP",
+            "duration_ms": 600,
+            "stuck_after_ms": 200,
+            "escape_tap_ms": 60,
+        }
+    )
+    time.sleep(0.9)
+
+    plan = session.status()["plan"]
+    assert plan["status"] == "completed"
+    assert plan["escapes"] >= 1, f"expected at least one escape: {plan}"
+    actions = session._controller.actions
+    # 侧移是一次 60ms 的短按，方向来自垂直轴（左右）。
+    assert any(action.get("duration_ms") == 60 and action.get("button") in ("DPAD_LEFT", "DPAD_RIGHT") for action in actions)
+    # 脱困前必须松开原方向，避免两个方向叠着按。
+    assert any(action.get("release") for action in actions)
+
+
+def test_advance_does_not_escape_while_screen_moves():
+    session = make_diff_session(["changed"] * 60)
+    session.attach({"window": "unspecified"})
+    session.plan({"mode": "advance", "button": "DPAD_UP", "duration_ms": 300, "stuck_after_ms": 200})
+    time.sleep(0.6)
+
+    plan = session.status()["plan"]
+    assert plan["status"] == "completed"
+    assert plan["escapes"] == 0
 

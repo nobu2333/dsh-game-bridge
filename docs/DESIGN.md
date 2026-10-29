@@ -43,7 +43,7 @@
 | `game_attach` | 绑定窗口（用户授权步骤） | 一次 | M2 ✅ |
 | `game_act` | 单步按键（默认 dry-run） | 一次/动作 | M2 ✅ |
 | `game_stop` | 松手 + 解绑 | 随时，越易越好 | M2 ✅ |
-| `game_plan` | 给目标，启动本地 20 Hz 循环 | 一次/目标 | M3 ✅（dry-run 验证） |
+| `game_plan` | 给目标，启动本地 20 Hz 循环（hold / tap / advance 撞墙侧移脱困） | 一次/目标 | M3 ✅（dry-run 验证） |
 | `game_status` | 轮询进度与事件 | 稀疏 | M3 ✅ |
 
 **判定标准**：任何工具如果要求模型以高于 1 Hz 的频率调用，就说明它设计错了。
@@ -150,3 +150,4 @@ DSH 的兼容性检查是**严格 semver**，而运行时版本常带预发布�
 
 v1 仅 Windows 10/11 x64（DXcam、ViGEmBus、Win32 输入）。抽象层留好接口，
 但不承诺跨平台；ViGEmBus 已 EOL，长期要给替代路径或退到模拟器键盘通道。
+

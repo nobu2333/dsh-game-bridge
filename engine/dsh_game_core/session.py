@@ -24,6 +24,16 @@ TICK_S = 0.05  # 20 Hz
 MIN_PLAN_MS = 100
 MAX_PLAN_MS = 120_000
 DEFAULT_TAP_INTERVAL_MS = 150
+DEFAULT_STUCK_MS = 800
+DEFAULT_ESCAPE_MS = 150
+
+# 「advance」卡住时往哪侧脱困：上下方向的侧移取左右，反之取上下。
+DIRECTION_SIDES = {
+    "DPAD_UP": ("DPAD_LEFT", "DPAD_RIGHT"),
+    "DPAD_DOWN": ("DPAD_LEFT", "DPAD_RIGHT"),
+    "DPAD_LEFT": ("DPAD_UP", "DPAD_DOWN"),
+    "DPAD_RIGHT": ("DPAD_UP", "DPAD_DOWN"),
+}
 
 
 class GameSession:
@@ -120,6 +130,9 @@ class GameSession:
         reset_diff = getattr(self.engine, "reset_diff", None)
         if callable(reset_diff):
             reset_diff()
+        warmup = getattr(self.engine, "warmup_capture", None)
+        if callable(warmup):
+            warmup((self.attached or {}).get("monitor"))
         safety = self.gate.evaluate().to_dict()
         self.audit.write(
             {
@@ -158,16 +171,20 @@ class GameSession:
         if self.attached is None:
             raise EngineError("NOT_ATTACHED", "还没有 attach 任何窗口：先调 game_attach，再调 game_plan")
         mode = str(params.get("mode") or "hold").lower()
-        if mode not in ("hold", "tap"):
-            raise EngineError("BAD_PLAN_MODE", f"mode 只支持 hold / tap，收到 {mode!r}")
+        if mode not in ("hold", "tap", "advance"):
+            raise EngineError("BAD_PLAN_MODE", f"mode 只支持 hold / tap / advance，收到 {mode!r}")
         button = str(params.get("button") or "A")
         try:
             duration = int(params.get("duration_ms") or 1000)
             interval = int(params.get("tap_interval_ms") or DEFAULT_TAP_INTERVAL_MS)
+            stuck_after_ms = int(params.get("stuck_after_ms") or DEFAULT_STUCK_MS)
+            escape_tap_ms = int(params.get("escape_tap_ms") or DEFAULT_ESCAPE_MS)
         except (TypeError, ValueError) as error:
             raise EngineError("BAD_PLAN_PARAM", f"plan 参数不是整数：{error}") from error
         duration = max(MIN_PLAN_MS, min(duration, MAX_PLAN_MS))
         interval = max(20, min(interval, 1000))
+        stuck_after_ms = max(200, min(stuck_after_ms, 10_000))
+        escape_tap_ms = max(30, min(escape_tap_ms, 1000))
 
         report = self.gate.evaluate()
         if not report.allowed:
@@ -181,10 +198,14 @@ class GameSession:
             "button": button,
             "duration_ms": duration,
             "tap_interval_ms": interval,
+            "stuck_after_ms": stuck_after_ms,
+            "escape_tap_ms": escape_tap_ms,
             "started_at_ms": int(time.time() * 1000),
             "ended_at_ms": None,
             "ticks": 0,
             "actions": 0,
+            "escapes": 0,
+            "last_event": None,
             "status": "running",
             "stop_reason": None,
         }
@@ -195,18 +216,33 @@ class GameSession:
         self._plan_thread.start()
         return {"plan": self._plan_snapshot(), "safety": report.to_dict()}
 
+    def _diff_event(self) -> dict | None:
+        """在闭环里取一次帧差分事件；引擎异常时返回 None（闭环继续走）。"""
+        monitor = (self.attached or {}).get("monitor")
+        try:
+            return self.engine.grab_diff(monitor=monitor)
+        except Exception:  # noqa: BLE001 - 差分失败不该让闭环崩掉
+            return None
+
     def _run_plan(self, state: dict) -> None:
         controller = self._controller_instance()
         mode = state["mode"]
         button = state["button"]
         deadline = time.monotonic() + state["duration_ms"] / 1000.0
-        if mode == "hold":
+        holds_direction = mode in ("hold", "advance")
+        if holds_direction:
             controller.hold(button)
             state["actions"] += 1
+        static_ms = 0.0
+        previous_iteration = time.monotonic()
         try:
             while not self._plan_stop.is_set():
-                now = time.monotonic()
-                if now >= deadline:
+                iteration = time.monotonic()
+                # 用真实经过时间累积「静止」时长：一拍的抓屏/差分可能远慢于 50ms，
+                # 用固定 TICK 会让阈值失真（实测首拍 DXcam 初始化 ~340ms）。
+                dt_ms = min((iteration - previous_iteration) * 1000.0, 500.0)
+                previous_iteration = iteration
+                if iteration >= deadline:
                     state["status"] = "completed"
                     break
                 report = self.gate.evaluate()
@@ -217,11 +253,29 @@ class GameSession:
                 if mode == "tap":
                     controller.press(button, 30)
                     state["actions"] += 1
+                elif mode == "advance":
+                    # 撞墙检测：画面连续静止超过阈值，就朝垂直方向短促侧移再继续走。
+                    event = self._diff_event()
+                    state["last_event"] = event.get("event") if event else "unknown"
+                    if event and event.get("event") == "static":
+                        static_ms += dt_ms
+                    else:
+                        static_ms = 0.0
+                    if static_ms >= state["stuck_after_ms"]:
+                        sides = DIRECTION_SIDES.get(button.upper())
+                        if sides:
+                            side = sides[state["escapes"] % len(sides)]
+                            controller.release(button)
+                            controller.press(side, state["escape_tap_ms"])
+                            controller.hold(button)
+                            state["actions"] += 2
+                            state["escapes"] += 1
+                        static_ms = 0.0
                 state["ticks"] += 1
                 # 用固定节拍推进；长循环里 sleep 被中断也不会漂太多。
                 self._plan_stop.wait(TICK_S)
         finally:
-            if mode == "hold":
+            if holds_direction:
                 controller.release(button)
             state["ended_at_ms"] = int(time.time() * 1000)
             self.audit.write(

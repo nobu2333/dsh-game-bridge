@@ -47,7 +47,7 @@ dsh plugin --profile web add dsh-game-bridge
 | `game_events` | Cheap frame-difference event (baseline / static / changed / scene_cut) |
 | `game_attach` | Attach to a window (the user-authorization step) |
 | `game_act` | Press one gamepad button (dry-run by default) |
-| `game_plan` | Start a bounded local ~20 Hz loop (hold/tap) |
+| `game_plan` | Bounded local ~20 Hz loop (hold / tap / advance with stuck-detection sidestep) |
 | `game_status` | Attach state, safety verdict, loop progress, audit tail |
 | `game_stop` | Stop the loop, release everything, detach |
 
@@ -67,3 +67,4 @@ bootstrap verification, and [docs/DESIGN.md](docs/DESIGN.md) for the design deci
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
