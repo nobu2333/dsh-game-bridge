@@ -13,6 +13,7 @@ import os
 import threading
 import time
 
+from .audit import AuditLog
 from .control import DryRunController, VGamepadController
 from .engine import EngineError, GameEngine
 from .safety import SafetyGate
@@ -31,11 +32,13 @@ class GameSession:
         engine: GameEngine | None = None,
         gate: SafetyGate | None = None,
         control_backend: str | None = None,
+        audit: AuditLog | None = None,
     ):
         self.engine = engine or GameEngine()
         unattended_after_s = float(os.environ.get("DSH_GAME_BRIDGE_UNATTENDED_S", "180"))
         self.gate = gate or SafetyGate(unattended_after_s=unattended_after_s)
         self.backend = control_backend or os.environ.get("DSH_GAME_BRIDGE_CONTROL", "dry-run")
+        self.audit = audit or AuditLog(os.environ.get("DSH_GAME_BRIDGE_AUDIT_LOG") or None)
         self._controller = None
         self.attached: dict | None = None
         self.history: list[dict] = []
@@ -60,7 +63,9 @@ class GameSession:
         self.attached = {"window": window, "attached_at_ms": int(time.time() * 1000)}
         # 重新 attach 视为用户重新授权：清掉夺权闩锁。
         self.gate.reset_takeover()
-        return {"attached": self.attached, "backend": self.backend, "safety": self.gate.evaluate().to_dict()}
+        safety = self.gate.evaluate().to_dict()
+        self.audit.write({"event": "attach", "window": window, "backend": self.backend, "safety": safety})
+        return {"attached": self.attached, "backend": self.backend, "safety": safety}
 
     def act(self, params: dict | None = None) -> dict:
         params = params or {}
@@ -68,6 +73,7 @@ class GameSession:
             raise EngineError("NOT_ATTACHED", "还没有 attach 任何窗口：先调 game_attach，再调 game_act")
         report = self.gate.evaluate()
         if not report.allowed:
+            self.audit.write({"event": "act_blocked", "reasons": report.reasons})
             raise EngineError("SAFETY_BLOCKED", "；".join(report.reasons))
         button = str(params.get("button") or "A")
         try:
@@ -78,6 +84,7 @@ class GameSession:
         action = self._controller_instance().press(button, duration)
         entry = {**action, "at_ms": int(time.time() * 1000)}
         self.history.append(entry)
+        self.audit.write({"event": "act", "button": action.get("button"), "duration_ms": duration, "backend": action.get("backend"), "dry_run": action.get("dry_run")})
         return {"action": action, "safety": report.to_dict(), "attached": self.attached, "actions_total": len(self.history)}
 
     # ── 小脑：20 Hz 闭环 ──────────────────────────────────────────────
@@ -99,6 +106,7 @@ class GameSession:
 
         report = self.gate.evaluate()
         if not report.allowed:
+            self.audit.write({"event": "plan_blocked", "reasons": report.reasons})
             raise EngineError("SAFETY_BLOCKED", "；".join(report.reasons))
 
         self._stop_plan(join=True)
@@ -117,6 +125,7 @@ class GameSession:
         }
         self._plan = state
         self._plan_stop.clear()
+        self.audit.write({"event": "plan_start", "plan": state["id"], "mode": mode, "button": button, "duration_ms": duration})
         self._plan_thread = threading.Thread(target=self._run_plan, args=(state,), daemon=True)
         self._plan_thread.start()
         return {"plan": self._plan_snapshot(), "safety": report.to_dict()}
@@ -150,6 +159,16 @@ class GameSession:
             if mode == "hold":
                 controller.release(button)
             state["ended_at_ms"] = int(time.time() * 1000)
+            self.audit.write(
+                {
+                    "event": "plan_end",
+                    "plan": state["id"],
+                    "status": state["status"],
+                    "ticks": state["ticks"],
+                    "actions": state["actions"],
+                    "stop_reason": state["stop_reason"],
+                }
+            )
 
     def _plan_snapshot(self) -> dict | None:
         if self._plan is None:
@@ -174,6 +193,7 @@ class GameSession:
             self._controller.release_all()
         self.attached = None
         self.gate.reset_takeover()
+        self.audit.write({"event": "stop", "actions_total": len(self.history)})
         return {"stopped": True, "actions_total": len(self.history), "plan": self._plan_snapshot()}
 
     def status(self) -> dict:
@@ -184,6 +204,7 @@ class GameSession:
             "actions_total": len(self.history),
             "last_action": self.history[-1] if self.history else None,
             "plan": self._plan_snapshot(),
+            "audit": {"path": self.audit.path, "tail": self.audit.tail(5)},
         }
 
     # ── 眼 ────────────────────────────────────────────────────────────

@@ -99,7 +99,9 @@ DSH 的兼容性检查是**严格 semver**，而运行时版本常带预发布�
 2. **无人不自娱**：无人类输入且无显式 `game_plan` 授权时不输出；
 3. **反作弊不接**：命中 EAC/BattlEye/Vanguard 等进程即拒绝一切输出通道；
 4. **默认只读**：发布版只做抓屏 + 手柄，不读内存、不注入；
-5. **审计**：每次 attach/plan/stop 写本地 JSONL，供用户与排障。
+5. **可审计**：`DSH_GAME_BRIDGE_AUDIT_LOG` 打开后，`attach / act / plan_start /
+   plan_end / stop` 与 `act_blocked / plan_blocked` 全部写本地 JSONL；写失败只记
+   在条目里，不影响主流程。默认关闭，路径完全由用户指定。
 
 ## 6.5 引擎生命周期（M1 实测踩到的坑）
 

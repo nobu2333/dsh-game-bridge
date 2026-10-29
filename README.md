@@ -2,7 +2,9 @@
 
 **给 DeepSeek Harness 装上眼睛和手：让 DSH 看得懂游戏、也能替你玩。**
 
-> 状态：**M2 进行中（未发布）**。M1 已完成（引擎自举 + 真实抓屏/OCR）；
+[English](README.en.md)
+
+> 状态：**M2/M3 进行中（未发布）**。M1 已完成（引擎自举 + 真实抓屏/OCR）；
 > M2 已有 `game_attach` / `game_act` / `game_stop` 与三条安全闸，
 > **默认 dry-run 后端（只记录、不碰设备）**；真实手柄注入（vgamepad）尚未实机验证。
 
@@ -100,7 +102,9 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 - 安装方式：`uv venv` + `uv pip install dsh-game-core==<version>`（uv 自带 Python，
   用户无需预装 Python；但**需要机器上有 uv**，缺失时工具结果里会给出安装命令）；
 - 调试覆盖：`DSH_GAME_BRIDGE_PYTHON` / `DSH_GAME_BRIDGE_ENGINE_DIR` 指向现成环境，
-  `DSH_GAME_BRIDGE_PYTHON=off` 强制走合成帧，`DSH_GAME_BRIDGE_CACHE_DIR` 换缓存位置。
+  `DSH_GAME_BRIDGE_PYTHON=off` 强制走合成帧，`DSH_GAME_BRIDGE_CACHE_DIR` 换缓存位置；
+- 审计：设置 `DSH_GAME_BRIDGE_AUDIT_LOG=<path>` 后，attach/act/plan/stop/拦截
+  都会写本地 JSONL（默认关闭；`game_status` 的 `audit` 字段带最近 5 条）。
 
 ## 路线图
 
@@ -117,7 +121,9 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 1. **随时可夺回**：本地热键/一动鼠标即松手，不经过模型、不经过会话；
 2. **无人不自娱**：没有人类输入且没有显式授权时，停止一切输出；
 3. **反作弊不接**：EAC / BattlEye / Vanguard 等游戏一律拒绝输出通道；
-4. **默认只读**：发布版默认只做抓屏 + 手柄，不读内存、不注入进程。
+4. **默认只读**：发布版默认只做抓屏 + 手柄，不读内存、不注入进程；
+5. **可审计**：打开 `DSH_GAME_BRIDGE_AUDIT_LOG` 后，每一次 attach/act/plan/stop
+   与每一次被拒绝的尝试都落本地 JSONL，可自证。
 
 ## 许可
 
