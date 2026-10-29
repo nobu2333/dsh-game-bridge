@@ -5,6 +5,7 @@ pipeline, attach/act flow) without a real screen, real gamepad, or safety state.
 Real capture/OCR and the real safety gate are covered by engine/ unit tests.
 """
 import json
+import os
 import sys
 
 SAFETY = {
@@ -84,6 +85,9 @@ def main() -> int:
         request = json.loads(line)
         result = handle(request.get("method"), request.get("params") or {}, state)
         print(json.dumps({"id": request.get("id"), "ok": True, "result": result}), flush=True)
+        # 测试引擎崩溃自愈：回完这一条就退出，逼插件下次调用时重建客户端。
+        if os.environ.get("FAKE_ENGINE_EXIT_AFTER") == "1":
+            return 0
     return 0
 
 

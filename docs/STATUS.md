@@ -31,7 +31,7 @@ cd engine; python -m pytest tests -q       # 33 passed（抓屏/OCR/安全闸/�
 cd ..
 $env:DSH_HOME='<repo>/.dsh-test'
 $env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'
-npm run test:all                           # 8/8 PASS，约 90 秒
+npm run test:all                           # 9/9 PASS，约 100 秒
 pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm tarball 并校验
 ```
 
@@ -71,3 +71,4 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
   否则会挂住 DSH 事件循环（实测 headless 永不退出）。
 - **严格 semver**：`engines.dsh` / peer 必须匹配带预发布标签的运行时版本。
 - **默认 dry-run + 真实后端审批**：最便宜的安全默认。
+

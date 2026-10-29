@@ -85,6 +85,17 @@ const cases = [
     expect: 'APPROVAL PASS',
   },
   {
+    name: 'engine recovery after crash',
+    env: {
+      DSH_GAME_BRIDGE_ENGINE_SPEC: resolve(repo, 'test/fixtures/fake-engine'),
+      DSH_GAME_BRIDGE_CACHE_DIR: resolve(repo, `tmp/regression-recovery-${Date.now()}`),
+      DSH_GAME_BRIDGE_EXPECT_RECOVERY: '1',
+      FAKE_ENGINE_EXIT_AFTER: '1',
+      FAKE_SEQUENCE: 'game_attach,game_status',
+    },
+    expect: 'RECOVERY PASS',
+  },
+  {
     name: 'bootstrap (fixture engine install)',
     env: {
       DSH_GAME_BRIDGE_ENGINE_SPEC: resolve(repo, 'test/fixtures/fake-engine'),

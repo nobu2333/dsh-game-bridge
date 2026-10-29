@@ -134,6 +134,9 @@ DSH 的兼容性检查是**严格 semver**，而运行时版本常带预发布�
   窗口标题写进 stdout 会抛 `UnicodeEncodeError`，整个引擎进程 exit 1（实测在
   `game_windows` 上炸）。修复：引擎启动时强制 UTF-8 stdio，插件 spawn 时兜底设
   `PYTHONIOENCODING=utf-8`。
+- **崩溃自愈**：引擎意外退出后，下一次工具调用会**重建客户端**（复用已装好的
+  引擎路径，不再自举）。不自动重放上一次请求——`attach`/`act` 不是幂等操作。
+  引擎内状态（attach、闭环）会丢，这是有意的：重来一次比在不确定状态下继续安全。
 - 引擎的 stdio 只走协议，诊断一律 stderr；错误码稳定（`ENGINE_TIMEOUT`、
   `ENGINE_EXITED`、`ENGINE_SPAWN_FAILED`）。
 

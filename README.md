@@ -68,7 +68,7 @@ npm run test:session
 **harness 实际发出的请求体**里断言：工具确实出现在 `tools` 数组里、工具结果确实
 回来了、图片确实以 `data:image/png` 送到了模型。产物落在 `test/integration/.out/`。
 
-**全量回归**（一次跑完 M0/M1/M2/M3/events/windows/审批/bootstrap 八条）：
+**全量回归**（一次跑完 M0/M1/M2/M3/events/windows/审批/崩溃自愈/bootstrap 九条）：
 
 ```powershell
 $env:DSH_HOME='<repo>/.dsh-test'
@@ -76,7 +76,7 @@ $env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'   # 不设则跳过需要真实
 npm run test:all
 ```
 
-最近一次实测：8/8 PASS，约 90 秒（含真实抓屏、OCR、闭环、窗口列表、审批 fail-closed、自举安装）。
+最近一次实测：9/9 PASS，约 100 秒（含真实抓屏、OCR、闭环、窗口列表、审批 fail-closed、引擎崩溃自愈、自举安装）。
 
 验证自举安装（不需要系统 Python：uv 建 venv，装仓库内的假引擎包，秒级）：
 
@@ -161,3 +161,4 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 ## 许可
 
 MIT。游戏内的策略/档案数据将来单独许可，见 `LICENSE`。
+
