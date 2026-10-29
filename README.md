@@ -123,7 +123,10 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 2. **无人不自娱**：没有人类输入且没有显式授权时，停止一切输出；
 3. **反作弊不接**：EAC / BattlEye / Vanguard 等游戏一律拒绝输出通道；
 4. **默认只读**：发布版默认只做抓屏 + 手柄，不读内存、不注入进程；
-5. **可审计**：打开 `DSH_GAME_BRIDGE_AUDIT_LOG` 后，每一次 attach/act/plan/stop
+5. **真实后端需批准**：`DSH_GAME_BRIDGE_CONTROL=vgamepad` 时，`game_attach`
+   会走 DSH 的 user-approval 一次性批准；没有批准应答者的部署（headless/CI）
+   fail-closed 拒绝；
+6. **可审计**：打开 `DSH_GAME_BRIDGE_AUDIT_LOG` 后，每一次 attach/act/plan/stop
    与每一次被拒绝的尝试都落本地 JSONL，可自证。
 
 ## 许可

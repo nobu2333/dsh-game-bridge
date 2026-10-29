@@ -19,8 +19,13 @@ const { apply, inject, name } = await import('../lib/index.js')
 
 function fakeCtx() {
   const registered = []
+  const listeners = new Map()
   return {
     registered,
+    listeners,
+    on(event, listener) {
+      listeners.set(event, listener)
+    },
     tools: {
       register(definition) {
         registered.push(definition)
@@ -94,4 +99,36 @@ test('game_snapshot falls back to the synthetic frame when the engine is off', a
   assert.equal(blocks[0].type, 'text')
   assert.equal(blocks[1].type, 'image')
   assert.equal(blocks[1].attachment.attachmentId, 'att_m0_test')
+})
+
+test('dry-run registers no approval hook', () => {
+  delete process.env.DSH_GAME_BRIDGE_CONTROL
+  const ctx = fakeCtx()
+  apply(ctx)
+  assert.equal(ctx.listeners.has('tools/pre-execute'), false)
+})
+
+test('real backend asks approval before attach and passes other tools through', async () => {
+  process.env.DSH_GAME_BRIDGE_CONTROL = 'vgamepad'
+  try {
+    const ctx = fakeCtx()
+    apply(ctx)
+    const hook = ctx.listeners.get('tools/pre-execute')
+    assert.ok(hook, 'real backend must register the approval hook')
+
+    const asked = await hook({ name: 'game_attach' }, async () => ({ kind: 'allow' }))
+    assert.equal(asked.kind, 'ask')
+    assert.match(asked.displayReason.en, /real input control/)
+    assert.match(asked.displayReason.zh, /真实输入后端/)
+
+    let nextCalled = false
+    const passed = await hook({ name: 'game_act' }, async () => {
+      nextCalled = true
+      return { kind: 'allow' }
+    })
+    assert.equal(passed.kind, 'allow')
+    assert.equal(nextCalled, true)
+  } finally {
+    delete process.env.DSH_GAME_BRIDGE_CONTROL
+  }
 })

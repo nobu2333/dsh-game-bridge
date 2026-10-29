@@ -111,7 +111,11 @@ DSH 的兼容性检查是**严格 semver**，而运行时版本常带预发布�
 2. **无人不自娱**：无人类输入且无显式 `game_plan` 授权时不输出；
 3. **反作弊不接**：命中 EAC/BattlEye/Vanguard 等进程即拒绝一切输出通道；
 4. **默认只读**：发布版只做抓屏 + 手柄，不读内存、不注入；
-5. **可审计**：`DSH_GAME_BRIDGE_AUDIT_LOG` 打开后，`attach / act / plan_start /
+5. **真实后端需批准**：`DSH_GAME_BRIDGE_CONTROL` 不是 dry-run 时，插件注册
+   `tools/pre-execute` 钩子，对 `game_attach` 返回 `{kind:'ask'}`，走 DSH
+   user-approval 的一次性批准；headless/CI 没有应答者时 fail-closed 拒绝。
+   dry-run 下不注册钩子——只记录动作的操作不值得打断用户；
+6. **可审计**：`DSH_GAME_BRIDGE_AUDIT_LOG` 打开后，`attach / act / plan_start /
    plan_end / stop` 与 `act_blocked / plan_blocked` 全部写本地 JSONL；写失败只记
    在条目里，不影响主流程。默认关闭，路径完全由用户指定。
 
