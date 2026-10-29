@@ -1,0 +1,40 @@
+{
+  "name": "dsh-game-bridge",
+  "version": "0.0.1",
+  "description": "Give DeepSeek Harness eyes and hands on your games: candidate-level tools backed by a local capture + control engine, so the model picks goals while a 20 Hz loop plays.",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis-plugin",
+    "game",
+    "gamepad",
+    "screen-capture",
+    "computer-use"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22",
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

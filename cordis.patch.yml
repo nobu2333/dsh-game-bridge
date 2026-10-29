@@ -1,0 +1,6 @@
+# Registers the game bridge with the Cordis kernel that DSH is built on.
+# A bundle patch is the only thing that makes `dsh plugin add dsh-game-bridge`
+# install this package as a plugin instead of a plain dependency.
+- insert:
+    - id: dsh-game-bridge
+      name: dsh-game-bridge
