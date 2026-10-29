@@ -44,7 +44,7 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 1. 反作弊进程（EAC/BattlEye/Vanguard/ACE…）→ 拒绝一切输出；
 2. 超时无键鼠输入 / 拿不到输入遥测 → 拒绝（fail-closed）；
 3. F12 → 闩锁拒绝，重新 attach 才解除；
-4. 真实后端（`DSH_GAME_BRIDGE_CONTROL=vgamepad`）→ `game_attach` 走 DSH 审批；
+4. 真实后端（`vgamepad` 手柄 / `keyboard` SendInput 键盘）→ `game_attach` 走 DSH 审批；
    无审批应答者（headless/CI）→ 拒绝（已实测报文：`requires approval, but no approval channel is available`）；
 5. 默认 dry-run，不碰设备；审计日志默认关闭、路径用户指定。
 
@@ -52,7 +52,7 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 
 - Windows-only；非 Windows 自举阶段直接拒绝（可 `DSH_GAME_BRIDGE_ALLOW_UNSUPPORTED=1` 开发覆盖）；
 - 多显示器基本支持（显示器枚举 + 分辨率/主屏映射；两块同分辨率非主屏仍可能选错）；
-- 真实手柄注入未实机验证（等用户授权的 3 秒测试）；
+- 真实注入未实机验证（vgamepad 手柄与 keyboard 键盘两个后端都等用户授权实测）；
 - 帧差阈值、OCR 区域未按具体游戏校准。
 
 ## 用户回来后要做的（按顺序）
@@ -60,7 +60,7 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 1. `gh auth login` → 我建远程仓库并 push（或给我空仓库 URL）；
 2. `npm login` + 设 `UV_PUBLISH_TOKEN` → 我跑
    `pwsh -File scripts/release.ps1 -Publish -SkipTests`；
-3. 允许真实手柄注入测试（按一次 A + XInput 回读，约 3 秒、不抢焦点）；
+3. 允许真实注入测试（手柄：按一次 A + XInput 回读；键盘：按一次 W；约 3 秒、不抢焦点）；
 4. 发布后按 `docs/RELEASE.md` 做安装验收；市场提交材料在 `docs/MARKETPLACE.md`。
 
 ## 关键决策（一句话版）
@@ -71,4 +71,5 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
   否则会挂住 DSH 事件循环（实测 headless 永不退出）。
 - **严格 semver**：`engines.dsh` / peer 必须匹配带预发布标签的运行时版本。
 - **默认 dry-run + 真实后端审批**：最便宜的安全默认。
+
 

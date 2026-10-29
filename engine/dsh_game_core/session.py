@@ -14,7 +14,7 @@ import threading
 import time
 
 from .audit import AuditLog
-from .control import DryRunController, VGamepadController
+from .control import DryRunController, SendInputController, VGamepadController
 from .engine import EngineError, GameEngine
 from .safety import SafetyGate
 
@@ -92,12 +92,18 @@ class GameSession:
     # ── 手 ────────────────────────────────────────────────────────────
     def _controller_instance(self):
         if self._controller is None:
-            if self.backend == "dry-run":
+            backend = (self.backend or "dry-run").lower()
+            if backend == "dry-run":
                 self._controller = DryRunController()
-            elif self.backend == "vgamepad":
+            elif backend in ("vgamepad", "gamepad"):
                 self._controller = VGamepadController()
+            elif backend in ("keyboard", "sendinput"):
+                self._controller = SendInputController()
             else:
-                raise EngineError("BAD_CONTROL_BACKEND", f"未知输出后端：{self.backend!r}（只支持 dry-run / vgamepad）")
+                raise EngineError(
+                    "BAD_CONTROL_BACKEND",
+                    f"未知输出后端：{self.backend!r}（只支持 dry-run / vgamepad / keyboard）",
+                )
         return self._controller
 
     def attach(self, params: dict | None = None) -> dict:

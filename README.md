@@ -7,7 +7,7 @@
 > 状态：**M2/M3 进行中（未发布）**。M1 已完成（引擎自举 + 真实抓屏/OCR）；
 > M2 已有 `game_attach` / `game_act` / `game_stop` 与三条安全闸，
 > **attach 后只截目标窗口**；M3 的 20 Hz 闭环已在 dry-run 下验证。
-> **默认 dry-run 后端（只记录、不碰设备）**；真实手柄注入（vgamepad）尚未实机验证。
+> **默认 dry-run 后端（只记录、不碰设备）**；真实注入（vgamepad 手柄 / keyboard 键鼠）尚未实机验证。
 
 ## 这是什么
 
@@ -125,6 +125,10 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
   用户无需预装 Python；但**需要机器上有 uv**，缺失时工具结果里会给出安装命令）；
 - 调试覆盖：`DSH_GAME_BRIDGE_PYTHON` / `DSH_GAME_BRIDGE_ENGINE_DIR` 指向现成环境，
   `DSH_GAME_BRIDGE_PYTHON=off` 强制走合成帧，`DSH_GAME_BRIDGE_CACHE_DIR` 换缓存位置；
+- 输出后端：`DSH_GAME_BRIDGE_CONTROL=dry-run`（默认，只记录）/ `vgamepad`（Xbox 手柄）/
+  `keyboard`（SendInput 键盘，按键名 W/A/S/D/SPACE/ENTER/ESC/ARROWS…）；
+  非 dry-run 时 attach 需要 DSH 一次性审批；
+- 安全阈值：`DSH_GAME_BRIDGE_UNATTENDED_S`（默认 180 秒无输入即拒绝输出）；
 - 审计：设置 `DSH_GAME_BRIDGE_AUDIT_LOG=<path>` 后，attach/act/plan/stop/拦截
   都会写本地 JSONL（默认关闭；`game_status` 的 `audit` 字段带最近 5 条）。
 
@@ -144,7 +148,7 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 - **多显示器基本支持**：用 Win32 显示器枚举 + 分辨率/主屏标记把窗口映射到对应
   DXcam output，裁剪区按显示器原点换算。已知边界：两块**同分辨率且都不是主屏**时
   无法从 dxcam 信息里区分，会按序号确定性选择（可能选错）；单屏/常规双屏实测通过。
-- **真实手柄注入未实机验证**：默认 dry-run；vgamepad 后端要等用户授权的实测。
+- **真实注入未实机验证**：默认 dry-run；`vgamepad`（手柄）与 `keyboard`（SendInput）两个后端都要等用户授权的实测。
 - **游戏内语义未校准**：帧差分阈值、OCR 区域都还是通用值，没有按具体游戏调过。
 
 ## 安全承诺（发布版必须成立）
@@ -153,7 +157,7 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 2. **无人不自娱**：没有人类输入且没有显式授权时，停止一切输出；
 3. **反作弊不接**：EAC / BattlEye / Vanguard 等游戏一律拒绝输出通道；
 4. **默认只读**：发布版默认只做抓屏 + 手柄，不读内存、不注入进程；
-5. **真实后端需批准**：`DSH_GAME_BRIDGE_CONTROL=vgamepad` 时，`game_attach`
+5. **真实后端需批准**：`DSH_GAME_BRIDGE_CONTROL` 不是 dry-run（`vgamepad` / `keyboard`）时，`game_attach`
    会走 DSH 的 user-approval 一次性批准；没有批准应答者的部署（headless/CI）
    fail-closed 拒绝；
 6. **可审计**：打开 `DSH_GAME_BRIDGE_AUDIT_LOG` 后，每一次 attach/act/plan/stop
@@ -162,4 +166,5 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 ## 许可
 
 MIT。游戏内的策略/档案数据将来单独许可，见 `LICENSE`。
+
 
