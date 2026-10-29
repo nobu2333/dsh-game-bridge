@@ -2,6 +2,16 @@
 node_modules/
 *.tgz
 
+# 凭据与本地配置：永不入库
+.env
+.env.*
+!.env.example
+.npmrc
+*.pem
+*.key
+*.token
+*.pfx
+
 # 本地调试
 tmp/
 *.log

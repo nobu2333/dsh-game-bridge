@@ -44,7 +44,7 @@ dsh plugin --profile web add dsh-game-bridge
 
 ```bash
 # 本地以 file: 依赖装进一个 profile（不碰 npm 上的正式版本）
-dsh plugin --profile web add file:F:/dsh-game-bridge
+dsh plugin --profile web add file:<repo>
 
 # 卸载
 dsh plugin --profile web remove dsh-game-bridge

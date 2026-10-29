@@ -16,7 +16,7 @@
 | 被跟踪文件 | 48 个，全部属于插件/引擎/文档/测试/CI；无 `tmp/`、无 `.dsh-test/`、无 `dist/` |
 | 密钥扫描 | 对全部被跟踪文件扫 `sk-*` / `yotta_pk_` / `AUTH_TOKEN=` / `api_key=`：**0 命中** |
 | gitignore | `.dsh-test/`、`tmp/`、`engine/dist/`、`node_modules/` 均被忽略 |
-| 私人项目 | `另一个本地项目` HEAD 仍为 `<removed>`（<removed>），工作区干净——**零改动** |
+| 另一个项目 | 工作区干净、未受影响（本次审计只读参考） |
 
 ## 2. 版本一致性
 

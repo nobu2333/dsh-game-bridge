@@ -21,6 +21,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { homedir } from 'node:os'
 import assert from 'node:assert/strict'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -28,7 +29,22 @@ const repo = resolve(here, '../..')
 const dshHome = process.env.DSH_HOME ?? resolve(repo, '.dsh-test')
 const profileDir = resolve(dshHome, 'profiles/headless')
 const outDir = resolve(here, '.out')
-const dshCmd = process.env.DSH_CMD ?? 'C:/Users/<user>/AppData/Roaming/npm/dsh.cmd'
+
+/** 找全局安装的 dsh CLI（避免把本机用户名/路径写进仓库）。 */
+function resolveDshBin() {
+  if (process.env.DSH_BIN) return process.env.DSH_BIN
+  const home = homedir()
+  const candidates = [
+    resolve(home, 'AppData/Roaming/npm/node_modules/@deepseek-ai/dsh/lib/bin.js'),
+    resolve(home, '.npm-global/lib/node_modules/@deepseek-ai/dsh/lib/bin.js'),
+    resolve(home, '.local/share/pnpm/global/5/node_modules/@deepseek-ai/dsh/lib/bin.js'),
+  ]
+  const found = candidates.find((candidate) => existsSync(candidate))
+  if (!found) {
+    throw new Error('dsh CLI not found; set DSH_BIN to .../@deepseek-ai/dsh/lib/bin.js')
+  }
+  return found
+}
 
 const requests = []
 
@@ -176,7 +192,7 @@ function runHeadless() {
       process.execPath,
       [
         ...nodeArgs,
-        process.env.DSH_BIN ?? 'C:/Users/<user>/AppData/Roaming/npm/node_modules/@deepseek-ai/dsh/lib/bin.js',
+        resolveDshBin(),
         '--profile',
         'headless',
         '--json',
