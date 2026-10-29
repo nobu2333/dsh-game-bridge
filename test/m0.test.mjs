@@ -11,7 +11,11 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { apply, inject, name } from '../lib/index.js'
+
+// 单元测试不许触发真实引擎自举（会去建 venv / 装包）：显式关掉。
+process.env.DSH_GAME_BRIDGE_PYTHON = 'off'
+
+const { apply, inject, name } = await import('../lib/index.js')
 
 function fakeCtx() {
   const registered = []
@@ -54,27 +58,28 @@ test('apply() registers exactly the M0 tools', () => {
   )
 })
 
-test('game_selftest renders plain text and reports an unconfigured engine', async () => {
+test('game_selftest reports a failed engine instead of pretending', async () => {
   const ctx = fakeCtx()
   apply(ctx)
   const definition = tool(ctx, 'game_selftest')
   const value = await definition.execute({}, {})
   assert.equal(value.plugin, 'dsh-game-bridge')
   assert.equal(value.engine_ready, false)
-  assert.equal(value.engine.includes('not configured'), true)
+  assert.equal(value.engine.includes('failed'), true)
   JSON.stringify(value) // 输出值必须是无损 JSON
   const blocks = definition.output.render({}, value)
   assert.equal(blocks.length, 1)
   assert.equal(blocks[0].type, 'text')
 })
 
-test('game_snapshot returns an image attachment and renders it as an image block', async () => {
+test('game_snapshot falls back to the synthetic frame when the engine is off', async () => {
   const ctx = fakeCtx()
   apply(ctx)
   const definition = tool(ctx, 'game_snapshot')
   const value = await definition.execute({}, {})
   assert.equal(value.width, 320)
   assert.equal(value.height, 180)
+  assert.equal(value.source, 'synthetic fallback')
   assert.equal(value.attachment.attachmentId, 'att_m0_test')
   JSON.stringify(value) // 图片引用必须是可序列化的，不能带原始字节
   const blocks = definition.output.render({}, value)

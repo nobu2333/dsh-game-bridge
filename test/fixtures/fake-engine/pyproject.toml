@@ -1,0 +1,14 @@
+# 仅用于自举集成测试的假引擎：只实现 ping，零依赖。
+# 真引擎在 engine/；这里验证的是「uv 建 venv → 安装 → spawn → 协议应答」这条路。
+[project]
+name = "dsh-game-core"
+version = "0.0.1"
+description = "Fake engine fixture for the dsh-game-bridge bootstrap test."
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["dsh_game_core*"]

@@ -64,12 +64,22 @@ npm run test:session
 **harness 实际发出的请求体**里断言：工具确实出现在 `tools` 数组里、工具结果确实
 回来了、图片确实以 `data:image/png` 送到了模型。产物落在 `test/integration/.out/`。
 
-接真实引擎（开发期形态，自举安装未做前需要手动指一个装好依赖的 Python）：
+验证自举安装（不需要系统 Python：uv 建 venv，装仓库内的假引擎包，秒级）：
 
 ```powershell
-$env:DSH_GAME_BRIDGE_PYTHON='<python-with-numpy-dxcam-rapidocr>'   # 例如本项目源码旁已有的 venv
-$env:DSH_GAME_BRIDGE_ENGINE_DIR='<repo>/engine'                    # `-m dsh_game_core` 的 cwd
-npm run test:session      # 额外断言：帧来自真实屏幕、OCR 文本随帧进入模型
+$env:DSH_GAME_BRIDGE_ENGINE_SPEC='<repo>/test/fixtures/fake-engine'
+$env:DSH_GAME_BRIDGE_CACHE_DIR='<repo>/tmp/engine-cache'
+$env:FAKE_TOOL='game_selftest'
+npm run test:session        # 断言：引擎被装上、spawn 起来、ping 有应答
+```
+
+接真实引擎（开发期形态：直接指向一个装好依赖的 Python，跳过自举）：
+
+```powershell
+$env:DSH_GAME_BRIDGE_PYTHON='<python-with-numpy-dxcam-rapidocr>'
+$env:DSH_GAME_BRIDGE_ENGINE_DIR='<repo>/engine'    # `-m dsh_game_core` 的 cwd
+$env:FAKE_TOOL='game_snapshot'
+npm run test:session        # 额外断言：帧来自真实屏幕、OCR 文本随帧进入模型
 ```
 
 引擎自检（不联网、不注入输入）：
@@ -78,6 +88,18 @@ npm run test:session      # 额外断言：帧来自真实屏幕、OCR 文本随
 cd engine
 python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 / 抓一帧的真实耗时
 ```
+
+### 引擎自举与缓存（发布形态）
+
+插件装载时会在后台准备引擎，状态机 `idle → installing → ready | failed`；
+工具调用最多等一小段时间，没等到就用合成帧并写明原因。
+
+- 缓存目录：Windows `%LOCALAPPDATA%\dsh-game-bridge\engine\<version>`，
+  macOS `~/Library/Caches/...`，Linux `~/.cache/...`；
+- 安装方式：`uv venv` + `uv pip install dsh-game-core==<version>`（uv 自带 Python，
+  用户无需预装 Python；但**需要机器上有 uv**，缺失时工具结果里会给出安装命令）；
+- 调试覆盖：`DSH_GAME_BRIDGE_PYTHON` / `DSH_GAME_BRIDGE_ENGINE_DIR` 指向现成环境，
+  `DSH_GAME_BRIDGE_PYTHON=off` 强制走合成帧，`DSH_GAME_BRIDGE_CACHE_DIR` 换缓存位置。
 
 ## 路线图
 

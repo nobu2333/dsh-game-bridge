@@ -226,30 +226,46 @@ async function main() {
   const allRequestText = JSON.stringify(requests)
   const sawImage = allRequestText.includes('data:image/png')
   const sawToolResult = requests.some((request) => (request?.body?.messages ?? []).some((message) => message?.role === 'tool'))
-  const engineEnabled = Boolean(process.env.DSH_GAME_BRIDGE_PYTHON) && process.env.DSH_GAME_BRIDGE_PYTHON !== 'off'
+  const toolCalled = process.env.FAKE_TOOL ?? 'game_snapshot'
+  const engineExpected =
+    (Boolean(process.env.DSH_GAME_BRIDGE_PYTHON) && process.env.DSH_GAME_BRIDGE_PYTHON !== 'off') ||
+    Boolean(process.env.DSH_GAME_BRIDGE_ENGINE_SPEC)
   const sawScreenFrame = allRequestText.includes('screen via dsh-game-core')
   const sawOcr = /OCR: [^"]+/.test(allRequestText)
+  const sawEngineAnswered = allRequestText.includes('answered')
 
   console.log(`run exit: ${run.code}`)
+  console.log(`tool called: ${toolCalled}`)
   console.log(`tools exposed to the model: ${JSON.stringify(toolNames)}`)
   console.log(`tool result came back: ${sawToolResult}`)
   console.log(`image bytes returned to the model as data:image/png: ${sawImage}`)
-  if (engineEnabled) {
+  if (engineExpected) {
     console.log(`real screen frame used: ${sawScreenFrame}`)
     console.log(`OCR text attached: ${sawOcr}`)
+    console.log(`engine answered ping: ${sawEngineAnswered}`)
   }
 
   assert.equal(run.code, 0, `headless exited ${run.code}\nstderr:\n${run.stderr}\nstdout:\n${run.stdout}`)
   assert.ok(toolNames.includes('game_selftest'), 'game_selftest was not exposed to the model')
   assert.ok(toolNames.includes('game_snapshot'), 'game_snapshot was not exposed to the model')
   assert.ok(sawToolResult, 'the tool result did not come back to the model')
-  assert.ok(sawImage, 'the screenshot did not reach the model as an image')
-  if (engineEnabled) {
-    assert.ok(sawScreenFrame, 'the engine was configured but the frame was not a real screen capture')
-    assert.ok(sawOcr, 'the engine returned no OCR text with the frame')
+  if (toolCalled === 'game_snapshot') {
+    assert.ok(sawImage, 'the screenshot did not reach the model as an image')
+    if (engineExpected) {
+      assert.ok(sawScreenFrame, 'the engine was configured but the frame was not a real screen capture')
+      assert.ok(sawOcr, 'the engine returned no OCR text with the frame')
+    }
+  }
+  if (toolCalled === 'game_selftest' && engineExpected) {
+    assert.ok(sawEngineAnswered, 'the engine was expected but the selftest did not report a ping answer')
   }
   assert.ok(run.stdout.includes('M0-INTEGRATION-OK'), 'final assistant text missing from headless output')
-  console.log(engineEnabled ? 'M1 INTEGRATION PASS (real capture + OCR)' : 'M0 INTEGRATION PASS (synthetic frame)')
+  const mode = engineExpected
+    ? toolCalled === 'game_selftest'
+      ? 'M1 BOOTSTRAP PASS (engine installed and answered)'
+      : 'M1 INTEGRATION PASS (real capture + OCR)'
+    : 'M0 INTEGRATION PASS (synthetic frame)'
+  console.log(mode)
 }
 
 main().catch((error) => {

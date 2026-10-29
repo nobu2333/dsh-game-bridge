@@ -28,3 +28,8 @@ test/integration/.out/
 Thumbs.db
 .idea/
 .vscode/
+
+# Python 构建产物（uv/pip 安装本地包时会产生）
+**/build/
+*.egg-info/
+**/__pycache__/

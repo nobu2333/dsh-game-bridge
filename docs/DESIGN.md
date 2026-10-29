@@ -56,9 +56,16 @@
 - 官方安装 = `dsh plugin --profile <p> add dsh-game-bridge`；实行验证过它会把包
   自动选进 `dsh.profile.bundles`（无需手改 profile）。
 - **零 install 脚本**：市场不收需要手动放行构建脚本的插件；pnpm 也可能拦脚本。
-  因此引擎在**首次激活**时自举：下载 uv（静态二进制，校验 SHA-256）→
-  `uv tool install dsh-game-core==<pin>` → 缓存到用户目录。用户机器不需要 Python。
-- 引擎未就绪时只注册 `game_selftest`，绝不假装能玩。
+  因此引擎在**首次激活**时自举（M1 已实现并验证）：`uv venv <cache>/<version>` →
+  `uv pip install dsh-game-core==<version>` → 用缓存里的 Python 起引擎。
+  用户机器不需要预装 Python；**但需要 uv**（缺失时工具结果给出安装命令，
+  自动下载 uv 留到发布前再做）。
+- 自举是**非阻塞**的：插件装载即开始，状态机 `idle → installing → ready | failed`；
+  工具调用最多等 20 秒（可配），没等到就降级合成帧并写明原因。
+- 引擎未就绪时绝不假装能玩；`game_selftest` 永远报告真实状态。
+- 缓存与覆盖：`%LOCALAPPDATA%\dsh-game-bridge\engine\<version>`；调试可用
+  `DSH_GAME_BRIDGE_PYTHON`（现成 Python）、`DSH_GAME_BRIDGE_ENGINE_SPEC`（自定义安装源）、
+  `DSH_GAME_BRIDGE_CACHE_DIR`、`DSH_GAME_BRIDGE_PYTHON=off`（强制合成帧）。
 
 ## 5. 版本兼容（踩过的坑）
 
