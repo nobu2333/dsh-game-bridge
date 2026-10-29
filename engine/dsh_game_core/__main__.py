@@ -17,6 +17,24 @@ import platform
 import sys
 import time
 
+
+def force_utf8_stdio() -> None:
+    """把协议用的 stdout/stderr 强制成 UTF-8。
+
+    Windows 控制台默认是 GBK（cp936）：窗口标题、OCR 文本里的中文/符号写 stdout
+    会抛 UnicodeEncodeError，而引擎是被插件 spawn 的、没有 PYTHONIOENCODING，
+    结果整个进程崩掉（实测：game_windows 在中文窗口标题上 exit 1）。
+    协议是 UTF-8 JSON，所以这里无条件收紧，且对测试用的 StringIO 安全跳过。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:  # noqa: BLE001 - 某些流不支持重配置时保持原样
+                pass
+
+
 from . import __version__
 
 
@@ -79,6 +97,7 @@ def serve(stdin=None, stdout=None) -> int:
     from .engine import EngineError
     from .session import GameSession
 
+    force_utf8_stdio()
     stdin = stdin or sys.stdin
     stdout = stdout or sys.stdout
     session = GameSession()
@@ -101,6 +120,8 @@ def serve(stdin=None, stdout=None) -> int:
                     ocr=bool(params.get("ocr", True)),
                     max_width=params.get("max_width"),
                 )
+            elif method == "windows":
+                result = session.windows(limit=int(params.get("limit") or 40))
             elif method == "attach":
                 result = session.attach(params)
             elif method == "act":
@@ -129,16 +150,24 @@ def serve(stdin=None, stdout=None) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    force_utf8_stdio()
     parser = argparse.ArgumentParser(prog="dsh-game-core", description="Local capture + OCR engine for dsh-game-bridge")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command")
     selftest_parser = sub.add_parser("selftest", help="报告依赖、显示器、OCR 与抓屏状态（JSON）")
     selftest_parser.add_argument("--capture", action="store_true", help="真的抓一帧（只读，不注入输入）")
+    windows_parser = sub.add_parser("windows", help="列出当前可见窗口（只读）")
+    windows_parser.add_argument("--limit", type=int, default=40)
     sub.add_parser("serve", help="stdio JSON 服务（插件用）")
     args = parser.parse_args(argv)
 
     if args.command == "selftest":
         print(json.dumps(selftest(capture=args.capture), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "windows":
+        from .session import GameSession
+
+        print(json.dumps(GameSession().windows(limit=args.limit), ensure_ascii=False, indent=2))
         return 0
     if args.command == "serve":
         return serve()

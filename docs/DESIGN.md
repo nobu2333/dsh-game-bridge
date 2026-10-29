@@ -38,6 +38,7 @@
 |:--|:--|:--|:--|
 | `game_selftest` | 装没装上、引擎在哪一步 | 一次 | M1 ✅ |
 | `game_snapshot` | 看一眼（图 + OCR） | 模型需要时 | M1 ✅ |
+| `game_windows` | 列出可见窗口（标题/进程/尺寸） | 一次/局 | M2 ✅ |
 | `game_attach` | 绑定窗口（用户授权步骤） | 一次 | M2 ✅ |
 | `game_act` | 单步按键（默认 dry-run） | 一次/动作 | M2 ✅ |
 | `game_stop` | 松手 + 解绑 | 随时，越易越好 | M2 ✅ |
@@ -124,6 +125,10 @@ DSH 的兼容性检查是**严格 semver**，而运行时版本常带预发布�
   `process.once('exit')` 兜底 `kill`，同时保留 dispose 供 HMR/Web 卸载时使用。
 - **每个请求必须有超时**：抓屏可能卡在 DXGI；超时后工具降级并报告原因，不能挂住
   模型轮次。
+- **Windows 控制台默认 GBK**：引擎被插件 spawn 时没有 `PYTHONIOENCODING`，把中文
+  窗口标题写进 stdout 会抛 `UnicodeEncodeError`，整个引擎进程 exit 1（实测在
+  `game_windows` 上炸）。修复：引擎启动时强制 UTF-8 stdio，插件 spawn 时兜底设
+  `PYTHONIOENCODING=utf-8`。
 - 引擎的 stdio 只走协议，诊断一律 stderr；错误码稳定（`ENGINE_TIMEOUT`、
   `ENGINE_EXITED`、`ENGINE_SPAWN_FAILED`）。
 

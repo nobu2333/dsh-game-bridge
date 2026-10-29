@@ -259,6 +259,7 @@ async function main() {
   const sawDryRun = allRequestText.includes('DRY-RUN')
   const sawPlan = allRequestText.includes('Plan plan-')
   const sawStatus = allRequestText.includes('ticks=')
+  const sawWindows = allRequestText.includes('Visible windows')
 
   console.log(`run exit: ${run.code}`)
   console.log(`tool sequence: ${sequence.join(' → ')}`)
@@ -292,10 +293,12 @@ async function main() {
   if (sequence.includes('game_act')) assert.ok(sawDryRun, 'game_act did not report a dry-run action')
   if (sequence.includes('game_plan')) assert.ok(sawPlan, 'game_plan did not report a started plan')
   if (sequence.includes('game_status')) assert.ok(sawStatus, 'game_status did not report plan progress')
+  if (sequence.includes('game_windows')) assert.ok(sawWindows, 'game_windows did not list visible windows')
   assert.ok(run.stdout.includes('M0-INTEGRATION-OK'), 'final assistant text missing from headless output')
   let mode
   if (sequence.includes('game_plan')) mode = 'M3 PASS (attach → plan → status → stop, dry-run loop)'
   else if (sequence.includes('game_act')) mode = 'M2 PASS (attach → dry-run act, no real input)'
+  else if (sequence.includes('game_windows')) mode = 'WINDOWS PASS (visible window list)'
   else if (engineExpected) {
     mode = toolCalled === 'game_selftest' ? 'M1 BOOTSTRAP PASS (engine installed and answered)' : 'M1 INTEGRATION PASS (real capture + OCR)'
   } else mode = 'M0 INTEGRATION PASS (synthetic frame)'

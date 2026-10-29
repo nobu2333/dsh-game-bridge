@@ -21,6 +21,14 @@ def handle(method, params, state):
         return {"ok": True, "version": "0.0.1"}
     if method == "selftest":
         return {"engine": "fixture", "deps": {}, "monitors": [], "ocr_ready": False}
+    if method == "windows":
+        return {
+            "count": 2,
+            "windows": [
+                {"title": "Fixture Game", "process": "fixture.exe", "width": 1280, "height": 720},
+                {"title": "Editor", "process": "editor.exe", "width": 1024, "height": 768},
+            ],
+        }
     if method == "attach":
         state["attached"] = {"window": params.get("window") or "fixture-game"}
         return {"attached": state["attached"], "backend": "dry-run", "safety": SAFETY}

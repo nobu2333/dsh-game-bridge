@@ -20,7 +20,7 @@
 {"id": 1, "ok": false, "error": {"code": "ENCODE_FAILED", "message": "..."}}
 ```
 
-方法：`ping` · `selftest` · `snapshot` · `attach` · `act` · `plan` · `status` · `stop`。
+方法：`ping` · `selftest` · `snapshot` · `windows` · `attach` · `act` · `plan` · `status` · `stop`。
 
 `attach` 接受窗口标题子串（大小写不敏感）：优先后台只截该窗口；找不到时返回
 `WINDOW_NOT_FOUND` 并列出当前可见窗口，便于换关键词。传 `unspecified` 退回整屏。
@@ -30,6 +30,7 @@
 ```bash
 python -m dsh_game_core selftest            # 依赖 / 显示器 / OCR 预热
 python -m dsh_game_core selftest --capture  # 再加一次真实抓屏（只读，不注入输入）
+python -m dsh_game_core windows --limit 20  # 列出可见窗口（只读）
 python -m dsh_game_core serve               # 插件用的 stdio 服务
 ```
 

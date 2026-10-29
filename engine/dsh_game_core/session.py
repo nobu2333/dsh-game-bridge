@@ -260,6 +260,21 @@ class GameSession:
         }
 
     # ── 眼 ────────────────────────────────────────────────────────────
+    def windows(self, limit: int = 40) -> dict:
+        """列出当前可见窗口，供模型自己挑 attach 目标。"""
+        from .windows import list_windows
+
+        items = [
+            {
+                "title": window["title"],
+                "process": window.get("process"),
+                "width": window["width"],
+                "height": window["height"],
+            }
+            for window in list_windows()[: max(1, limit)]
+        ]
+        return {"windows": items, "count": len(items)}
+
     def snapshot(self, *, ocr: bool = True, max_width: int | None = None) -> dict:
         region = None
         attached = self.attached or {}
