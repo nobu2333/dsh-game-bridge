@@ -68,7 +68,7 @@ npm run test:session
 **harness 实际发出的请求体**里断言：工具确实出现在 `tools` 数组里、工具结果确实
 回来了、图片确实以 `data:image/png` 送到了模型。产物落在 `test/integration/.out/`。
 
-**全量回归**（一次跑完 M0/M1/M2/M3/events/windows/bootstrap 七条）：
+**全量回归**（一次跑完 M0/M1/M2/M3/events/windows/审批/bootstrap 八条）：
 
 ```powershell
 $env:DSH_HOME='<repo>/.dsh-test'
@@ -76,7 +76,7 @@ $env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'   # 不设则跳过需要真实
 npm run test:all
 ```
 
-最近一次实测：7/7 PASS，约 68 秒（含真实抓屏、OCR、闭环、窗口列表、自举安装）。
+最近一次实测：8/8 PASS，约 90 秒（含真实抓屏、OCR、闭环、窗口列表、审批 fail-closed、自举安装）。
 
 验证自举安装（不需要系统 Python：uv 建 venv，装仓库内的假引擎包，秒级）：
 
@@ -137,6 +137,14 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 | **M2（进行中）** | 安全闸 + 输出通道 + 单步 act | 三条安全闸单测钉死；attach → dry-run act 端到端通过 |
 | **M3（进行中）** | 20 Hz 本地闭环（dry-run 已验证）；发布未做 | 闭环 ~20 Hz、逐拍安全复检、stop 立即松手 |
 | 发布 | npm + PyPI + 插件市场 | 真实手柄注入实测、市场收录 |
+
+## 已知限制（v1）
+
+- **仅 Windows**：抓屏/虚拟手柄/输入注入都是 Win32；非 Windows 在自举阶段直接拒绝。
+- **多显示器未完整支持**：抓屏走 DXcam 的 output 0（主显示器）。窗口在副屏时
+  当前会裁剪出错误区域；需要先切回主屏，或等 M4 做「窗口 → 显示器」映射。
+- **真实手柄注入未实机验证**：默认 dry-run；vgamepad 后端要等用户授权的实测。
+- **游戏内语义未校准**：帧差分阈值、OCR 区域都还是通用值，没有按具体游戏调过。
 
 ## 安全承诺（发布版必须成立）
 

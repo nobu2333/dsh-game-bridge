@@ -262,6 +262,8 @@ async function main() {
   const sawStatus = allRequestText.includes('ticks=')
   const sawWindows = allRequestText.includes('Visible windows')
   const sawEvent = allRequestText.includes('Frame event')
+  const expectApprovalDenied = process.env.DSH_GAME_BRIDGE_EXPECT_APPROVAL_DENIED === '1'
+  const sawApprovalDenied = allRequestText.includes('requires approval')
 
   console.log(`run exit: ${run.code}`)
   console.log(`tool sequence: ${sequence.join(' → ')}`)
@@ -291,7 +293,13 @@ async function main() {
   if (toolCalled === 'game_selftest' && engineExpected) {
     assert.ok(sawEngineAnswered, 'the engine was expected but the selftest did not report a ping answer')
   }
-  if (sequence.includes('game_attach')) assert.ok(sawAttach, 'game_attach did not produce an attach result')
+  if (sequence.includes('game_attach')) {
+    if (expectApprovalDenied) {
+      assert.ok(sawApprovalDenied, 'approval was expected to fail closed but no approval error was reported')
+    } else {
+      assert.ok(sawAttach, 'game_attach did not produce an attach result')
+    }
+  }
   if (sequence.includes('game_act')) assert.ok(sawDryRun, 'game_act did not report a dry-run action')
   if (sequence.includes('game_plan')) assert.ok(sawPlan, 'game_plan did not report a started plan')
   if (sequence.includes('game_status')) assert.ok(sawStatus, 'game_status did not report plan progress')
@@ -299,7 +307,8 @@ async function main() {
   if (sequence.includes('game_events')) assert.ok(sawEvent, 'game_events did not report a frame-difference event')
   assert.ok(run.stdout.includes('M0-INTEGRATION-OK'), 'final assistant text missing from headless output')
   let mode
-  if (sequence.includes('game_plan')) mode = 'M3 PASS (attach → plan → status → stop, dry-run loop)'
+  if (expectApprovalDenied) mode = 'APPROVAL PASS (real backend without responder fails closed)'
+  else if (sequence.includes('game_plan')) mode = 'M3 PASS (attach → plan → status → stop, dry-run loop)'
   else if (sequence.includes('game_act')) mode = 'M2 PASS (attach → dry-run act, no real input)'
   else if (sequence.includes('game_events')) mode = 'EVENTS PASS (frame differencing)'
   else if (sequence.includes('game_windows')) mode = 'WINDOWS PASS (visible window list)'

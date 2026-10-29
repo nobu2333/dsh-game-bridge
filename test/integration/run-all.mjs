@@ -75,6 +75,16 @@ const cases = [
     requiresPython: true,
   },
   {
+    name: 'approval fail-closed (real backend, no responder)',
+    env: {
+      DSH_GAME_BRIDGE_PYTHON: 'off',
+      DSH_GAME_BRIDGE_CONTROL: 'vgamepad',
+      DSH_GAME_BRIDGE_EXPECT_APPROVAL_DENIED: '1',
+      FAKE_SEQUENCE: 'game_attach',
+    },
+    expect: 'APPROVAL PASS',
+  },
+  {
     name: 'bootstrap (fixture engine install)',
     env: {
       DSH_GAME_BRIDGE_ENGINE_SPEC: resolve(repo, 'test/fixtures/fake-engine'),
