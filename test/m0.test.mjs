@@ -54,13 +54,14 @@ test('apply() registers exactly the M0 tools', () => {
   )
 })
 
-test('game_selftest renders plain text and reports an uninstalled engine', async () => {
+test('game_selftest renders plain text and reports an unconfigured engine', async () => {
   const ctx = fakeCtx()
   apply(ctx)
   const definition = tool(ctx, 'game_selftest')
   const value = await definition.execute({}, {})
   assert.equal(value.plugin, 'dsh-game-bridge')
-  assert.equal(value.engine.includes('not installed'), true)
+  assert.equal(value.engine_ready, false)
+  assert.equal(value.engine.includes('not configured'), true)
   JSON.stringify(value) // 输出值必须是无损 JSON
   const blocks = definition.output.render({}, value)
   assert.equal(blocks.length, 1)

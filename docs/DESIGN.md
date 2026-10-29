@@ -77,6 +77,20 @@ DSH 的兼容性检查是**严格 semver**，而运行时版本常带预发布�
 4. **默认只读**：发布版只做抓屏 + 手柄，不读内存、不注入；
 5. **审计**：每次 attach/plan/stop 写本地 JSONL，供用户与排障。
 
+## 6.5 引擎生命周期（M1 实测踩到的坑）
+
+- **子进程与它的管道必须 `unref`**：插件跑在 DSH 宿主进程内，普通 `spawn` 会让
+  宿主的事件循环被引擎握住。实测 `dsh headless` 任务已经完成、JSON 事件也输出了
+  `turn_end completed`，但进程**永不退出**，最后被外部超时杀掉，表现为 exit code 1。
+  修复：`child.unref()` + `stdin/stdout/stderr.unref()`。
+- **不能只靠 `ctx.on('dispose')` 清理**：headless 成功路径是设置 `process.exitCode`
+  等事件循环自然排空，并不会逐插件 dispose（实测 dispose 从未被调用）。因此必须有
+  `process.once('exit')` 兜底 `kill`，同时保留 dispose 供 HMR/Web 卸载时使用。
+- **每个请求必须有超时**：抓屏可能卡在 DXGI；超时后工具降级并报告原因，不能挂住
+  模型轮次。
+- 引擎的 stdio 只走协议，诊断一律 stderr；错误码稳定（`ENGINE_TIMEOUT`、
+  `ENGINE_EXITED`、`ENGINE_SPAWN_FAILED`）。
+
 ## 7. 平台
 
 v1 仅 Windows 10/11 x64（DXcam、ViGEmBus、Win32 输入）。抽象层留好接口，

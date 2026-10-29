@@ -2,8 +2,8 @@
 
 **给 DeepSeek Harness 装上眼睛和手：让 DSH 看得懂游戏、也能替你玩。**
 
-> 状态：**M0 已通过（未发布）**。本版本只有两个只读工具，截图是合成帧，
-> **还不会抓屏、也还不会按键**。装上去只能验证插件链路是否通，不能玩游戏。
+> 状态：**M1 进行中（未发布）**。插件壳已通过 M0；Python 引擎能在本机真实抓屏 + OCR，
+> 但**还需要手动指定 Python**（自举安装未做），也**还不会按键**。
 
 ## 这是什么
 
@@ -64,12 +64,27 @@ npm run test:session
 **harness 实际发出的请求体**里断言：工具确实出现在 `tools` 数组里、工具结果确实
 回来了、图片确实以 `data:image/png` 送到了模型。产物落在 `test/integration/.out/`。
 
+接真实引擎（开发期形态，自举安装未做前需要手动指一个装好依赖的 Python）：
+
+```powershell
+$env:DSH_GAME_BRIDGE_PYTHON='<python-with-numpy-dxcam-rapidocr>'   # 例如本项目源码旁已有的 venv
+$env:DSH_GAME_BRIDGE_ENGINE_DIR='<repo>/engine'                    # `-m dsh_game_core` 的 cwd
+npm run test:session      # 额外断言：帧来自真实屏幕、OCR 文本随帧进入模型
+```
+
+引擎自检（不联网、不注入输入）：
+
+```powershell
+cd engine
+python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 / 抓一帧的真实耗时
+```
+
 ## 路线图
 
 | 里程碑 | 内容 | 验收 |
 |:--|:--|:--|
-| **M0**（当前） | 插件壳 + 合成帧工具 | 工具出现在列表；图片进上下文；卸载无残留 |
-| M1 | 引擎自举 + 真实抓屏/OCR（Python） | 能对任一窗口游戏返回真实截图与 OCR |
+| M0 ✅ | 插件壳 + 合成帧工具 | 工具出现在列表；图片进上下文；进程干净退出 |
+| **M1（进行中）** | 真实抓屏/OCR 接进插件；引擎自举未做 | 隔离 harness 里拿到真实屏幕帧 + OCR 文本 |
 | M2 | 虚拟手柄 + 20 Hz 闭环 + 目标级控制 | 在三种已验证玩法模板上跑通 |
 | M3 | 安全边界、审计日志、发布 | 上架插件市场；夺回/反作弊实测记录 |
 

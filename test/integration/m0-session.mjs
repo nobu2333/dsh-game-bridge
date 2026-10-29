@@ -17,8 +17,8 @@
  *   dsh plugin --profile headless add file:<repo>
  */
 import { createServer } from 'node:http'
-import { spawn } from 'node:child_process'
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import assert from 'node:assert/strict'
@@ -53,6 +53,8 @@ function startFakeProvider() {
         /* 记录原文便于排障 */
       }
       requests.push({ url: req.url, body })
+      mkdirSync(outDir, { recursive: true })
+      appendFileSync(resolve(outDir, 'provider-requests.jsonl'), `${JSON.stringify({ url: req.url, body })}\n`)
       const messages = Array.isArray(body.messages) ? body.messages : []
       const sawToolResult = messages.some((message) => message?.role === 'tool')
 
@@ -68,7 +70,8 @@ function startFakeProvider() {
         model: 'fake-1',
       }
       if (!sawToolResult) {
-        // 第一次：要求模型调用 game_snapshot。
+        // 第一次：要求模型调用指定工具（默认 game_snapshot）。
+        const fakeTool = process.env.FAKE_TOOL ?? 'game_snapshot'
         sse(res, {
           ...base,
           choices: [
@@ -77,7 +80,7 @@ function startFakeProvider() {
               delta: {
                 role: 'assistant',
                 tool_calls: [
-                  { index: 0, id: 'call_fake_1', type: 'function', function: { name: 'game_snapshot', arguments: '' } },
+                  { index: 0, id: 'call_fake_1', type: 'function', function: { name: fakeTool, arguments: (process.env.FAKE_ARGS ?? '{}') } },
                 ],
               },
               finish_reason: null,
@@ -87,7 +90,7 @@ function startFakeProvider() {
         sse(res, {
           ...base,
           choices: [
-            { index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: '{}' } }] }, finish_reason: null },
+            { index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: '' } }] }, finish_reason: null },
           ],
         })
         sse(res, {
@@ -144,23 +147,58 @@ function writePatch(port) {
 
 function runHeadless() {
   return new Promise((resolvePromise) => {
-    const child = spawn(process.env.ComSpec ?? 'cmd.exe', ['/c', dshCmd, '--profile', 'headless', '--json', 'Call game_snapshot once, then report what you saw.'], {
-      cwd: repo,
-      env: { ...process.env, DSH_HOME: dshHome },
-      windowsHide: true,
-    })
+    mkdirSync(outDir, { recursive: true })
+    const stdoutPath = resolve(outDir, 'headless.stdout.txt')
+    const stderrPath = resolve(outDir, 'headless.stderr.txt')
+    writeFileSync(stdoutPath, '')
+    writeFileSync(stderrPath, '')
+    const nodeArgs = []
+    if (process.env.DSH_GAME_BRIDGE_TRACE) nodeArgs.push('--trace-exit', '--trace-uncaught')
+    const child = spawn(
+      process.execPath,
+      [
+        ...nodeArgs,
+        process.env.DSH_BIN ?? 'C:/Users/<user>/AppData/Roaming/npm/node_modules/@deepseek-ai/dsh/lib/bin.js',
+        '--profile',
+        'headless',
+        '--json',
+        'Call game_snapshot once, then report what you saw.',
+      ],
+      {
+        cwd: repo,
+        env: { ...process.env, DSH_HOME: dshHome },
+        windowsHide: true,
+      },
+    )
     let stdout = ''
     let stderr = ''
-    child.stdout.on('data', (chunk) => (stdout += chunk))
-    child.stderr.on('data', (chunk) => (stderr += chunk))
-    const timer = setTimeout(() => {
-      child.kill()
-      resolvePromise({ code: 'timeout', stdout, stderr })
-    }, 180_000)
-    child.on('close', (code) => {
+    let settled = false
+    const finish = (code) => {
+      if (settled) return
+      settled = true
       clearTimeout(timer)
       resolvePromise({ code, stdout, stderr })
+    }
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk
+      appendFileSync(stdoutPath, chunk)
     })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk
+      appendFileSync(stderrPath, chunk)
+    })
+    const timeoutMs = Number(process.env.DSH_GAME_BRIDGE_TEST_TIMEOUT_MS || 120_000)
+    const timer = setTimeout(() => {
+      // cmd.exe 的孙进程（dsh 的 node、插件的 python）不会随 child.kill() 消失，
+      // 必须整棵杀掉，否则测试永远等不到 close。
+      try {
+        spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true })
+      } catch {
+        /* 进程可能已退出 */
+      }
+      setTimeout(() => finish('timeout'), 3000)
+    }, timeoutMs)
+    child.on('close', (code) => finish(code))
   })
 }
 
@@ -188,22 +226,34 @@ async function main() {
   const allRequestText = JSON.stringify(requests)
   const sawImage = allRequestText.includes('data:image/png')
   const sawToolResult = requests.some((request) => (request?.body?.messages ?? []).some((message) => message?.role === 'tool'))
+  const engineEnabled = Boolean(process.env.DSH_GAME_BRIDGE_PYTHON) && process.env.DSH_GAME_BRIDGE_PYTHON !== 'off'
+  const sawScreenFrame = allRequestText.includes('screen via dsh-game-core')
+  const sawOcr = /OCR: [^"]+/.test(allRequestText)
 
   console.log(`run exit: ${run.code}`)
   console.log(`tools exposed to the model: ${JSON.stringify(toolNames)}`)
   console.log(`tool result came back: ${sawToolResult}`)
   console.log(`image bytes returned to the model as data:image/png: ${sawImage}`)
+  if (engineEnabled) {
+    console.log(`real screen frame used: ${sawScreenFrame}`)
+    console.log(`OCR text attached: ${sawOcr}`)
+  }
 
   assert.equal(run.code, 0, `headless exited ${run.code}\nstderr:\n${run.stderr}\nstdout:\n${run.stdout}`)
   assert.ok(toolNames.includes('game_selftest'), 'game_selftest was not exposed to the model')
   assert.ok(toolNames.includes('game_snapshot'), 'game_snapshot was not exposed to the model')
   assert.ok(sawToolResult, 'the tool result did not come back to the model')
   assert.ok(sawImage, 'the screenshot did not reach the model as an image')
+  if (engineEnabled) {
+    assert.ok(sawScreenFrame, 'the engine was configured but the frame was not a real screen capture')
+    assert.ok(sawOcr, 'the engine returned no OCR text with the frame')
+  }
   assert.ok(run.stdout.includes('M0-INTEGRATION-OK'), 'final assistant text missing from headless output')
-  console.log('M0 INTEGRATION PASS')
+  console.log(engineEnabled ? 'M1 INTEGRATION PASS (real capture + OCR)' : 'M0 INTEGRATION PASS (synthetic frame)')
 }
 
 main().catch((error) => {
   console.error('M0 INTEGRATION FAIL:', error.message)
   process.exitCode = 1
 })
+
