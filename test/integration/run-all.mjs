@@ -85,6 +85,15 @@ const cases = [
     expect: 'APPROVAL PASS',
   },
   {
+    name: 'controls (backend button list)',
+    env: {
+      DSH_GAME_BRIDGE_ENGINE_SPEC: resolve(repo, 'test/fixtures/fake-engine'),
+      DSH_GAME_BRIDGE_CACHE_DIR: resolve(repo, `tmp/regression-controls-${Date.now()}`),
+      FAKE_SEQUENCE: 'game_controls',
+    },
+    expect: 'CONTROLS PASS',
+  },
+  {
     name: 'engine recovery after crash',
     env: {
       DSH_GAME_BRIDGE_ENGINE_SPEC: resolve(repo, 'test/fixtures/fake-engine'),

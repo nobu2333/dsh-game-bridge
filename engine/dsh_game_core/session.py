@@ -333,6 +333,25 @@ class GameSession:
         }
 
     # ── 眼 ────────────────────────────────────────────────────────────
+    def controls(self) -> dict:
+        """当前后端支持哪些按钮/按键——省得模型瞎猜键名。"""
+        from .control import VK_CODES
+
+        backend = (self.backend or "dry-run").lower()
+        if backend in ("vgamepad", "gamepad"):
+            buttons = sorted(VGamepadController.BUTTONS)
+            note = "Xbox 360 gamepad buttons"
+        elif backend in ("keyboard", "sendinput"):
+            buttons = sorted(VK_CODES)
+            note = "keyboard keys (SendInput)"
+        elif backend == "dry-run":
+            buttons = sorted(set(VGamepadController.BUTTONS) | set(VK_CODES))
+            note = "dry-run records any name; a real backend validates against its own list"
+        else:
+            buttons = []
+            note = f"unknown backend {backend!r}"
+        return {"backend": backend, "buttons": buttons, "note": note}
+
     def windows(self, limit: int = 40) -> dict:
         """列出当前可见窗口，供模型自己挑 attach 目标。"""
         from .windows import list_windows

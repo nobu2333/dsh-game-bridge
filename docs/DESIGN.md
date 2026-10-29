@@ -39,6 +39,7 @@
 | `game_selftest` | 装没装上、引擎在哪一步 | 一次 | M1 ✅ |
 | `game_snapshot` | 看一眼（图 + OCR） | 模型需要时 | M1 ✅ |
 | `game_windows` | 列出可见窗口（标题/进程/尺寸） | 一次/局 | M2 ✅ |
+| `game_controls` | 当前后端支持的按钮/按键 | 一次/局 | M2 ✅ |
 | `game_events` | 帧差分事件（baseline/static/changed/scene_cut） | 稀疏轮询 | M2 ✅ |
 | `game_attach` | 绑定窗口（用户授权步骤） | 一次 | M2 ✅ |
 | `game_act` | 单步按键（默认 dry-run） | 一次/动作 | M2 ✅ |
@@ -153,4 +154,5 @@ DSH 的兼容性检查是**严格 semver**，而运行时版本常带预发布�
 
 v1 仅 Windows 10/11 x64（DXcam、ViGEmBus、Win32 输入）。抽象层留好接口，
 但不承诺跨平台；ViGEmBus 已 EOL，长期要给替代路径或退到模拟器键盘通道。
+
 

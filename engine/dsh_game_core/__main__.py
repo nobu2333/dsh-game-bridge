@@ -124,6 +124,8 @@ def serve(stdin=None, stdout=None) -> int:
                 result = session.windows(limit=int(params.get("limit") or 40))
             elif method == "events":
                 result = session.events()
+            elif method == "controls":
+                result = session.controls()
             elif method == "attach":
                 result = session.attach(params)
             elif method == "act":

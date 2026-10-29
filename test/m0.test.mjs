@@ -59,7 +59,7 @@ test('apply() registers the current tool surface', () => {
   apply(ctx)
   assert.deepEqual(
     ctx.registered.map((definition) => definition.name).sort(),
-    ['game_act', 'game_attach', 'game_events', 'game_plan', 'game_selftest', 'game_snapshot', 'game_status', 'game_stop', 'game_windows'],
+    ['game_act', 'game_attach', 'game_controls', 'game_events', 'game_plan', 'game_selftest', 'game_snapshot', 'game_status', 'game_stop', 'game_windows'],
   )
 })
 

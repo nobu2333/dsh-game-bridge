@@ -262,6 +262,7 @@ async function main() {
   const sawStatus = allRequestText.includes('backend: dry-run;')
   const sawWindows = allRequestText.includes('Visible windows')
   const sawEvent = allRequestText.includes('Frame event')
+  const sawControls = allRequestText.includes('Controls (backend')
   const expectApprovalDenied = process.env.DSH_GAME_BRIDGE_EXPECT_APPROVAL_DENIED === '1'
   const sawApprovalDenied = allRequestText.includes('requires approval')
   const expectRecovery = process.env.DSH_GAME_BRIDGE_EXPECT_RECOVERY === '1'
@@ -306,12 +307,14 @@ async function main() {
   if (sequence.includes('game_status')) assert.ok(sawStatus, 'game_status did not report status')
   if (sequence.includes('game_windows')) assert.ok(sawWindows, 'game_windows did not list visible windows')
   if (sequence.includes('game_events')) assert.ok(sawEvent, 'game_events did not report a frame-difference event')
+  if (sequence.includes('game_controls')) assert.ok(sawControls, 'game_controls did not list backend buttons')
   assert.ok(run.stdout.includes('M0-INTEGRATION-OK'), 'final assistant text missing from headless output')
   let mode
   if (expectRecovery) mode = 'RECOVERY PASS (engine restarted after exit)'
   else if (expectApprovalDenied) mode = 'APPROVAL PASS (real backend without responder fails closed)'
   else if (sequence.includes('game_plan')) mode = 'M3 PASS (attach → plan → status → stop, dry-run loop)'
   else if (sequence.includes('game_act')) mode = 'M2 PASS (attach → dry-run act, no real input)'
+  else if (sequence.includes('game_controls')) mode = 'CONTROLS PASS (backend button list)'
   else if (sequence.includes('game_events')) mode = 'EVENTS PASS (frame differencing)'
   else if (sequence.includes('game_windows')) mode = 'WINDOWS PASS (visible window list)'
   else if (engineExpected) {

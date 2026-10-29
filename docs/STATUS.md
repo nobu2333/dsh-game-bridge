@@ -20,8 +20,8 @@ Python 引擎里；默认 dry-run（只记录不注入）。
 | 发布 | ⛔ 等用户 | 需要 `npm login` + PyPI token；脚本已就绪 |
 | 市场收录 | ⛔ 等发布 | 需要先有公开仓库与 npm 包 |
 
-工具面（9 个）：`game_selftest` · `game_snapshot` · `game_windows` · `game_events` ·
-`game_attach` · `game_act` · `game_plan` · `game_status` · `game_stop`。
+工具面（10 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
+`game_events` · `game_attach` · `game_act` · `game_plan` · `game_status` · `game_stop`。
 
 ## 一次跑完的验证
 

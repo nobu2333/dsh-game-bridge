@@ -67,3 +67,21 @@ def test_session_accepts_keyboard_backend_alias():
     controller = session._controller_instance()
     assert controller.backend == "keyboard"
     # 只构造、不调用 press/hold：不会有任何真实按键。
+
+
+def test_controls_lists_buttons_for_each_backend():
+    expected = {
+        "dry-run": "A",
+        "keyboard": "W",
+        "vgamepad": "DPAD_UP",
+    }
+    for backend, button in expected.items():
+        session = GameSession(
+            engine=FakeEngine(),
+            gate=SafetyGate(unattended_after_s=180, process_source=lambda: [], idle_source=lambda: 1.0, takeover_source=lambda: False, process_ttl_s=0),
+            control_backend=backend,
+        )
+        data = session.controls()
+        assert data["backend"] == backend
+        assert button in data["buttons"], f"{backend} controls missing {button}"
+        assert data["note"]

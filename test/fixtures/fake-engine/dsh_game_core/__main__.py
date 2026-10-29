@@ -30,6 +30,8 @@ def handle(method, params, state):
                 {"title": "Editor", "process": "editor.exe", "width": 1024, "height": 768},
             ],
         }
+    if method == "controls":
+        return {"backend": "dry-run", "buttons": ["A", "B", "W", "SPACE"], "note": "fixture control list"}
     if method == "events":
         return {"event": "changed", "mean_diff": 3.25, "changed_ratio": 0.0412, "elapsed_ms": 220, "width": 160, "height": 90}
     if method == "attach":
