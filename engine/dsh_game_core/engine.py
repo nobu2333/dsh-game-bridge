@@ -25,35 +25,66 @@ class EngineError(Exception):
 
 
 class GameEngine:
-    """一台显示器 = 一个引擎实例。capturer/ocr 可注入，便于单测。"""
+    """引擎实例。capturer/ocr 可注入；多显示器时按 output 缓存抓屏器。"""
 
-    def __init__(self, capturer: Any = None, ocr: Any = None, max_width: int = 1280):
+    def __init__(self, capturer: Any = None, ocr: Any = None, max_width: int = 1280, capturer_factory: Any = None):
         self._capturer = capturer
+        self._capturers: dict[int, Any] = {}
+        self._capturer_factory = capturer_factory
         self._ocr = ocr
         self._max_width = max_width
         self._last_gray = None
         self._last_grab_at = None
 
-    def _ensure(self) -> None:
-        if self._capturer is None:
-            from .capture import ScreenCapturer
-
-            self._capturer = ScreenCapturer()
+    def _ensure_ocr(self) -> None:
         if self._ocr is None:
             from .ocr import Ocr
 
             self._ocr = Ocr()
 
-    def snapshot(self, *, ocr: bool = True, max_width: int | None = None, region: dict | None = None) -> dict:
+    def _capturer_for(self, output_idx: int):
+        # 注入的 capturer（单测）永远优先，且不区分 output。
+        if self._capturer is not None:
+            return self._capturer
+        if output_idx not in self._capturers:
+            if self._capturer_factory is not None:
+                self._capturers[output_idx] = self._capturer_factory(output_idx)
+            else:
+                from .capture import ScreenCapturer
+
+                self._capturers[output_idx] = ScreenCapturer(output_idx=output_idx)
+        return self._capturers[output_idx]
+
+    def _resolve_output(self, monitor: dict | None) -> int:
+        if not monitor:
+            return 0
+        from .capture import list_monitors, match_output_index
+
+        index = match_output_index(monitor, list_monitors())
+        if index is None:
+            raise EngineError(
+                "MONITOR_UNSUPPORTED",
+                f"没有与窗口所在显示器匹配的抓屏输出（{monitor.get('width')}x{monitor.get('height')}）",
+            )
+        return index
+
+    def snapshot(
+        self,
+        *,
+        ocr: bool = True,
+        max_width: int | None = None,
+        region: dict | None = None,
+        monitor: dict | None = None,
+    ) -> dict:
         import cv2
 
-        self._ensure()
-        frame = self._capturer.grab()
+        output_idx = self._resolve_output(monitor)
+        frame = self._capturer_for(output_idx).grab()
         if not isinstance(frame, np.ndarray) or frame.ndim != 3:
             raise EngineError("BAD_FRAME", f"抓到的不是三通道图像：{type(frame)}")
 
         crop = None
-        if region:
+        if region:  # 有 monitor 时 region 已换算成该显示器的相对坐标
             try:
                 left = max(0, int(region["left"]))
                 top = max(0, int(region["top"]))
@@ -83,6 +114,7 @@ class GameEngine:
 
         lines = []
         if ocr:
+            self._ensure_ocr()
             try:
                 lines = [line.to_dict() for line in self._ocr.read(frame)]
             except Exception as error:  # noqa: BLE001 - OCR 挂了不该让截图一起失败
@@ -107,7 +139,7 @@ class GameEngine:
             result["ocr_error"] = lines_error
         return result
 
-    def grab_diff(self) -> dict:
+    def grab_diff(self, monitor: dict | None = None) -> dict:
         """抓一帧并和上一帧做差分，返回廉价事件（不跑 OCR）。
 
         这是观测层最便宜的信号：不调模型、不做识别，只回答「画面刚才变了没有、
@@ -116,8 +148,8 @@ class GameEngine:
         """
         import cv2
 
-        self._ensure()
-        frame = self._capturer.grab()
+        output_idx = self._resolve_output(monitor)
+        frame = self._capturer_for(output_idx).grab()
         if not isinstance(frame, np.ndarray) or frame.ndim != 3:
             raise EngineError("BAD_FRAME", f"抓到的不是三通道图像：{type(frame)}")
 
@@ -170,12 +202,14 @@ class GameEngine:
         self._last_grab_at = None
 
     def close(self) -> None:
-        capturer, self._capturer = self._capturer, None
-        if capturer is not None and hasattr(capturer, "close"):
-            try:
-                capturer.close()
-            except Exception:  # noqa: BLE001 - 释放失败不掩盖主流程
-                pass
+        capturers, self._capturers = self._capturers, {}
+        injected, self._capturer = self._capturer, None
+        for capturer in [injected, *capturers.values()]:
+            if capturer is not None and hasattr(capturer, "close"):
+                try:
+                    capturer.close()
+                except Exception:  # noqa: BLE001 - 释放失败不掩盖主流程
+                    pass
         # DXcam 内部是 COM 对象；显式回收能避免解释器退出时 comtypes 在
         # 已反初始化的 COM 上再 Release 一次（实测会打印 access violation）。
         try:

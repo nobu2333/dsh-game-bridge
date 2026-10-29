@@ -78,7 +78,13 @@ DwmGetWindowAttribute）解析出窗口矩形；之后每次 `snapshot` 重新�
 比「随便截个整屏让模型猜」有用得多。
 
 实测（本机）：attach 到 1280×800 的窗口后，帧尺寸与裁剪区完全一致
-（`region {left:239, top:203, width:1280, height:800}`，OCR 读出 54 行界面文字）。
+（`region {left:239, top:203, width:1280, height:800}`，OCR 读出 32–54 行界面文字）。
+
+**多显示器**：`EnumDisplayMonitors` + `GetMonitorInfoW` 拿到每块显示器的虚拟桌面
+坐标，`MonitorFromWindow` 找窗口所在屏；`capture.match_output_index` 用分辨率与主屏
+标记把它映射到 DXcam 的 output 序号，裁剪区换算成「相对该显示器原点」。引擎按
+output 缓存抓屏器。已知边界：两块同分辨率且都不是主屏时，dxcam 不暴露输出坐标，
+只能按序号确定性选择（可能选错）。
 
 ## 4. 安装与自举
 

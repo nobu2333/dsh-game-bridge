@@ -80,3 +80,28 @@ def list_monitors() -> list[MonitorInfo]:
             MonitorInfo(index=int(index), width=int(width), height=int(height), primary="Primary:True" in rest)
         )
     return info
+
+
+def match_output_index(display: dict, outputs: list[MonitorInfo]) -> int | None:
+    """把一块 Win32 显示器映射到 DXcam 的输出序号。
+
+    可用信息只有分辨率与主屏标记（dxcam 不暴露输出坐标），所以：
+    1. 先按分辨率筛；
+    2. 唯一命中即用；
+    3. 同分辨率多块时优先主屏标记一致的那块；
+    4. 仍不唯一（两块同分辨率非主屏）时按序号取——**确定性但可能错**，
+       这是已知限制，见 README「多显示器」。
+    """
+    width = int(display.get("width") or 0)
+    height = int(display.get("height") or 0)
+    candidates = [output for output in outputs if output.width == width and output.height == height]
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0].index
+    wanted_primary = bool(display.get("primary"))
+    primary_matches = [output for output in candidates if output.primary == wanted_primary]
+    pool = primary_matches or candidates
+    if len(pool) == 1:
+        return pool[0].index
+    return sorted(pool, key=lambda output: (not output.primary, output.index))[0].index

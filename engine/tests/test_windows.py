@@ -41,13 +41,14 @@ def test_find_window_prefers_exact_then_prefix_then_largest():
     assert find_window(WINDOWS, "") is None
 
 
-def make_session(engine):
+def make_session(engine, *, window_rect=(308, 138, 1408, 1041), monitor=None):
     return GameSession(
         engine=engine,
         gate=allowed_gate(),
         control_backend="dry-run",
         window_resolver=lambda match: find_window(WINDOWS, match),
-        window_rect_source=lambda hwnd: (308, 138, 1408, 1041),
+        window_rect_source=lambda hwnd: window_rect,
+        window_monitor_source=lambda hwnd: monitor or {"left": 0, "top": 0, "width": 1920, "height": 1200, "primary": True},
     )
 
 
@@ -73,6 +74,19 @@ def test_attach_without_match_fails_with_window_list():
         assert "可见窗口" in error.message
     else:  # pragma: no cover
         raise AssertionError("expected WINDOW_NOT_FOUND")
+
+
+def test_snapshot_uses_monitor_relative_region_on_secondary_display():
+    """窗口在副屏时，裁剪区必须减掉显示器原点，并带上 monitor 让引擎选对应输出。"""
+    engine = RecordingEngine()
+    monitor = {"left": 1920, "top": 0, "width": 1920, "height": 1200, "primary": False}
+    session = make_session(engine, window_rect=(2000, 100, 3000, 900), monitor=monitor)
+    session.attach({"window": "Knock"})
+    session.snapshot(ocr=False)
+
+    call = engine.calls[-1]
+    assert call["monitor"] == monitor
+    assert call["region"] == {"left": 80, "top": 100, "width": 1000, "height": 800}
 
 
 def test_attach_unspecified_falls_back_to_full_screen():

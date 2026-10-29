@@ -35,6 +35,7 @@ class GameSession:
         audit: AuditLog | None = None,
         window_resolver=None,
         window_rect_source=None,
+        window_monitor_source=None,
     ):
         self.engine = engine or GameEngine()
         unattended_after_s = float(os.environ.get("DSH_GAME_BRIDGE_UNATTENDED_S", "180"))
@@ -43,6 +44,7 @@ class GameSession:
         self.audit = audit or AuditLog(os.environ.get("DSH_GAME_BRIDGE_AUDIT_LOG") or None)
         self._window_resolver = window_resolver
         self._window_rect_source = window_rect_source
+        self._window_monitor_source = window_monitor_source
         self._controller = None
         self.attached: dict | None = None
         self.history: list[dict] = []
@@ -64,6 +66,13 @@ class GameSession:
         from .windows import window_rect
 
         return window_rect(hwnd)
+
+    def _window_monitor(self, hwnd: int):
+        if self._window_monitor_source is not None:
+            return self._window_monitor_source(hwnd)
+        from .windows import monitor_for_window
+
+        return monitor_for_window(hwnd)
 
     def _window_titles(self) -> list[str]:
         from .windows import list_windows
@@ -100,6 +109,7 @@ class GameSession:
                 "top": window.get("top"),
                 "width": window.get("width"),
                 "height": window.get("height"),
+                "monitor": self._window_monitor(window["hwnd"]),
                 "attached_at_ms": int(time.time() * 1000),
             }
         else:
@@ -280,18 +290,31 @@ class GameSession:
 
     def events(self) -> dict:
         """帧差分事件：不截图、不做 OCR 的廉价「刚才发生了什么」。"""
-        return self.engine.grab_diff()
+        monitor = (self.attached or {}).get("monitor")
+        return self.engine.grab_diff(monitor=monitor)
 
     def snapshot(self, *, ocr: bool = True, max_width: int | None = None) -> dict:
         region = None
+        monitor = None
         attached = self.attached or {}
         hwnd = attached.get("hwnd")
         if hwnd:
             rect = self._window_rect(hwnd)
             if rect is not None:
                 left, top, right, bottom = rect
-                region = {"left": left, "top": top, "width": right - left, "height": bottom - top}
-        return self.engine.snapshot(ocr=ocr, max_width=max_width, region=region)
+                monitor = attached.get("monitor") or self._window_monitor(hwnd)
+                if monitor:
+                    # 换算成「相对该显示器」的裁剪区：多显示器下窗口可能在副屏，
+                    # 而抓屏是按 output（显示器）来的。
+                    region = {
+                        "left": left - monitor["left"],
+                        "top": top - monitor["top"],
+                        "width": right - left,
+                        "height": bottom - top,
+                    }
+                else:
+                    region = {"left": left, "top": top, "width": right - left, "height": bottom - top}
+        return self.engine.snapshot(ocr=ocr, max_width=max_width, region=region, monitor=monitor)
 
     def close(self) -> None:
         self._stop_plan(join=True)

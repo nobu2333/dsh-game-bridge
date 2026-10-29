@@ -51,7 +51,7 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 ## 已知限制
 
 - Windows-only；非 Windows 自举阶段直接拒绝（可 `DSH_GAME_BRIDGE_ALLOW_UNSUPPORTED=1` 开发覆盖）；
-- 多显示器未完整支持（DXcam output 0 / 主屏；副屏窗口会裁错）；
+- 多显示器基本支持（显示器枚举 + 分辨率/主屏映射；两块同分辨率非主屏仍可能选错）；
 - 真实手柄注入未实机验证（等用户授权的 3 秒测试）；
 - 帧差阈值、OCR 区域未按具体游戏校准。
 

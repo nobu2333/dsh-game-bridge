@@ -16,6 +16,79 @@ IS_WINDOWS = hasattr(ctypes, "windll")
 
 DWMWA_EXTENDED_FRAME_BOUNDS = 9
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+MONITOR_DEFAULTTONEAREST = 2
+MONITORINFOF_PRIMARY = 1
+
+
+class _MONITORINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+    ]
+
+
+def list_display_monitors() -> list[dict]:
+    """列出物理显示器（Win32 枚举，含虚拟桌面坐标与主屏标记）。
+
+    与 `capture.list_monitors()`（DXcam 的输出列表）不同：这里的坐标是
+    虚拟桌面坐标系，用来把窗口矩形换算成「相对某台显示器」的裁剪区。
+    """
+    if not IS_WINDOWS:
+        return []
+    user32 = ctypes.windll.user32
+    monitors: list[dict] = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HMONITOR, wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
+    def callback(hmonitor, _hdc, _rect, _lparam):
+        info = _MONITORINFO()
+        info.cbSize = ctypes.sizeof(_MONITORINFO)
+        try:
+            if user32.GetMonitorInfoW(hmonitor, ctypes.byref(info)):
+                rect = info.rcMonitor
+                monitors.append(
+                    {
+                        "left": rect.left,
+                        "top": rect.top,
+                        "width": rect.right - rect.left,
+                        "height": rect.bottom - rect.top,
+                        "primary": bool(info.dwFlags & MONITORINFOF_PRIMARY),
+                    }
+                )
+        except Exception:  # noqa: BLE001 - 单个显示器失败不影响其它
+            pass
+        return True
+
+    try:
+        user32.EnumDisplayMonitors(None, None, callback, 0)
+    except Exception:  # noqa: BLE001
+        return []
+    return monitors
+
+
+def monitor_for_window(hwnd: int) -> dict | None:
+    """窗口所在的显示器（取最近的一块）。"""
+    if not IS_WINDOWS:
+        return None
+    try:
+        hmonitor = ctypes.windll.user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+        if not hmonitor:
+            return None
+        info = _MONITORINFO()
+        info.cbSize = ctypes.sizeof(_MONITORINFO)
+        if not ctypes.windll.user32.GetMonitorInfoW(hmonitor, ctypes.byref(info)):
+            return None
+        rect = info.rcMonitor
+        return {
+            "left": rect.left,
+            "top": rect.top,
+            "width": rect.right - rect.left,
+            "height": rect.bottom - rect.top,
+            "primary": bool(info.dwFlags & MONITORINFOF_PRIMARY),
+        }
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _user32():
