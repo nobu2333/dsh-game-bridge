@@ -2,7 +2,7 @@
 
 **给 DeepSeek Harness 装上眼睛和手：让 DSH 看得懂游戏、也能替你玩。**
 
-[English](README.en.md)
+[English](README.en.md) · [现状与交班](docs/STATUS.md)
 
 > 状态：**M2/M3 进行中（未发布）**。M1 已完成（引擎自举 + 真实抓屏/OCR）；
 > M2 已有 `game_attach` / `game_act` / `game_stop` 与三条安全闸，
