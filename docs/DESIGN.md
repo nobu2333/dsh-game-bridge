@@ -41,10 +41,14 @@
 | `game_attach` | 绑定窗口（用户授权步骤） | 一次 | M2 ✅ |
 | `game_act` | 单步按键（默认 dry-run） | 一次/动作 | M2 ✅ |
 | `game_stop` | 松手 + 解绑 | 随时，越易越好 | M2 ✅ |
-| `game_plan` | 给目标，启动本地 20 Hz 循环 | 一次/目标 | M3 |
-| `game_status` | 轮询进度与事件 | 稀疏 | M3（现在从 selftest 看） |
+| `game_plan` | 给目标，启动本地 20 Hz 循环 | 一次/目标 | M3 ✅（dry-run 验证） |
+| `game_status` | 轮询进度与事件 | 稀疏 | M3 ✅ |
 
 **判定标准**：任何工具如果要求模型以高于 1 Hz 的频率调用，就说明它设计错了。
+
+闭环实现（`session.plan`）：本地线程按 20 Hz 跑（实测 21.3 Hz），**每一拍重新过
+安全闸**——命中反作弊、超过无人时限、或 F12 闩锁，都在一拍内释放按键并记录
+`stop_reason`；`game_stop` 立刻停止并松手。模型只发一次 `game_plan`，不逐拍调用。
 
 ## 2.5 M2 的安全闸实现（safety.py / control.py）
 

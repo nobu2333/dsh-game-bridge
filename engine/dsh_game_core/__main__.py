@@ -105,6 +105,8 @@ def serve(stdin=None, stdout=None) -> int:
                 result = session.attach(params)
             elif method == "act":
                 result = session.act(params)
+            elif method == "plan":
+                result = session.plan(params)
             elif method == "status":
                 result = session.status()
             elif method == "stop":

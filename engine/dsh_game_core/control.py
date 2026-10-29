@@ -18,11 +18,15 @@ class Controller(Protocol):
 
     def press(self, button: str, duration_ms: int) -> dict: ...
 
+    def hold(self, button: str) -> dict: ...
+
+    def release(self, button: str) -> dict: ...
+
     def release_all(self) -> None: ...
 
 
 class DryRunController:
-    """只记录，不发送。返回值里 action 带 dry_run=True，模型能看出没真的按。"""
+    """只记录，不发送。返回值里 dry_run=True，模型能看出没真的按。"""
 
     backend = "dry-run"
 
@@ -31,6 +35,16 @@ class DryRunController:
 
     def press(self, button: str, duration_ms: int) -> dict:
         action = {"backend": self.backend, "button": button, "duration_ms": duration_ms, "dry_run": True}
+        self.actions.append(action)
+        return action
+
+    def hold(self, button: str) -> dict:
+        action = {"backend": self.backend, "button": button, "hold": True, "dry_run": True}
+        self.actions.append(action)
+        return action
+
+    def release(self, button: str) -> dict:
+        action = {"backend": self.backend, "button": button, "release": True, "dry_run": True}
         self.actions.append(action)
         return action
 
@@ -64,17 +78,32 @@ class VGamepadController:
         self._vg = vg
         self._pad = vg.VX360Gamepad()
 
-    def press(self, button: str, duration_ms: int) -> dict:
+    def _code(self, button: str):
         name = self.BUTTONS.get(button.upper())
         if name is None:
             raise ValueError(f"unknown gamepad button: {button}")
-        code = getattr(self._vg.XUSB_BUTTON, name)
+        return getattr(self._vg.XUSB_BUTTON, name)
+
+    def press(self, button: str, duration_ms: int) -> dict:
+        code = self._code(button)
         self._pad.press_button(button=code)
         self._pad.update()
         time.sleep(max(1, min(duration_ms, 2000)) / 1000.0)
         self._pad.release_button(button=code)
         self._pad.update()
         return {"backend": self.backend, "button": button.upper(), "duration_ms": duration_ms, "dry_run": False}
+
+    def hold(self, button: str) -> dict:
+        code = self._code(button)
+        self._pad.press_button(button=code)
+        self._pad.update()
+        return {"backend": self.backend, "button": button.upper(), "hold": True, "dry_run": False}
+
+    def release(self, button: str) -> dict:
+        code = self._code(button)
+        self._pad.release_button(button=code)
+        self._pad.update()
+        return {"backend": self.backend, "button": button.upper(), "release": True, "dry_run": False}
 
     def release_all(self) -> None:
         self._pad.reset()

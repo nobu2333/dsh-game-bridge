@@ -36,11 +36,32 @@ def handle(method, params, state):
             "safety": SAFETY,
             "actions_total": state["actions"],
         }
+    if method == "plan":
+        state["plan"] = {
+            "id": "plan-fixture",
+            "mode": params.get("mode") or "hold",
+            "button": params.get("button") or "A",
+            "duration_ms": params.get("duration_ms") or 1000,
+            "status": "running",
+            "ticks": 0,
+            "hz": 0,
+        }
+        return {"plan": dict(state["plan"]), "safety": SAFETY}
     if method == "stop":
         state["attached"] = None
-        return {"stopped": True, "actions_total": state.get("actions", 0)}
+        if "plan" in state:
+            state["plan"]["status"] = "stopped"
+        return {"stopped": True, "actions_total": state.get("actions", 0), "plan": state.get("plan")}
     if method == "status":
-        return {"attached": state.get("attached"), "backend": "dry-run", "safety": SAFETY, "actions_total": state.get("actions", 0)}
+        if "plan" in state:
+            state["plan"].update({"status": "completed", "ticks": 6, "hz": 20.0})
+        return {
+            "attached": state.get("attached"),
+            "backend": "dry-run",
+            "safety": SAFETY,
+            "actions_total": state.get("actions", 0),
+            "plan": state.get("plan"),
+        }
     return {}
 
 

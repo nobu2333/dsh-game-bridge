@@ -140,16 +140,34 @@ class SafetyGate:
         process_source: Callable[[], list[str]] = list_process_names,
         idle_source: Callable[[], float | None] = seconds_since_last_input,
         takeover_source: Callable[[], bool] = takeover_pressed,
+        process_ttl_s: float = 2.0,
     ):
         self.unattended_after_s = unattended_after_s
+        self.process_ttl_s = process_ttl_s
         self._process_source = process_source
         self._idle_source = idle_source
         self._takeover_source = takeover_source
         self.takeover_latched = False
+        self._process_cache: list[str] = []
+        self._process_cache_at = -1e9
+
+    def _anticheat_hits(self) -> list[str]:
+        """进程扫描带缓存：20 Hz 闭环里每拍都跑 tasklist 是不可接受的。
+
+        缓存 2 秒只会让「刚启动的反作弊」最多晚 2 秒被看到——而反作弊通常是
+        游戏启动前就在跑的，真正影响判定的时间窗远大于 2 秒。
+        """
+        import time as _time
+
+        now = _time.monotonic()
+        if now - self._process_cache_at > self.process_ttl_s:
+            self._process_cache = scan_processes(self._process_source())
+            self._process_cache_at = now
+        return self._process_cache
 
     def evaluate(self) -> SafetyReport:
         reasons: list[str] = []
-        anticheat = scan_processes(self._process_source())
+        anticheat = self._anticheat_hits()
         if anticheat:
             reasons.append("anti-cheat detected; output channels are refused")
         if self._takeover_source():
