@@ -87,6 +87,17 @@ $env:FAKE_TOOL='game_selftest'
 npm run test:session        # 断言：引擎被装上、spawn 起来、ping 有应答
 ```
 
+**真实引擎自举**（已实测）：用本地构建的 wheel 走 uv 安装，依赖经阿里云镜像下载
+17 个包、约 **20 秒**；之后插件直接用缓存里的 Python 起引擎，`ping`/`selftest`
+报告 numpy / cv2 / dxcam / rapidocr 就绪、显示器 1920×1200、OCR 预热通过。
+再跑一次「只有缓存、不设任何 Python 环境变量」的集成：
+
+```powershell
+$env:DSH_GAME_BRIDGE_CACHE_DIR='<repo>/tmp/engine-cache-real'
+$env:FAKE_TOOL='game_snapshot'
+npm run test:session        # M1 PASS：真实屏幕帧 + OCR 进模型
+```
+
 接真实引擎（开发期形态：直接指向一个装好依赖的 Python，跳过自举）：
 
 ```powershell

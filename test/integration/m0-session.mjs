@@ -251,7 +251,8 @@ async function main() {
   const toolCalled = sequence[0]
   const engineExpected =
     (Boolean(process.env.DSH_GAME_BRIDGE_PYTHON) && process.env.DSH_GAME_BRIDGE_PYTHON !== 'off') ||
-    Boolean(process.env.DSH_GAME_BRIDGE_ENGINE_SPEC)
+    Boolean(process.env.DSH_GAME_BRIDGE_ENGINE_SPEC) ||
+    Boolean(process.env.DSH_GAME_BRIDGE_CACHE_DIR)
   const sawScreenFrame = allRequestText.includes('screen via dsh-game-core')
   const sawOcr = /OCR: [^"]+/.test(allRequestText)
   const sawEngineAnswered = allRequestText.includes('answered')
