@@ -5,8 +5,9 @@
 > Status: **released 0.0.1** (npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`).
 > Verified end to end from the published artifact: install → engine bootstrap from PyPI →
 > real screen capture + OCR → 20 Hz closed loop. Control is **dry-run by default**
-> (it records actions instead of injecting input); the real gamepad/keyboard backends
-> have not been verified on hardware yet. Windows only.
+> (it records actions instead of injecting input); real injection was verified on
+> hardware on 2026-10-29 (gamepad A read back via XInput, keyboard W read back via
+> AsyncKeyState), but a long 20 Hz loop has not yet been run on a real game. Windows only.
 
 DSH has a brain (models, tools, sessions) but no eyes or hands: it can read files,
 run commands and browse the web, yet it cannot see the game you are playing or press

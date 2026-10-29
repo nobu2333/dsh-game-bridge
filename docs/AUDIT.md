@@ -92,10 +92,12 @@ LICENSE×2、CI workflow 均在库。
 | 引擎安装 | 全新 venv `uv pip install dsh-game-core==0.0.1` 成功（含依赖约 102s），selftest OCR ready |
 | 插件安装 | 从 registry 下载的 0.0.1 tarball → 隔离 profile 安装成功 |
 | 端到端 | 同一安装 + **空缓存自举**（PyPI 拉引擎）→ M1 真实抓屏/OCR PASS（18.6s）；M3 闭环 PASS |
+| 真实注入 | 2026-10-29：vgamepad 虚拟手柄插入 XInput slot 0，按 A 回读 `wButtons & 0x1000 = True`、松开回读 False；SendInput 按 W 经 `GetAsyncKeyState` 回读 down/released 均 True；引擎会话层两个后端 `dry_run=False` |
 | 环境异常 | 本机 pnpm 12 连 registry 报 `os error 10013`（Node/npm/uv 正常），故用 tarball 安装；已记入 STATUS |
 
 发布过程中遇到 npm 的 **staged publishing**：首次网页/上传会生成 `0.0.0-stage` 占位包，
 CLI 直接 publish 会报 `E409 Cannot publish over previously staged version`；等暂存版本
 批准后 0.0.1 才出现在 registry（本次约 2 分钟后生效）。这条已写进 RELEASE。
 
-**结论：包已发布且发布产物端到端可用。** 剩余：仓库转 public、市场提交、真实注入实测。
+**结论：包已发布、发布产物端到端可用、真实注入已回读验证。** 剩余：市场提交（awesome 列表，仓库需满 1 天 + topic）、旧提交对象清理（可选删库重建）。
+

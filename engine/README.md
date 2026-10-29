@@ -31,7 +31,7 @@
 - `vgamepad`：Xbox 360 虚拟手柄（ViGEmBus）；
 - `keyboard`：Win32 SendInput 键盘（W/A/S/D/SPACE/ENTER/ESC/ARROWS…）。
 
-真实后端都必须经过 safety 闸与 DSH 审批；`keyboard` 的 SendInput 路径**尚未实机验证**。
+真实后端都必须经过 safety 闸与 DSH 审批；`keyboard` 的 SendInput 路径已于 2026-10-29 实机回读验证。
 
 ## 自检
 
@@ -48,4 +48,5 @@ python -m dsh_game_core serve               # 插件用的 stdio 服务
   默认 `min` 会把 640×80 的 HUD 区域放大到短边 736px，det 从 ~9ms 变成 ~1.3s。
 - 一次性 `grab()`，不开连续捕获线程：采样只有 2–5 Hz，起线程只会抢游戏帧数。
 - 抓屏是只读操作；任何**输入注入**能力（M2）必须另有夺回热键与反作弊拒绝。
+
 

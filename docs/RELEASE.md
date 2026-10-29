@@ -78,9 +78,10 @@ python -m pytest engine/tests -q
 
 ## 4. 发布后必须实测（目前未做）
 
-1. **真实手柄注入**（vgamepad 后端，需用户同意）：按一次 A 并回读 XInput；
+1. ~~真实手柄注入~~ ✅ 2026-10-29：按 A 经 XInput 回读、按 W 经 AsyncKeyState 回读；
 2. **反作弊阻断**：在装有 EAC 的机器上确认 `game_act` 被拒绝；
 3. **夺回**：闭环运行中按 F12，确认一拍内松手；
 4. **无人不自娱**：闭环运行中停止键鼠输入超过阈值，确认自动 abort；
 5. **审批**：`DSH_GAME_BRIDGE_CONTROL=vgamepad` 时，Web 界面里 attach 会弹出
    一次性批准；拒绝后 attach 不执行（headless 下直接 fail-closed）。
+
