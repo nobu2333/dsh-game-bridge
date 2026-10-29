@@ -17,8 +17,8 @@ Python 引擎里；默认 dry-run（只记录不注入）。
 | M1 引擎 + 自举 | ✅ | 真实抓屏 1280×800 + 54 行 OCR 进模型；uv 自举装 17 个包约 20 秒 |
 | M2 手 + 安全闸 | ✅（dry-run） | 反作弊/无人/F12 三道闸单测钉死；attach→act 端到端；真实后端需审批 |
 | M3 20 Hz 闭环 | ✅（dry-run） | 实测 21.3 Hz；逐拍安全复检；stop 一拍内松手 |
-| 发布 | ⛔ 等用户 | 需要 `npm login` + PyPI token；脚本已就绪 |
-| 市场收录 | ⛔ 等发布 | 需要先有公开仓库与 npm 包 |
+| 发布 | ✅ 2026-10-29 | npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`；发布版安装+自举+M1/M3 实测通过 |
+| 市场收录 | ⏳ 待提交 | 先转 public，再按 MARKETPLACE 提交 |
 
 工具面（10 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
 `game_events` · `game_attach` · `game_act` · `game_plan` · `game_status` · `game_stop`。
@@ -55,13 +55,27 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 - 真实注入未实机验证（vgamepad 手柄与 keyboard 键盘两个后端都等用户授权实测）；
 - 帧差阈值、OCR 区域未按具体游戏校准。
 
-## 用户回来后要做的（按顺序）
+## 发布之后剩下的事
 
-1. `gh auth login` → 我建远程仓库并 push（或给我空仓库 URL）；
-2. `npm login` + 设 `UV_PUBLISH_TOKEN` → 我跑
-   `pwsh -File scripts/release.ps1 -Publish -SkipTests`；
-3. 允许真实注入测试（手柄：按一次 A + XInput 回读；键盘：按一次 W；约 3 秒、不抢焦点）；
-4. 发布后按 `docs/RELEASE.md` 做安装验收；市场提交材料在 `docs/MARKETPLACE.md`。
+1. ~~建远程仓库~~ ✅ `github.com/nobu2333/dsh-game-bridge`（当前 private，SSH remote）；
+2. ~~npm / PyPI 发布~~ ✅ 2026-10-29，两处都是 0.0.1；
+3. **转 public**（Settings → Danger Zone），然后按 `docs/MARKETPLACE.md` 提交市场；
+4. **真实注入测试**（手柄按 A + XInput 回读，或键盘按 W；约 3 秒、不抢焦点）——
+   完成后把 vgamepad / keyboard 从「未实机验证」改成已验证；
+5. 可选：把 PyPI sdist 补传（0.0.1 当前只有 wheel；下次发布脚本已会同时发 sdist），
+   并把账号级 PyPI token 换成项目级。
+
+## 已知环境问题（2026-10-29 实测）
+
+本机 **pnpm 12.11.2 无法连接任何 npm registry**（`os error 10013`，Node/npm/uv 都正常），
+所以 `dsh plugin add <npm 包名>` 在这台机器上会失败。两种绕过：
+
+- 下载 tarball 后 `dsh plugin add file:<tarball>`（本次验收即如此，装的是 registry 上的
+  0.0.1 产物）；
+- 仓库转 public 后 `dsh plugin add github:nobu2333/dsh-game-bridge`。
+
+这不是包的问题，是 pnpm 的网络栈被本机安全策略拦截；其他用户机器大概率正常。
+
 
 ## 关键决策（一句话版）
 
@@ -71,5 +85,6 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
   否则会挂住 DSH 事件循环（实测 headless 永不退出）。
 - **严格 semver**：`engines.dsh` / peer 必须匹配带预发布标签的运行时版本。
 - **默认 dry-run + 真实后端审批**：最便宜的安全默认。
+
 
 

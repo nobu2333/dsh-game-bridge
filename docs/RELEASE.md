@@ -46,9 +46,19 @@ uv publish engine/dist/*            # 需要 PyPI token：UV_PUBLISH_TOKEN
 ## 2. 插件（npm）
 
 ```powershell
-npm pack --dry-run                  # 确认只含 8 个文件、无 tmp/.dsh-test
-npm publish                        # 需要 npm 登录（2FA）
+npm pack --dry-run                  # 确认只含 9 个文件、无 tmp/.dsh-test
+npm publish --access public         # 需要 npm 登录（2FA，交互输 OTP）
 ```
+
+**npm staged publishing（2026-10-29 实测）**：首次通过网页上传/暂存时，registry 会先
+生成 `0.0.0-stage` 占位包；此后 CLI 直接 publish 同一版本会报
+
+```
+E409 Cannot publish over previously staged version "0.0.1"
+```
+
+这不是失败：去 npm 网页的包页面批准该暂存版本（需 2FA），稍后 `npm view` 就能看到
+`0.0.1` 且 `latest` 指向它。CLI 非交互环境无法输 OTP，所以发布请在自己的终端跑。
 
 发布后必须用**真实包名**验证官方安装链路（不要用本地路径）：
 

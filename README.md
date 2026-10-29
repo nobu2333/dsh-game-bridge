@@ -4,10 +4,9 @@
 
 [English](README.en.md) · [现状与交班](docs/STATUS.md)
 
-> 状态：**M2/M3 进行中（未发布）**。M1 已完成（引擎自举 + 真实抓屏/OCR）；
-> M2 已有 `game_attach` / `game_act` / `game_stop` 与三条安全闸，
-> **attach 后只截目标窗口**；M3 的 20 Hz 闭环已在 dry-run 下验证。
-> **默认 dry-run 后端（只记录、不碰设备）**；真实注入（vgamepad 手柄 / keyboard 键鼠）尚未实机验证。
+> 状态：**已发布 0.0.1**（npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`）。
+> 已实测：从 registry 的 tarball 安装 → 引擎自举（PyPI）→ 真实抓屏/OCR → 20 Hz 闭环。
+> **默认 dry-run 后端（只记录、不碰设备）**；真实注入（vgamepad 手柄 / keyboard 键鼠）尚未实机验证；仅 Windows。
 
 ## 这是什么
 

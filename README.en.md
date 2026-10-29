@@ -2,10 +2,11 @@
 
 **Give DeepSeek Harness eyes and hands on your games.**
 
-> Status: **M2/M3 in progress (not published yet).** Screen capture + OCR work and
-> the engine installs itself on first activation. Control is **dry-run by default**
-> (it records actions instead of injecting input); the real gamepad backend has not
-> been verified on hardware yet.
+> Status: **released 0.0.1** (npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`).
+> Verified end to end from the published artifact: install → engine bootstrap from PyPI →
+> real screen capture + OCR → 20 Hz closed loop. Control is **dry-run by default**
+> (it records actions instead of injecting input); the real gamepad/keyboard backends
+> have not been verified on hardware yet. Windows only.
 
 DSH has a brain (models, tools, sessions) but no eyes or hands: it can read files,
 run commands and browse the web, yet it cannot see the game you are playing or press

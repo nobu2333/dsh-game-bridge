@@ -76,11 +76,26 @@ M3：attach → plan → status → stop → PASS
 README（中/英）、DESIGN、RELEASE、STATUS、CONTROLS、MARKETPLACE、engine/README、
 LICENSE×2、CI workflow 均在库。
 
-## 8. 发布阻塞项（唯一缺口）
+## 8. 发布阻塞项（2026-10-29 已解除）
 
-1. `gh auth login`（建远程 + push）；
-2. `npm login` + `UV_PUBLISH_TOKEN`（`scripts/release.ps1 -Publish`）；
-3. 用户授权的真实注入实测（vgamepad 按 A / keyboard 按 W，约 3 秒）；
-4. 发布后按 RELEASE §2 用**真实包名**复验安装；市场提交按 MARKETPLACE。
+1. ~~`gh auth login`~~ → 仓库已建并 push（SSH remote，private）；
+2. ~~`npm login` + `UV_PUBLISH_TOKEN`~~ → 两处均已发布 0.0.1；
+3. 用户授权的真实注入实测（vgamepad 按 A / keyboard 按 W，约 3 秒）——**仍未做**；
+4. 市场提交——待仓库转 public。
 
-在上述 1–3 完成前，**不要**把版本标记为已发布。
+## 9. 0.0.1 发布后验收（2026-10-29 实测）
+
+| 检查 | 结果 |
+|:--|:--|
+| npm | `dsh-game-bridge@0.0.1`，maintainer `ihuakaze`，dist-tag `latest` 指向 0.0.1 |
+| PyPI | `dsh-game-core==0.0.1` 可装；当前 release 只有 wheel（sdist 漏发，脚本已修） |
+| 引擎安装 | 全新 venv `uv pip install dsh-game-core==0.0.1` 成功（含依赖约 102s），selftest OCR ready |
+| 插件安装 | 从 registry 下载的 0.0.1 tarball → 隔离 profile 安装成功 |
+| 端到端 | 同一安装 + **空缓存自举**（PyPI 拉引擎）→ M1 真实抓屏/OCR PASS（18.6s）；M3 闭环 PASS |
+| 环境异常 | 本机 pnpm 12 连 registry 报 `os error 10013`（Node/npm/uv 正常），故用 tarball 安装；已记入 STATUS |
+
+发布过程中遇到 npm 的 **staged publishing**：首次网页/上传会生成 `0.0.0-stage` 占位包，
+CLI 直接 publish 会报 `E409 Cannot publish over previously staged version`；等暂存版本
+批准后 0.0.1 才出现在 registry（本次约 2 分钟后生效）。这条已写进 RELEASE。
+
+**结论：包已发布且发布产物端到端可用。** 剩余：仓库转 public、市场提交、真实注入实测。
