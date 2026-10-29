@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  engine:
+    # 引擎的测试不依赖 DSH，也不抓真实屏幕（OCR 用渲染图）：Windows 与产品一致。
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -e .
+      - run: python -m pytest tests -q
+
+  plugin-syntax:
+    # 插件的契约测试需要宿主里那份 @deepseek-ai/dsh-tools（DSH 自带、不单独发布），
+    # CI 里只做语法检查；真正的契约/集成测试在 docs/RELEASE.md 的发布清单里跑。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check lib/index.js
+      - run: node --check lib/engine.js
+      - run: node --check lib/bootstrap.js
