@@ -49,13 +49,20 @@ test('plugin declares identity and the services it needs', () => {
   assert.deepEqual(inject, ['tools', 'attachments'])
 })
 
-test('apply() registers exactly the M0 tools', () => {
+test('apply() registers the current tool surface', () => {
   const ctx = fakeCtx()
   apply(ctx)
   assert.deepEqual(
     ctx.registered.map((definition) => definition.name).sort(),
-    ['game_selftest', 'game_snapshot'],
+    ['game_act', 'game_attach', 'game_selftest', 'game_snapshot', 'game_stop'],
   )
+})
+
+test('game_attach refuses loudly when the engine is unavailable', async () => {
+  const ctx = fakeCtx()
+  apply(ctx)
+  const definition = tool(ctx, 'game_attach')
+  await assert.rejects(() => definition.execute({ window: 'SomeGame' }, {}), /not ready/)
 })
 
 test('game_selftest reports a failed engine instead of pretending', async () => {

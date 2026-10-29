@@ -56,7 +56,13 @@ function startFakeProvider() {
       mkdirSync(outDir, { recursive: true })
       appendFileSync(resolve(outDir, 'provider-requests.jsonl'), `${JSON.stringify({ url: req.url, body })}\n`)
       const messages = Array.isArray(body.messages) ? body.messages : []
-      const sawToolResult = messages.some((message) => message?.role === 'tool')
+      const toolResults = messages.filter((message) => message?.role === 'tool').length
+      // FAKE_SEQUENCE 允许脚本化多步工具调用，例如 "game_attach,game_act"。
+      const sequence = (process.env.FAKE_SEQUENCE ?? process.env.FAKE_TOOL ?? 'game_snapshot')
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean)
+      const nextTool = toolResults < sequence.length ? sequence[toolResults] : null
 
       res.writeHead(200, {
         'content-type': 'text/event-stream',
@@ -69,9 +75,14 @@ function startFakeProvider() {
         created: Math.floor(Date.now() / 1000),
         model: 'fake-1',
       }
-      if (!sawToolResult) {
-        // 第一次：要求模型调用指定工具（默认 game_snapshot）。
-        const fakeTool = process.env.FAKE_TOOL ?? 'game_snapshot'
+      if (nextTool) {
+        const defaultArgs =
+          nextTool === 'game_attach'
+            ? '{"window":"fixture-game"}'
+            : nextTool === 'game_act'
+              ? '{"button":"A","duration_ms":50}'
+              : '{}'
+        const args = process.env.FAKE_ARGS ?? defaultArgs
         sse(res, {
           ...base,
           choices: [
@@ -80,7 +91,12 @@ function startFakeProvider() {
               delta: {
                 role: 'assistant',
                 tool_calls: [
-                  { index: 0, id: 'call_fake_1', type: 'function', function: { name: fakeTool, arguments: (process.env.FAKE_ARGS ?? '{}') } },
+                  {
+                    index: 0,
+                    id: `call_fake_${toolResults + 1}`,
+                    type: 'function',
+                    function: { name: nextTool, arguments: args },
+                  },
                 ],
               },
               finish_reason: null,
@@ -99,7 +115,7 @@ function startFakeProvider() {
           usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
         })
       } else {
-        // 第二次：看到工具结果了，给最终文本。
+        // 序列走完：给最终文本。
         sse(res, {
           ...base,
           choices: [{ index: 0, delta: { role: 'assistant', content: 'M0-INTEGRATION-OK' }, finish_reason: null }],
@@ -226,16 +242,22 @@ async function main() {
   const allRequestText = JSON.stringify(requests)
   const sawImage = allRequestText.includes('data:image/png')
   const sawToolResult = requests.some((request) => (request?.body?.messages ?? []).some((message) => message?.role === 'tool'))
-  const toolCalled = process.env.FAKE_TOOL ?? 'game_snapshot'
+  const sequence = (process.env.FAKE_SEQUENCE ?? process.env.FAKE_TOOL ?? 'game_snapshot')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+  const toolCalled = sequence[0]
   const engineExpected =
     (Boolean(process.env.DSH_GAME_BRIDGE_PYTHON) && process.env.DSH_GAME_BRIDGE_PYTHON !== 'off') ||
     Boolean(process.env.DSH_GAME_BRIDGE_ENGINE_SPEC)
   const sawScreenFrame = allRequestText.includes('screen via dsh-game-core')
   const sawOcr = /OCR: [^"]+/.test(allRequestText)
   const sawEngineAnswered = allRequestText.includes('answered')
+  const sawAttach = allRequestText.includes('Attached to')
+  const sawDryRun = allRequestText.includes('DRY-RUN')
 
   console.log(`run exit: ${run.code}`)
-  console.log(`tool called: ${toolCalled}`)
+  console.log(`tool sequence: ${sequence.join(' → ')}`)
   console.log(`tools exposed to the model: ${JSON.stringify(toolNames)}`)
   console.log(`tool result came back: ${sawToolResult}`)
   console.log(`image bytes returned to the model as data:image/png: ${sawImage}`)
@@ -244,10 +266,13 @@ async function main() {
     console.log(`OCR text attached: ${sawOcr}`)
     console.log(`engine answered ping: ${sawEngineAnswered}`)
   }
+  if (sequence.includes('game_attach')) console.log(`attach result seen: ${sawAttach}`)
+  if (sequence.includes('game_act')) console.log(`dry-run action seen: ${sawDryRun}`)
 
   assert.equal(run.code, 0, `headless exited ${run.code}\nstderr:\n${run.stderr}\nstdout:\n${run.stdout}`)
-  assert.ok(toolNames.includes('game_selftest'), 'game_selftest was not exposed to the model')
-  assert.ok(toolNames.includes('game_snapshot'), 'game_snapshot was not exposed to the model')
+  for (const name of ['game_selftest', 'game_snapshot', 'game_attach', 'game_act', 'game_stop']) {
+    assert.ok(toolNames.includes(name), `${name} was not exposed to the model`)
+  }
   assert.ok(sawToolResult, 'the tool result did not come back to the model')
   if (toolCalled === 'game_snapshot') {
     assert.ok(sawImage, 'the screenshot did not reach the model as an image')
@@ -259,12 +284,14 @@ async function main() {
   if (toolCalled === 'game_selftest' && engineExpected) {
     assert.ok(sawEngineAnswered, 'the engine was expected but the selftest did not report a ping answer')
   }
+  if (sequence.includes('game_attach')) assert.ok(sawAttach, 'game_attach did not produce an attach result')
+  if (sequence.includes('game_act')) assert.ok(sawDryRun, 'game_act did not report a dry-run action')
   assert.ok(run.stdout.includes('M0-INTEGRATION-OK'), 'final assistant text missing from headless output')
-  const mode = engineExpected
-    ? toolCalled === 'game_selftest'
-      ? 'M1 BOOTSTRAP PASS (engine installed and answered)'
-      : 'M1 INTEGRATION PASS (real capture + OCR)'
-    : 'M0 INTEGRATION PASS (synthetic frame)'
+  let mode
+  if (sequence.includes('game_act')) mode = 'M2 PASS (attach → dry-run act, no real input)'
+  else if (engineExpected) {
+    mode = toolCalled === 'game_selftest' ? 'M1 BOOTSTRAP PASS (engine installed and answered)' : 'M1 INTEGRATION PASS (real capture + OCR)'
+  } else mode = 'M0 INTEGRATION PASS (synthetic frame)'
   console.log(mode)
 }
 

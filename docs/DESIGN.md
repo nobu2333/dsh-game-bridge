@@ -34,16 +34,29 @@
 模型一次工具调用 3–5 秒。让模型逐步决定「往右走一步」，游戏里就是植物人。
 因此工具只暴露：
 
-| 工具 | 语义 | 频率 |
-|:--|:--|:--|
-| `game_selftest` | 装没装上、引擎在哪一步 | 一次 |
-| `game_snapshot` | 看一眼（图 + OCR + 帧差事件） | 模型需要时 |
-| `game_attach` | 绑定窗口与游戏档案（需批准） | 一次 |
-| `game_plan` | 给目标，启动本地循环（需批准） | 一次/目标 |
-| `game_status` | 轮询进度与事件 | 稀疏 |
-| `game_stop` / `game_takeover` | 停 / 交还 | 随时，越易越好 |
+| 工具 | 语义 | 频率 | 状态 |
+|:--|:--|:--|:--|
+| `game_selftest` | 装没装上、引擎在哪一步 | 一次 | M1 ✅ |
+| `game_snapshot` | 看一眼（图 + OCR） | 模型需要时 | M1 ✅ |
+| `game_attach` | 绑定窗口（用户授权步骤） | 一次 | M2 ✅ |
+| `game_act` | 单步按键（默认 dry-run） | 一次/动作 | M2 ✅ |
+| `game_stop` | 松手 + 解绑 | 随时，越易越好 | M2 ✅ |
+| `game_plan` | 给目标，启动本地 20 Hz 循环 | 一次/目标 | M3 |
+| `game_status` | 轮询进度与事件 | 稀疏 | M3（现在从 selftest 看） |
 
 **判定标准**：任何工具如果要求模型以高于 1 Hz 的频率调用，就说明它设计错了。
+
+## 2.5 M2 的安全闸实现（safety.py / control.py）
+
+输出通道有三道硬闸，全部在引擎侧、可注入、可单测：
+
+1. **反作弊**：`tasklist` 进程名前缀匹配 EAC/BattlEye/Vanguard/ACE…，命中即拒绝；
+2. **无人不自娱**：`GetLastInputInfo` 距离上次输入超过 `DSH_GAME_BRIDGE_UNATTENDED_S`
+   （默认 180s）即拒绝；**拿不到输入遥测也拒绝**（fail-closed）；
+3. **随时可夺回**：F12 一旦按下即闩锁拒绝，重新 `game_attach` 才解除。
+
+输出后端默认 `dry-run`（只记录动作、不碰设备）；真实手柄必须显式
+`DSH_GAME_BRIDGE_CONTROL=vgamepad`，且 vgamepad 后端尚未实机验证。
 
 ## 3. 图片：走宿主 attachment，不搬 base64
 

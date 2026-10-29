@@ -76,11 +76,12 @@ def selftest(capture: bool = False) -> dict:
 
 
 def serve(stdin=None, stdout=None) -> int:
-    from .engine import EngineError, GameEngine
+    from .engine import EngineError
+    from .session import GameSession
 
     stdin = stdin or sys.stdin
     stdout = stdout or sys.stdout
-    engine = GameEngine()
+    session = GameSession()
     for raw in stdin:
         line = raw.strip()
         if not line:
@@ -96,10 +97,18 @@ def serve(stdin=None, stdout=None) -> int:
             elif method == "selftest":
                 result = selftest(capture=bool(params.get("capture")))
             elif method == "snapshot":
-                result = engine.snapshot(
+                result = session.snapshot(
                     ocr=bool(params.get("ocr", True)),
                     max_width=params.get("max_width"),
                 )
+            elif method == "attach":
+                result = session.attach(params)
+            elif method == "act":
+                result = session.act(params)
+            elif method == "status":
+                result = session.status()
+            elif method == "stop":
+                result = session.stop()
             else:
                 raise EngineError("UNKNOWN_METHOD", f"未知方法：{method!r}")
             response = {"id": request_id, "ok": True, "result": result}
@@ -113,7 +122,7 @@ def serve(stdin=None, stdout=None) -> int:
             }
         stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
         stdout.flush()
-    engine.close()
+    session.close()
     return 0
 
 

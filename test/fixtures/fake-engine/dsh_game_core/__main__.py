@@ -1,18 +1,57 @@
-"""Fake engine fixture: speaks just enough of the stdio protocol for ping."""
+"""Fake engine fixture: canned responses for the plugin's protocol.
+
+It exists so integration tests can drive the *plugin* (tools, schemas, image
+pipeline, attach/act flow) without a real screen, real gamepad, or safety state.
+Real capture/OCR and the real safety gate are covered by engine/ unit tests.
+"""
 import json
 import sys
 
+SAFETY = {
+    "allowed": True,
+    "reasons": [],
+    "anticheat": [],
+    "idle_seconds": 0.0,
+    "takeover": False,
+}
+
+
+def handle(method, params, state):
+    if method == "ping":
+        return {"ok": True, "version": "0.0.1"}
+    if method == "selftest":
+        return {"engine": "fixture", "deps": {}, "monitors": [], "ocr_ready": False}
+    if method == "attach":
+        state["attached"] = {"window": params.get("window") or "fixture-game"}
+        return {"attached": state["attached"], "backend": "dry-run", "safety": SAFETY}
+    if method == "act":
+        state["actions"] = state.get("actions", 0) + 1
+        return {
+            "action": {
+                "backend": "dry-run",
+                "button": params.get("button") or "A",
+                "duration_ms": params.get("duration_ms") or 80,
+                "dry_run": True,
+            },
+            "safety": SAFETY,
+            "actions_total": state["actions"],
+        }
+    if method == "stop":
+        state["attached"] = None
+        return {"stopped": True, "actions_total": state.get("actions", 0)}
+    if method == "status":
+        return {"attached": state.get("attached"), "backend": "dry-run", "safety": SAFETY, "actions_total": state.get("actions", 0)}
+    return {}
+
 
 def main() -> int:
+    state = {}
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
         request = json.loads(line)
-        if request.get("method") == "ping":
-            result = {"ok": True, "version": "0.0.1"}
-        else:
-            result = {}
+        result = handle(request.get("method"), request.get("params") or {}, state)
         print(json.dumps({"id": request.get("id"), "ok": True, "result": result}), flush=True)
     return 0
 
