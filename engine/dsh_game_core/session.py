@@ -33,18 +33,42 @@ class GameSession:
         gate: SafetyGate | None = None,
         control_backend: str | None = None,
         audit: AuditLog | None = None,
+        window_resolver=None,
+        window_rect_source=None,
     ):
         self.engine = engine or GameEngine()
         unattended_after_s = float(os.environ.get("DSH_GAME_BRIDGE_UNATTENDED_S", "180"))
         self.gate = gate or SafetyGate(unattended_after_s=unattended_after_s)
         self.backend = control_backend or os.environ.get("DSH_GAME_BRIDGE_CONTROL", "dry-run")
         self.audit = audit or AuditLog(os.environ.get("DSH_GAME_BRIDGE_AUDIT_LOG") or None)
+        self._window_resolver = window_resolver
+        self._window_rect_source = window_rect_source
         self._controller = None
         self.attached: dict | None = None
         self.history: list[dict] = []
         self._plan: dict | None = None
         self._plan_thread: threading.Thread | None = None
         self._plan_stop = threading.Event()
+
+    # ── 窗口 ──────────────────────────────────────────────────────────
+    def _resolve_window(self, match: str) -> dict | None:
+        if self._window_resolver is not None:
+            return self._window_resolver(match)
+        from .windows import resolve_window
+
+        return resolve_window(match)
+
+    def _window_rect(self, hwnd: int):
+        if self._window_rect_source is not None:
+            return self._window_rect_source(hwnd)
+        from .windows import window_rect
+
+        return window_rect(hwnd)
+
+    def _window_titles(self) -> list[str]:
+        from .windows import list_windows
+
+        return [window["title"] for window in list_windows()[:8]]
 
     # ── 手 ────────────────────────────────────────────────────────────
     def _controller_instance(self):
@@ -59,12 +83,40 @@ class GameSession:
 
     def attach(self, params: dict | None = None) -> dict:
         params = params or {}
-        window = str(params.get("window") or "unspecified")
-        self.attached = {"window": window, "attached_at_ms": int(time.time() * 1000)}
+        match = str(params.get("window") or "").strip()
+        if match and match.lower() != "unspecified":
+            window = self._resolve_window(match)
+            if window is None:
+                titles = self._window_titles()
+                raise EngineError(
+                    "WINDOW_NOT_FOUND",
+                    f"找不到标题包含 {match!r} 的窗口；当前可见窗口（前 8 个）：{titles}",
+                )
+            self.attached = {
+                "window": window["title"],
+                "hwnd": window["hwnd"],
+                "process": window.get("process"),
+                "left": window.get("left"),
+                "top": window.get("top"),
+                "width": window.get("width"),
+                "height": window.get("height"),
+                "attached_at_ms": int(time.time() * 1000),
+            }
+        else:
+            # 不指定窗口时退回整屏（仍是有用的兜底，但模型应优先 attach 具体窗口）。
+            self.attached = {"window": "unspecified", "attached_at_ms": int(time.time() * 1000)}
         # 重新 attach 视为用户重新授权：清掉夺权闩锁。
         self.gate.reset_takeover()
         safety = self.gate.evaluate().to_dict()
-        self.audit.write({"event": "attach", "window": window, "backend": self.backend, "safety": safety})
+        self.audit.write(
+            {
+                "event": "attach",
+                "window": self.attached["window"],
+                "hwnd": self.attached.get("hwnd"),
+                "backend": self.backend,
+                "safety": safety,
+            }
+        )
         return {"attached": self.attached, "backend": self.backend, "safety": safety}
 
     def act(self, params: dict | None = None) -> dict:
@@ -209,7 +261,15 @@ class GameSession:
 
     # ── 眼 ────────────────────────────────────────────────────────────
     def snapshot(self, *, ocr: bool = True, max_width: int | None = None) -> dict:
-        return self.engine.snapshot(ocr=ocr, max_width=max_width)
+        region = None
+        attached = self.attached or {}
+        hwnd = attached.get("hwnd")
+        if hwnd:
+            rect = self._window_rect(hwnd)
+            if rect is not None:
+                left, top, right, bottom = rect
+                region = {"left": left, "top": top, "width": right - left, "height": bottom - top}
+        return self.engine.snapshot(ocr=ocr, max_width=max_width, region=region)
 
     def close(self) -> None:
         self._stop_plan(join=True)

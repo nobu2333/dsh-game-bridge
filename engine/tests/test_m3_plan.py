@@ -43,7 +43,7 @@ def test_plan_requires_attach():
 
 def test_plan_rejects_unknown_mode():
     session = make_session()
-    session.attach({"window": "fixture"})
+    session.attach({"window": "unspecified"})
     with pytest.raises(EngineError) as error:
         session.plan({"mode": "wiggle", "button": "A"})
     assert error.value.code == "BAD_PLAN_MODE"
@@ -51,7 +51,7 @@ def test_plan_rejects_unknown_mode():
 
 def test_hold_plan_runs_near_20hz_and_releases():
     session = make_session()
-    session.attach({"window": "fixture"})
+    session.attach({"window": "unspecified"})
     started = session.plan({"mode": "hold", "button": "DPAD_RIGHT", "duration_ms": 300})
     assert started["plan"]["status"] == "running"
 
@@ -67,7 +67,7 @@ def test_hold_plan_runs_near_20hz_and_releases():
 
 def test_tap_plan_records_repeated_presses():
     session = make_session()
-    session.attach({"window": "fixture"})
+    session.attach({"window": "unspecified"})
     session.plan({"mode": "tap", "button": "A", "duration_ms": 300, "tap_interval_ms": 50})
     time.sleep(0.6)
     plan = session.status()["plan"]
@@ -83,7 +83,7 @@ def test_plan_aborts_within_a_tick_when_anticheat_appears():
         return [] if state["clean"] else ["EasyAntiCheat.exe"]
 
     session = make_session(allowed_gate(process_source=processes))
-    session.attach({"window": "fixture"})
+    session.attach({"window": "unspecified"})
     session.plan({"mode": "hold", "button": "A", "duration_ms": 4000})
     time.sleep(0.25)
     state["clean"] = False
@@ -97,7 +97,7 @@ def test_plan_aborts_within_a_tick_when_anticheat_appears():
 
 def test_stop_mid_plan_releases_and_detaches():
     session = make_session()
-    session.attach({"window": "fixture"})
+    session.attach({"window": "unspecified"})
     session.plan({"mode": "hold", "button": "A", "duration_ms": 5000})
     time.sleep(0.15)
     result = session.stop()
@@ -106,3 +106,4 @@ def test_stop_mid_plan_releases_and_detaches():
     assert session._controller.actions[-1].get("release_all") or any(
         action.get("release") for action in session._controller.actions
     )
+

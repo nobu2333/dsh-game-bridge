@@ -6,6 +6,7 @@
 
 > 状态：**M2/M3 进行中（未发布）**。M1 已完成（引擎自举 + 真实抓屏/OCR）；
 > M2 已有 `game_attach` / `game_act` / `game_stop` 与三条安全闸，
+> **attach 后只截目标窗口**；M3 的 20 Hz 闭环已在 dry-run 下验证。
 > **默认 dry-run 后端（只记录、不碰设备）**；真实手柄注入（vgamepad）尚未实机验证。
 
 ## 这是什么

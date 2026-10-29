@@ -12,15 +12,18 @@
 ## 协议（v0，一行一条）
 
 ```jsonc
-// 请求
-{"id": 1, "method": "snapshot", "params": {"ocr": true, "max_width": 1280}}
+// 请求（region 可选：attach 到窗口后由会话自动填入）
+{"id": 1, "method": "snapshot", "params": {"ocr": true, "max_width": 1280, "region": {"left": 239, "top": 203, "width": 1280, "height": 800}}}
 // 成功
-{"id": 1, "ok": true, "result": {"png_b64": "...", "width": 1280, "height": 800, "scale": 0.667, "ocr": [...], "captured_at_ms": 0}}
+{"id": 1, "ok": true, "result": {"png_b64": "...", "width": 1280, "height": 800, "scale": 1.0, "region": {...}, "ocr": [...], "captured_at_ms": 0}}
 // 失败
 {"id": 1, "ok": false, "error": {"code": "ENCODE_FAILED", "message": "..."}}
 ```
 
-方法：`ping` · `selftest` · `snapshot`（M1）；`attach` / `act` / `plan` 在 M2 加入。
+方法：`ping` · `selftest` · `snapshot` · `attach` · `act` · `plan` · `status` · `stop`。
+
+`attach` 接受窗口标题子串（大小写不敏感）：优先后台只截该窗口；找不到时返回
+`WINDOW_NOT_FOUND` 并列出当前可见窗口，便于换关键词。传 `unspecified` 退回整屏。
 
 ## 自检
 

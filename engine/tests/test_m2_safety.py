@@ -104,7 +104,7 @@ def test_act_requires_attach():
 
 def test_act_is_blocked_by_safety_gate():
     session = make_session(make_gate(processes=["vgk.exe"], idle=1.0))
-    session.attach({"window": "SomeGame"})
+    session.attach({"window": "unspecified"})
     with pytest.raises(EngineError) as error:
         session.act({"button": "A", "duration_ms": 50})
     assert error.value.code == "SAFETY_BLOCKED"
@@ -112,7 +112,7 @@ def test_act_is_blocked_by_safety_gate():
 
 def test_act_runs_on_dry_run_backend_and_counts_actions():
     session = make_session(make_gate(idle=1.0))
-    session.attach({"window": "SomeGame"})
+    session.attach({"window": "unspecified"})
     result = session.act({"button": "A", "duration_ms": 50})
     assert result["action"]["dry_run"] is True
     assert result["actions_total"] == 1
@@ -122,9 +122,10 @@ def test_act_runs_on_dry_run_backend_and_counts_actions():
 
 def test_stop_releases_and_detaches():
     session = make_session(make_gate(idle=1.0))
-    session.attach({"window": "SomeGame"})
+    session.attach({"window": "unspecified"})
     session.act({"button": "B", "duration_ms": 10})
     stopped = session.stop()
     assert stopped["stopped"] is True
     assert session.attached is None
     assert session.status()["attached"] is None
+

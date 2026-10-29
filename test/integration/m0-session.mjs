@@ -78,7 +78,7 @@ function startFakeProvider() {
       if (nextTool) {
         const defaultArgs =
           nextTool === 'game_attach'
-            ? '{"window":"fixture-game"}'
+            ? JSON.stringify({ window: process.env.FAKE_WINDOW ?? 'fixture-game' })
             : nextTool === 'game_act'
               ? '{"button":"A","duration_ms":50}'
               : nextTool === 'game_plan'

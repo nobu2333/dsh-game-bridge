@@ -68,6 +68,16 @@
 `{ type: 'image', attachment: ImageAttachmentRef }`，引用由 `ctx.attachments.saveImage()`
 落盘。会话文本里只留尺寸与来源，字节不进历史。M0 已用合成帧验证这条链路。
 
+## 3.5 窗口级抓屏（不是整屏）
+
+`game_attach` 接受窗口标题子串，用只读 Win32 API（EnumWindows / GetWindowText /
+DwmGetWindowAttribute）解析出窗口矩形；之后每次 `snapshot` 重新读一次矩形再裁剪，
+窗口移动/缩放不会拍偏。找不到窗口时返回 `WINDOW_NOT_FOUND` 并列出当前可见标题——
+比「随便截个整屏让模型猜」有用得多。
+
+实测（本机）：attach 到 1280×800 的窗口后，帧尺寸与裁剪区完全一致
+（`region {left:239, top:203, width:1280, height:800}`，OCR 读出 54 行界面文字）。
+
 ## 4. 安装与自举
 
 - 官方安装 = `dsh plugin --profile <p> add dsh-game-bridge`；实行验证过它会把包

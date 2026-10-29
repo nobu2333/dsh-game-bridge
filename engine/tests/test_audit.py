@@ -49,7 +49,7 @@ def test_audit_write_failure_does_not_raise(tmp_path):
 def test_session_audits_attach_act_plan_and_blocked_attempts():
     audit = AuditLog()
     session = GameSession(engine=FakeEngine(), gate=allowed_gate(), control_backend="dry-run", audit=audit)
-    session.attach({"window": "fixture"})
+    session.attach({"window": "unspecified"})
     session.act({"button": "A", "duration_ms": 30})
     session.plan({"mode": "hold", "button": "A", "duration_ms": 150})
     session.stop()
@@ -72,9 +72,10 @@ def test_blocked_attempt_is_audited():
         control_backend="dry-run",
         audit=audit,
     )
-    session.attach({"window": "fixture"})
+    session.attach({"window": "unspecified"})
     try:
         session.act({"button": "A"})
     except Exception:  # noqa: BLE001 - 期望 SAFETY_BLOCKED
         pass
     assert any(entry["event"] == "act_blocked" for entry in audit.tail(5))
+

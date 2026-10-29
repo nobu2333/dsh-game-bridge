@@ -42,13 +42,27 @@ class GameEngine:
 
             self._ocr = Ocr()
 
-    def snapshot(self, *, ocr: bool = True, max_width: int | None = None) -> dict:
+    def snapshot(self, *, ocr: bool = True, max_width: int | None = None, region: dict | None = None) -> dict:
         import cv2
 
         self._ensure()
         frame = self._capturer.grab()
         if not isinstance(frame, np.ndarray) or frame.ndim != 3:
             raise EngineError("BAD_FRAME", f"抓到的不是三通道图像：{type(frame)}")
+
+        crop = None
+        if region:
+            try:
+                left = max(0, int(region["left"]))
+                top = max(0, int(region["top"]))
+                right = min(frame.shape[1], left + int(region["width"]))
+                bottom = min(frame.shape[0], top + int(region["height"]))
+            except (KeyError, TypeError, ValueError) as error:
+                raise EngineError("BAD_REGION", f"region 参数不合法：{region!r}") from error
+            if right - left < 8 or bottom - top < 8:
+                raise EngineError("BAD_REGION", f"region 裁剪后太小：{region!r}")
+            frame = frame[top:bottom, left:right]
+            crop = {"left": left, "top": top, "width": right - left, "height": bottom - top}
 
         height, width = frame.shape[:2]
         limit = max_width or self._max_width
@@ -85,10 +99,24 @@ class GameEngine:
             "ocr": lines,
             "captured_at_ms": int(time.time() * 1000),
         }
+        if crop:
+            result["region"] = crop
         if lines_error:
             result["ocr_error"] = lines_error
         return result
 
     def close(self) -> None:
-        if self._capturer is not None and hasattr(self._capturer, "close"):
-            self._capturer.close()
+        capturer, self._capturer = self._capturer, None
+        if capturer is not None and hasattr(capturer, "close"):
+            try:
+                capturer.close()
+            except Exception:  # noqa: BLE001 - 释放失败不掩盖主流程
+                pass
+        # DXcam 内部是 COM 对象；显式回收能避免解释器退出时 comtypes 在
+        # 已反初始化的 COM 上再 Release 一次（实测会打印 access violation）。
+        try:
+            import gc
+
+            gc.collect()
+        except Exception:  # noqa: BLE001
+            pass
