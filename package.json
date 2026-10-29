@@ -28,7 +28,9 @@
   "scripts": {
     "test": "node --test \"test/*.test.mjs\"",
     "test:session": "node test/integration/m0-session.mjs",
-    "test:all": "node test/integration/run-all.mjs"
+    "test:all": "node test/integration/run-all.mjs",
+    "release:check": "pwsh -File scripts/release.ps1",
+    "release": "pwsh -File scripts/release.ps1 -Publish -SkipTests"
   },
   "engines": {
     "node": ">=22",

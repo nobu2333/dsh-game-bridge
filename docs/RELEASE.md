@@ -4,6 +4,18 @@
 > `lib/bootstrap.js`、`engine/pyproject.toml`、`engine/dsh_game_core/__init__.py`
 > 三处必须同步，否则测试直接红。
 
+## 一条命令（推荐）
+
+```powershell
+pwsh -File scripts/release.ps1            # 演练：测试 + 构建 + 校验产物，不发布
+npm login                                 # 一次
+$env:UV_PUBLISH_TOKEN='<pypi token>'      # 一次
+pwsh -File scripts/release.ps1 -Publish -SkipTests   # 真发布
+```
+
+脚本会拒绝：缺 token、npm 未登录、tarball 里出现 `tmp/`、`.dsh-test/`、`node_modules`、
+或缺少 `package.json` / `cordis.patch.yml` / `lib/index.js`。
+
 ## 0. 发布前自检
 
 ```powershell
