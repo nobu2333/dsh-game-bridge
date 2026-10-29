@@ -10,6 +10,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { checkPlatform } from '../lib/bootstrap.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = resolve(here, '..')
@@ -33,4 +34,12 @@ test('engine declares MIT and ships its license file', () => {
   const pyproject = read('engine/pyproject.toml')
   assert.match(pyproject, /license = \{ text = "MIT" \}/)
   assert.ok(read('engine/LICENSE').includes('MIT License'))
+})
+
+test('non-Windows platforms are refused with a human reason', () => {
+  assert.match(checkPlatform('darwin', {}), /Windows only/)
+  assert.match(checkPlatform('linux', {}), /current platform is linux/)
+  assert.equal(checkPlatform('win32', {}), null)
+  // 开发者显式覆盖时才放行（例如在别的平台上跑 UI/打包测试）。
+  assert.equal(checkPlatform('darwin', { DSH_GAME_BRIDGE_ALLOW_UNSUPPORTED: '1' }), null)
 })

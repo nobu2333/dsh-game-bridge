@@ -68,6 +68,16 @@ npm run test:session
 **harness 实际发出的请求体**里断言：工具确实出现在 `tools` 数组里、工具结果确实
 回来了、图片确实以 `data:image/png` 送到了模型。产物落在 `test/integration/.out/`。
 
+**全量回归**（一次跑完 M0/M1/M2/M3/events/windows/bootstrap 七条）：
+
+```powershell
+$env:DSH_HOME='<repo>/.dsh-test'
+$env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'   # 不设则跳过需要真实引擎的五条
+npm run test:all
+```
+
+最近一次实测：7/7 PASS，约 68 秒（含真实抓屏、OCR、闭环、窗口列表、自举安装）。
+
 验证自举安装（不需要系统 Python：uv 建 venv，装仓库内的假引擎包，秒级）：
 
 ```powershell
