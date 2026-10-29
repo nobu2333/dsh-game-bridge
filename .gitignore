@@ -8,8 +8,14 @@ tmp/
 npm-debug.log*
 
 # 引擎缓存（首次激活时下载，不进仓库）
-engine/
+# 注意：engine/ 是引擎源码目录，要入库；只挡它下面的构建产物。
 .cache/
+.engine-cache/
+engine/.venv/
+engine/build/
+engine/dist/
+engine/*.egg-info/
+engine/**/__pycache__/
 
 # 隔离的 DSH_HOME：本地验证官方安装链路用，绝不入库
 .dsh-test/
