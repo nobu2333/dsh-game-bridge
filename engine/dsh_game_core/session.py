@@ -898,6 +898,13 @@ class GameSession:
         return None
 
     def _scene_loop(self, profile: dict, stop: threading.Event) -> None:
+        # 慢环降优先级，尽量不抢快环的 CPU。
+        try:
+            import ctypes
+
+            ctypes.windll.kernel32.SetThreadPriority(ctypes.windll.kernel32.GetCurrentThread(), -1)
+        except Exception:  # noqa: BLE001 - 非 Windows/受限环境忽略
+            pass
         try:
             from .ocr import Ocr
             from .state import detect_scene

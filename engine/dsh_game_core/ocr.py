@@ -44,6 +44,8 @@ class Ocr:
                 det_limit_side_len=960,
                 det_model_path="",
                 use_angle_cls=False,
+                intra_op_num_threads=1,
+                inter_op_num_threads=1,
             )
             self._engine(np.zeros((32, 128, 3), dtype=np.uint8))
 
