@@ -125,7 +125,10 @@
     },
     "danger_reflex": true,
     "face_back": false,
-    "engage_max_ms": 2500
+    "engage_max_ms": 2500,
+    "entity_memory": true,
+    "turn_and_shoot": true,
+    "turn_shoot_ms": 600
   },
   "colors": {
     "parry": {
