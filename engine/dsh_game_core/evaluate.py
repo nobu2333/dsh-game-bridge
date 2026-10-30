@@ -207,8 +207,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--level", default="forest-follies")
     args = parser.parse_args(argv)
     episodes = summarize_episodes(os.path.join(args.data_root, "episodes"), game=args.game, level=args.level)
-    cards = summarize_cards(load_cards(os.path.join(args.data_root, "knowledge"), args.game, args.level))
-    drift = summarize_coordinate_drift(cards)
+    card_list = load_cards(os.path.join(args.data_root, "knowledge"), args.game, args.level)
+    cards = summarize_cards(card_list)
+    drift = summarize_coordinate_drift(card_list)
     episodes["cards"] = cards
     episodes["drift"] = drift
     print(format_report(episodes))
