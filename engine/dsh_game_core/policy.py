@@ -321,6 +321,8 @@ class PolicyRunner:
         # 交战距离：威胁进入该半径时先停前进、继续射击，避免「一路走进敌人身上」。
         self._engage_radius = max(0.0, _as_float(combat.get("engage_radius"), 0.0) or 0.0)
         self._engage_hold_ms = max(0.0, _as_float(combat.get("engage_hold_ms"), 220.0) or 0.0)
+        # 基本操作先验：交战停步不能无限持续，否则会在原地「磨蹭」不推进。
+        self._engage_max_ms = max(0.0, _as_float(combat.get("engage_max_ms"), 0.0) or 0.0)
         # 实体跟踪 / 交战细节（通用，可按游戏关闭）。
         self._ignore_own_bullets = bool(combat.get("ignore_own_bullets", True))
         self._face_back = bool(combat.get("face_back", True))
@@ -373,6 +375,7 @@ class PolicyRunner:
         self._last_jump_at: float | None = None
         self._last_dash_at: float | None = None
         self._engage_until = 0.0
+        self._engage_started: float | None = None
         self._tracks = []
         # 非阻塞点按：press() 会 sleep 按住时长，60 Hz 环里不能调用它；
         # 这里改用 hold + 到期 release，避免跳跃/闪避把整拍拖慢。
@@ -467,6 +470,7 @@ class PolicyRunner:
         self._last_jump_at = None
         self._last_dash_at = None
         self._engage_until = 0.0
+        self._engage_started: float | None = None
         self._pending_releases = []
         self._held = set()
         self._tracks = []
@@ -704,6 +708,14 @@ class PolicyRunner:
                 if distance <= self._engage_radius and (target is None or distance < target[0]):
                     target = (distance, x, entity)
         if target is None:
+            self._engage_started = None
+            return
+        now = self._clock()
+        if self._engage_started is None:
+            self._engage_started = now
+        if self._engage_max_ms > 0 and (now - self._engage_started) * 1000.0 >= self._engage_max_ms:
+            # 已经停步太久：即使还有威胁也恢复推进，避免原地磨蹭。
+            self._engage_started = now
             return
         target_distance, target_x, _target = target
         self._engage_until = self._clock() + self._engage_hold_ms / 1000.0
