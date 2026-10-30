@@ -45,7 +45,7 @@ uv publish engine/dist/*            # 需要 PyPI token：UV_PUBLISH_TOKEN
 ## 2. 插件（npm）
 
 ```powershell
-npm pack --dry-run                  # 确认只含 9 个文件、无 tmp/.dsh-test
+npm pack --dry-run                  # 确认只含预期文件（README / README.en / lib / cordis.patch.yml / docs/STATUS.md / docs/CONTROLS.md / LICENSE）、无 tmp/.dsh-test
 npm publish --access public         # 需要 npm 登录（2FA，交互输 OTP）
 ```
 

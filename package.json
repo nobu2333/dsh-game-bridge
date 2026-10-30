@@ -12,6 +12,9 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
+    "README.en.md",
+    "docs/STATUS.md",
+    "docs/CONTROLS.md",
     "LICENSE"
   ],
   "keywords": [

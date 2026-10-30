@@ -75,15 +75,36 @@
 `{ type: 'image', attachment: ImageAttachmentRef }`，引用由 `ctx.attachments.saveImage()`
 落盘。会话文本里只留尺寸与来源，字节不进历史。M0 已用合成帧验证这条链路。
 
-## 3.5 窗口级抓屏（不是整屏）
+## 3.5 抓屏：整屏 grab + 窗口矩形裁剪（不是真正的窗口级抓屏）
+
+> 本节于 2026-10-30 修正：旧标题「窗口级抓屏（不是整屏）」与实现不符——实现一直是
+> 整屏 grab 再按窗口矩形裁剪，反例见 `docs/FIELD-2026-10-29.md` P1-2。
 
 `game_attach` 接受窗口标题子串，用只读 Win32 API（EnumWindows / GetWindowText /
-DwmGetWindowAttribute）解析出窗口矩形；之后每次 `snapshot` 重新读一次矩形再裁剪，
-窗口移动/缩放不会拍偏。找不到窗口时返回 `WINDOW_NOT_FOUND` 并列出当前可见标题——
-比「随便截个整屏让模型猜」有用得多。
+DwmGetWindowAttribute）解析出窗口矩形；之后每次 `snapshot` 重新读一次矩形，
+从 DXcam 抓到的**整块显示器画面**里裁出这一块。窗口移动/缩放不会拍偏，
+但**别的窗口盖住游戏时，裁出来的就是遮盖物**——引擎不会魔法般只拿回游戏像素。
+找不到窗口时返回 `WINDOW_NOT_FOUND` 并列出当前可见标题——比「随便截个整屏让模型猜」
+有用得多。
 
-实测（本机）：attach 到 1280×800 的窗口后，帧尺寸与裁剪区完全一致
+实测（本机，无遮挡）：attach 到 1280×800 的窗口后，帧尺寸与裁剪区完全一致
 （`region {left:239, top:203, width:1280, height:800}`，OCR 读出 32–54 行界面文字）。
+2026-10-29 实机则拍到反例：attach 在 Cuphead 上、snapshot 却返回覆盖其上的 DSH
+聊天窗口（`docs/FIELD-2026-10-29.md` P1-2）。
+
+**低成本可观测性（已实现）**：短期不换抓屏，但把「拍错人」从静默变成显式信号：
+
+- `foreground_window()`：前台窗口的 `hwnd / title / process / 矩形`；
+- `window_occlusion(hwnd)`：只统计 z-order 在目标之上的可见顶层窗口，按交叠面积
+  给出 `occluded_ratio`（0–1；`>= 0.5` 记为 `occluded`）与 `covered_by`（前 3 个）；
+- `game_snapshot` 返回 `foreground` / `occluded`，渲染追加 `Foreground: ...`，
+  遮挡或不在前台时打 `⚠`（带比例）；
+- `game_attach` / `game_act` / `game_plan` / `game_status` 也带 `foreground`，
+  `game_act` 另带 `delivery`。
+
+**真正的窗口级抓屏是后续工作**：`PrintWindow(PW_RENDERFULLCONTENT)` 或
+Windows Graphics Capture（WGC）。它们能绕开遮挡，但对部分游戏/受保护内容仍可能
+返回黑帧，需要逐游戏实机验证；在那之前，文档与工具文本都不得声称支持窗口级抓屏。
 
 **多显示器**：`EnumDisplayMonitors` + `GetMonitorInfoW` 拿到每块显示器的虚拟桌面
 坐标，`MonitorFromWindow` 找窗口所在屏；`capture.match_output_index` 用分辨率与主屏
@@ -125,7 +146,10 @@ DSH 的兼容性检查是**严格 semver**，而运行时版本常带预发布�
    `tools/pre-execute` 钩子，对 `game_attach` 返回 `{kind:'ask'}`，走 DSH
    user-approval 的一次性批准；headless/CI 没有应答者时 fail-closed 拒绝。
    dry-run 下不注册钩子——只记录动作的操作不值得打断用户；
-5. **可审计**：`DSH_GAME_BRIDGE_AUDIT_LOG` 打开后，`attach / act / plan_start /
+5. **前台校验**：真实后端在 `game_act` 前要求 attached 窗口在前台，否则抛
+   `EngineError("FOREGROUND_MISMATCH")`；`game_plan` 逐拍检查，丢前台即中止。
+   它与 §3.5 的 `foreground` / `occluded` 元数据一起，挡住「成功但无效」的静默失败；
+6. **可审计**：`DSH_GAME_BRIDGE_AUDIT_LOG` 打开后，`attach / act / plan_start /
    plan_end / stop` 与 `act_blocked / plan_blocked` 全部写本地 JSONL；写失败只记
    在条目里，不影响主流程。默认关闭，路径完全由用户指定。
 

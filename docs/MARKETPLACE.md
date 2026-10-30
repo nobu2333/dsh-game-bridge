@@ -11,7 +11,7 @@
 | 一句话 | 给 DSH 装上眼睛和手：看得懂屏幕上的游戏，也能用本地 20 Hz 闭环替你操作。 |
 | 许可证 | MIT |
 | 平台 | Windows 10/11 x64 |
-| 仓库 | `https://github.com/<owner>/dsh-game-bridge`（待建） |
+| 仓库 | `https://github.com/nobu2333/dsh-game-bridge` |
 | 安装命令 | `dsh plugin --profile web add dsh-game-bridge` |
 | 分类 | 游戏 / 计算机使用 / 自动化 |
 

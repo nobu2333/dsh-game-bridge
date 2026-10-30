@@ -13,6 +13,59 @@
 - Package version numbers were not bumped yet; bump them (4 places, see RELEASE.md)
   at release time.
 
+## Added: `game_selftest` readiness report (2026-10-30)
+
+- `game_selftest` now returns, alongside the existing text summary:
+  - `install`: `package_dir`, `profile`, `profile_dir`, `dependency`, `source`
+    (`registry` / `local-file` / `link` / `github` / `unknown`, inferred from the profile's
+    `package.json` dependency spec) and `warnings` (a `local-file` dependency under a temp
+    directory warns because the artifact can be cleaned up and break the next host start);
+  - `backend`: chosen backend readiness (`name`, `ready`, `detail`, `xinput_slot`,
+    `warnings`); for `vgamepad` it creates a pad once and closes it without pressing any
+    button (`probe_devices`);
+  - `report`: the raw engine self-test result.
+- The engine self-test now also reports `foreground` (current foreground window),
+  `backend` (selected from `DSH_GAME_BRIDGE_CONTROL`), `xinput_slots_connected`, and
+  always probes the `vgamepad` dependency.
+
+## Added: foreground / occlusion metadata (2026-10-30)
+
+- Capture is a full-monitor DXcam grab cropped to the window rectangle, so another window
+  covering the game is what gets captured. The plugin now exposes that instead of hiding it:
+  - `game_snapshot` returns `foreground` and `occluded` (`available`, `occluded_ratio`,
+    `occluded`, `covered_by` top 3) and renders `Foreground: ...` plus a `⚠` warning when
+    the attached window is not foreground or is occluded;
+  - `game_attach`, `game_act`, `game_plan` and `game_status` also carry `foreground`;
+    `game_act` carries `delivery`.
+- Real backends (`vgamepad` / `keyboard`) now refuse `game_act` with
+  `FOREGROUND_MISMATCH` when the attached window is not in the foreground, and
+  `game_plan` aborts the loop when the foreground is lost. Attach runs a backend preflight
+  and fails fast with `BACKEND_UNAVAILABLE` instead of failing at the first act.
+- `vgamepad` controllers scan XInput slots 0–3 after creation, record `xinput_slot`, and
+  retry pad creation up to twice when the slot is not 0 (warn, never raise just for that).
+  `game_attach` / `game_status` / `game_selftest` report the slot and warnings.
+- `session.stop()` / `close()` now release and close real controllers, so repeated
+  attach/stop cycles do not accumulate ghost virtual gamepads.
+
+## Docs (2026-10-30)
+
+- README (zh + en): install matrix for the desktop app (Settings → Plugins, profile
+  `desktop`, CLI cannot manage it), `dsh web` and `dsh headless`; restart the host after
+  install; how to switch `DSH_GAME_BRIDGE_CONTROL` (requires a host restart); what to do
+  when the deployment's approval policy is `never`; and what `game_selftest` reports.
+- `docs/DESIGN.md` §3.5 corrected: capture is a full-monitor grab + window-rect crop, not
+  true window capture; foreground/occlusion metadata is the low-cost signal; true window
+  capture (PrintWindow / Windows Graphics Capture) is future work.
+- `docs/STATUS.md` / `docs/CONTROLS.md` updated with the above; `docs/FIELD-2026-10-29.md`
+  and its evidence package are now in the repo with local paths/usernames genericized
+  (historical record; conclusions and evidence unchanged).
+- npm package now ships `README.en.md`, `docs/STATUS.md` and `docs/CONTROLS.md`
+  (the full docs tree and evidence images are intentionally not shipped).
+
+Note: the new foreground/occlusion behavior and refusal paths are covered by unit and
+integration tests, but have not been re-verified on a real game yet; the 2026-10-29 field
+evidence predates the fix.
+
 # v0.0.1
 
 First public release of **dsh-game-bridge** — it gives DeepSeek Harness eyes and hands on games.
