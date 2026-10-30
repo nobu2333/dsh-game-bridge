@@ -204,6 +204,8 @@ class PolicyRunner:
         scene_source: Callable[[], str | None] | None = None,
         foreground_ok: Callable[[], bool | None] | None = None,
         focus_window: Callable[[], Any] | None = None,
+        hp_source: Callable[[], Any] | None = None,
+        on_danger_outcome: Callable[[str, str], Any] | None = None,
     ):
         self._capture = capture
         self._controller = controller
@@ -218,6 +220,11 @@ class PolicyRunner:
         # 可选：逐拍前台校验 + 重新聚焦（SendInput 只送前台窗口）。
         self._foreground_ok = foreground_ok if callable(foreground_ok) else None
         self._focus_window = focus_window if callable(focus_window) else None
+        # 可选：缓存 HP + 危险卡结果回调（结果回写由会话持久化）。
+        self._hp_source = hp_source if callable(hp_source) else None
+        self._on_danger_outcome = on_danger_outcome if callable(on_danger_outcome) else None
+        self._danger_armed: dict | None = None
+        self._danger_armed_at = 0.0
         self._entities_missing = False
         self._last_error: str | None = None
 
@@ -349,6 +356,8 @@ class PolicyRunner:
         self._scroll_s = 0.0
         self._last_danger_id: str | None = None
         self._prev_scene: str | None = None
+        self._danger_armed = None
+        self._danger_armed_at = 0.0
 
         # ── 线程内状态 ──
         self._held: set[str] = set()
@@ -606,6 +615,7 @@ class PolicyRunner:
                 self._update_tracks(entities)
                 self._update_player(frame)
                 self._update_memory(previous_frame, frame)
+                self._check_danger_outcome()
                 self._maybe_engage(entities)
 
             # 3) 持续键（射击 / 前进）：缺什么补什么，已经按住的不重复按。
@@ -916,6 +926,42 @@ class PolicyRunner:
                 self._tap(key, 140.0)
             self._last_danger_id = card_id
             self._nearby_danger["acted"] = True
+            self._danger_armed = {"id": card_id, "hp": self._current_hp()}
+            self._danger_armed_at = self._clock()
+
+    def _current_hp(self) -> int | None:
+        if self._hp_source is None:
+            return None
+        try:
+            value = self._hp_source()
+            return None if value is None else int(value)
+        except (TypeError, ValueError):
+            return None
+        except Exception:  # noqa: BLE001 - HP 源失败只损失结果回写
+            return None
+
+    def _check_danger_outcome(self) -> None:
+        """危险卡执行后：掉血算 failed，离开窗口一段时间未掉血算 avoided。"""
+        armed = self._danger_armed
+        if not armed:
+            return
+        current_hp = self._current_hp()
+        outcome = None
+        if current_hp is not None and armed.get("hp") is not None and current_hp < int(armed["hp"]):
+            outcome = "failed"
+        elif self._clock() - self._danger_armed_at >= 2.8:
+            nearby = self._nearby_danger
+            if not nearby or nearby.get("id") != armed.get("id"):
+                outcome = "avoided"
+        if outcome is None:
+            return
+        callback = self._on_danger_outcome
+        if callback is not None:
+            try:
+                callback(str(armed.get("id") or ""), outcome)
+            except Exception:  # noqa: BLE001 - 回写失败不影响玩法
+                pass
+        self._danger_armed = None
 
     def _update_tracks(self, entities: list[dict]) -> None:
         if self._tracker is None:

@@ -399,3 +399,37 @@ def test_death_confirms_pending_hp_reading(tmp_path, monkeypatch):
     assert len(cards) == 1
     assert cards[0]["event"]["hp_before"] == 1
     session.close()
+
+def test_danger_outcome_writes_back_stats(tmp_path, monkeypatch):
+    monkeypatch.setenv("DSH_GAME_BRIDGE_DATA_DIR", str(tmp_path))
+    from dsh_game_core.memory import KnowledgeStore
+
+    store = KnowledgeStore(tmp_path / "knowledge")
+    card = store.upsert(
+        {
+            "id": "cuphead/forest-follies/danger-outcome",
+            "game": "cuphead",
+            "level": "forest-follies",
+            "place": {"scroll_s": 1.0},
+            "trigger": {"kind": "enemy"},
+            "response": {"skill": "jump_over"},
+        }
+    )
+    assert card is not None
+    session = GameSession(
+        engine=FakeEngine(),
+        gate=SafetyGate(process_source=lambda: [], takeover_source=lambda: False, process_ttl_s=0),
+    )
+    session._record_game = "cuphead"
+    session._record_level = "forest-follies"
+    session._danger_outcome(card["id"], "avoided")
+    stored = store.load("cuphead", "forest-follies")["cards"][0]
+    assert stored["stats"]["avoided"] == 1
+    assert stored["stats"]["response_tries"] == 1
+    assert stored["response_efficacy"] > 0.5
+    session._danger_outcome(card["id"], "failed")
+    stored = store.load("cuphead", "forest-follies")["cards"][0]
+    assert stored["stats"]["response_failures"] == 1
+    assert stored["stats"]["response_tries"] == 2
+    assert stored["response_efficacy"] <= 0.5
+    session.close()

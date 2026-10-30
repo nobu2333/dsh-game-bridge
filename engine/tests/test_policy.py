@@ -161,6 +161,8 @@ def build_runner(
     budget_ticks=None,
     tick_hz=60.0,
     scene_source=None,
+    hp_source=None,
+    on_danger_outcome=None,
 ):
     """构造一个由「虚拟时间 + 拍数预算」自动收尾的 runner。"""
     controller = controller or FakeController()
@@ -184,6 +186,8 @@ def build_runner(
         sleep=sleep,
         entities=entities if entities is not None else no_entities,
         scene_source=scene_source,
+        hp_source=hp_source,
+        on_danger_outcome=on_danger_outcome,
     )
     holder["runner"] = runner
     controller.clock = virtual.clock
@@ -445,3 +449,36 @@ def test_danger_reflex_uses_dodge_key_for_evade():
     run_to_completion(runner)
     assert any(call["action"] == "hold" and call["button"] == "SHIFT" for call in controller.calls)
     assert not any(call["action"] == "hold" and call["button"] == "Z" for call in controller.calls)
+
+def test_danger_outcome_failed_on_hp_drop():
+    profile = make_profile(danger_reflex=True)
+    profile["danger_cards"] = [
+        {
+            "id": "cuphead/forest-follies/danger-fail",
+            "game": "cuphead",
+            "level": "forest-follies",
+            "place": {"scroll_s": 0.0},
+            "trigger": {"kind": "enemy"},
+            "response": {"skill": "jump_over"},
+            "status": "candidate",
+        }
+    ]
+    outcomes = []
+    hp_values = [3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+    counter = {"i": 0}
+
+    def hp_source():
+        value = hp_values[min(counter["i"], len(hp_values) - 1)]
+        counter["i"] += 1
+        return value
+
+    runner, _, _ = build_runner(
+        budget_ticks=12,
+        profile=profile,
+        hp_source=hp_source,
+        on_danger_outcome=lambda card_id, outcome: outcomes.append((card_id, outcome)),
+    )
+    run_to_completion(runner)
+    assert outcomes
+    assert outcomes[0][0] == "cuphead/forest-follies/danger-fail"
+    assert outcomes[0][1] == "failed"

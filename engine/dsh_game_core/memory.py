@@ -38,6 +38,7 @@ _SKILLS = (
 )
 _RELATIONS = ("ahead", "behind", "above", "below", "same", "unknown")
 _ID_SAFE = re.compile(r"^[a-zA-Z0-9._-]{1,64}$")
+_CARD_ID_SAFE = re.compile(r"^(?!.*\.\.)[a-zA-Z0-9._/-]{1,160}$")
 
 
 def _num(value: Any, default: float) -> float:
@@ -58,6 +59,11 @@ def _clamp(value: Any, low: float, high: float, default: float) -> float:
 def _safe_id(value: Any, default: str) -> str:
     text = str(value or "").strip()
     return text if _ID_SAFE.match(text) else default
+
+
+def _safe_card_id(value: Any, default: str = "") -> str:
+    text = str(value or "").strip()
+    return text if _CARD_ID_SAFE.match(text) else default
 
 
 def _now(value: Any = None) -> float:
@@ -91,7 +97,7 @@ def normalize_danger_card(raw: Any, *, now: Any = None) -> dict | None:
     if status not in DANGER_STATUS:
         status = "candidate"
 
-    card_id = _safe_id(raw.get("id"), "")
+    card_id = _safe_card_id(raw.get("id"), "")
     if not card_id:
         card_id = f"{game}/{level}/danger-{uuid.uuid4().hex[:8]}"
     evidence = raw.get("evidence")
@@ -132,8 +138,12 @@ def normalize_danger_card(raw: Any, *, now: Any = None) -> dict | None:
             "encounters": max(0, int(_num(stats.get("encounters"), 0))),
             "damage_events": max(0, int(_num(stats.get("damage_events"), 0))),
             "avoided": max(0, int(_num(stats.get("avoided"), 0))),
+            "response_tries": max(0, int(_num(stats.get("response_tries"), 0))),
+            "response_failures": max(0, int(_num(stats.get("response_failures"), 0))),
         },
         "confidence": round(_clamp(raw.get("confidence"), 0.0, 1.0, 0.3), 3),
+        "hazard_confidence": round(_clamp(raw.get("hazard_confidence", raw.get("confidence")), 0.0, 1.0, 0.3), 3),
+        "response_efficacy": round(_clamp(raw.get("response_efficacy"), 0.0, 1.0, 0.5), 3),
         "status": status,
         "created_at": _now(raw.get("created_at") or now),
         "updated_at": _now(raw.get("updated_at") or now),
