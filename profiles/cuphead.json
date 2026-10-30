@@ -1,7 +1,10 @@
 {
   "id": "cuphead",
   "name": "Cuphead",
-  "self_pos": [0.28, 0.75],
+  "self_pos": [
+    0.28,
+    0.75
+  ],
   "controls": {
     "left": "LEFT",
     "right": "RIGHT",
@@ -14,15 +17,32 @@
   },
   "hud": {
     "hp": {
-      "box": [0.0, 0.88, 0.22, 0.14],
+      "box": [
+        0.0,
+        0.88,
+        0.22,
+        0.14
+      ],
       "prefix": "HP"
     }
   },
   "player": {
     "track": true,
     "every_n_ticks": 3,
-    "colors": [{"r_min": 170, "g_max": 110, "b_max": 110}],
-    "validate_colors": [{"r_min": 170, "g_max": 110, "b_max": 110}],
+    "colors": [
+      {
+        "r_min": 170,
+        "g_max": 110,
+        "b_max": 110
+      }
+    ],
+    "validate_colors": [
+      {
+        "r_min": 170,
+        "g_max": 110,
+        "b_max": 110
+      }
+    ],
     "validate_min_fraction": 0.005,
     "min_pixels": 20,
     "color_score": 0.55,
@@ -30,40 +50,80 @@
     "search_radius": 0.25
   },
   "scene": {
-    "menu_keywords": ["START", "OPTIONS", "EXIT", "DLC", "CONTINUE", "RESUME"],
-    "death_keywords": ["DEAD", "GAME OVER", "RETRY"],
+    "menu_keywords": [
+      "START",
+      "OPTIONS",
+      "EXIT",
+      "DLC",
+      "CONTINUE",
+      "RESUME"
+    ],
+    "death_keywords": [
+      "DEAD",
+      "GAME OVER",
+      "RETRY"
+    ],
     "loading_max_texts": 1,
     "refresh_ms": 2500,
     "recover_interval_ms": 700,
     "ocr_max_width": 962
   },
   "scenes": {
-    "death": {"recover": [{"press": "confirm"}]},
-    "equip": {"recover": [{"press": "ESC"}]},
-    "cutscene": {"recover": [{"press": "confirm"}]},
-    "menu": {"recover": []},
-    "loading": {"recover": []}
+    "death": {
+      "recover": [
+        {
+          "press": "confirm"
+        }
+      ]
+    },
+    "equip": {
+      "recover": [
+        {
+          "press": "ESC"
+        }
+      ]
+    },
+    "cutscene": {
+      "recover": [
+        {
+          "press": "confirm"
+        }
+      ]
+    },
+    "menu": {
+      "recover": []
+    },
+    "loading": {
+      "recover": []
+    }
   },
   "combat": {
-    "hold": ["X"],
+    "hold": [
+      "X"
+    ],
     "advance": "RIGHT",
     "dodge": {
-      "keys": ["Z"],
+      "keys": [
+        "Z"
+      ],
       "threat_radius": 0.18,
       "cooldown_ms": 350,
       "press_ms": 160
     },
     "jump_every_ms": 0,
     "dash_every_ms": 0,
-    "engage_radius": 0.20,
+    "engage_radius": 0.2,
     "engage_hold_ms": 220,
     "stuck": {
       "static_mean_diff": 0.9,
       "scroll_min_px": 0.8,
       "after_ms": 600,
       "probe_ms": 350,
-      "probe_keys": ["Z"]
-    }
+      "probe_keys": [
+        "Z"
+      ]
+    },
+    "danger_reflex": true
   },
   "colors": {
     "parry": {

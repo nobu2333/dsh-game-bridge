@@ -406,3 +406,23 @@ def test_status_reports_nearby_danger_card():
     assert status["danger"] is not None
     assert status["danger"]["trigger"] == "mushroom"
     assert status["danger"]["skill"] == "jump_over"
+
+def test_candidate_danger_reflex_jumps_once():
+    profile = make_profile(danger_reflex=True)
+    profile["danger_cards"] = [
+        {
+            "id": "cuphead/forest-follies/danger-reflex",
+            "game": "cuphead",
+            "level": "forest-follies",
+            "place": {"scroll_s": 0.0, "player_x": 0.4},
+            "trigger": {"kind": "threat", "template": "mushroom"},
+            "response": {"skill": "jump_over"},
+            "status": "candidate",
+        }
+    ]
+    runner, _, controller = build_runner(budget_ticks=20, profile=profile)
+    status = run_to_completion(runner)
+    assert status["danger"] is not None
+    assert status["danger"].get("acted") is True
+    jump_holds = [call for call in controller.calls if call["action"] == "hold" and call["button"] == "Z"]
+    assert len(jump_holds) == 1

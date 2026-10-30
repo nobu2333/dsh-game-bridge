@@ -319,6 +319,8 @@ class PolicyRunner:
         self._face_back = bool(combat.get("face_back", True))
         self._turn_press_ms = max(20.0, _as_float(combat.get("turn_press_ms"), 90.0) or 90.0)
         self._track_radius = max(0.01, _as_float(combat.get("track_match_radius"), 0.08) or 0.08)
+        # 单机「一次学习」反射：candidate 危险卡也允许在对应坐标执行一次规避动作。
+        self._danger_reflex = bool(combat.get("danger_reflex", False))
         self._tracker = None
         self._tracks: list[Any] = []
         # 场景门控/恢复：profile.scenes = {scene: {"recover": [{"press": "confirm"}], ...}}
@@ -897,21 +899,19 @@ class PolicyRunner:
             "trigger": str(trigger.get("template") or trigger.get("kind") or "")[:64],
             "skill": str(response.get("skill") or "")[:32],
             "status": str(card.get("status") or "candidate")[:16],
+            "acted": bool(card.get("id") and str(card.get("id")) == self._last_danger_id),
         }
-        # 已人工/评测确认的危险点才执行预设技能；candidate 只提示，不盲动。
+        # 已人工/评测确认的危险点才执行预设技能；开 danger_reflex 时 candidate 也执行一次。
         status = str(card.get("status") or "candidate")
         skill = str(response.get("skill") or "")
         card_id = self._nearby_danger["id"]
-        if (
-            status in ("validated", "trusted")
-            and skill == "jump_over"
-            and distance <= 0.35
-            and card_id != self._last_danger_id
-        ):
+        allowed = status in ("validated", "trusted") or (self._danger_reflex and status == "candidate")
+        if allowed and skill in ("jump_over", "evade", "unknown") and distance <= 0.35 and card_id != self._last_danger_id:
             jump = self._jump_keys[0] if self._jump_keys else None
             if jump:
                 self._tap(jump, 140.0)
             self._last_danger_id = card_id
+            self._nearby_danger["acted"] = True
 
     def _update_tracks(self, entities: list[dict]) -> None:
         if self._tracker is None:

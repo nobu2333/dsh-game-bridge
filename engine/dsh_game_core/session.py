@@ -602,6 +602,14 @@ class GameSession:
                                 "relation": attribution["relation"],
                             }
                         )
+                    if card["response"].get("skill") in ("", "unknown") and card["event"].get("cause") in (
+                        "contact",
+                        "projectile",
+                    ):
+                        card["response"]["skill"] = "jump_over" if card["event"]["cause"] == "contact" else "evade"
+                    # 同一坐标重复挨打，说明这里是稳定危险点：升级为 validated 供策略执行。
+                    if int(card["stats"]["damage_events"]) >= 2 and card.get("status") == "candidate":
+                        card["status"] = "validated"
                     if episode:
                         card["evidence"] = (card.get("evidence") or [])[-7:] + [episode]
                     store.save(self._record_game, self._record_level, book["cards"])
@@ -623,7 +631,9 @@ class GameSession:
                     "relation": attribution["relation"],
                 },
                 "event": {"type": "damage", "cause": attribution["cause"], "hp_before": hp_before, "hp_after": hp_after},
-                "response": {"skill": "unknown"},
+                "response": {
+                    "skill": "jump_over" if attribution["cause"] == "contact" else ("evade" if attribution["cause"] == "projectile" else "unknown")
+                },
                 "evidence": [episode] if episode else [],
                 "stats": {"encounters": 1, "damage_events": 1, "avoided": 0},
                 "confidence": 0.35,
