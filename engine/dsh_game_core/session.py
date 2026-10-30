@@ -647,6 +647,13 @@ class GameSession:
 
             policy_status = self._policy.status() if self._policy is not None else {}
             scroll_s = float(policy_status.get("scroll_s") or 0.0)
+            hit = policy_status.get("hit") if isinstance(policy_status.get("hit"), dict) else None
+            if hit is not None:
+                try:
+                    if time.monotonic() - float(hit.get("t")) <= 3.0:
+                        scroll_s = float(hit.get("scroll_s") or scroll_s)
+                except (TypeError, ValueError):
+                    pass
             nearby = policy_status.get("danger") if isinstance(policy_status.get("danger"), dict) else None
             attribution = self._attribute_damage(policy_status)
             store = KnowledgeStore(os.path.join(self._data_root(), "knowledge"))
