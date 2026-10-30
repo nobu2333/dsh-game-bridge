@@ -653,6 +653,12 @@ class GameSession:
                         card["status"] = "validated"
                 else:
                     stats["response_failures"] = int(stats.get("response_failures", 0)) + 1
+                    # 已 validated/trusted 的应对如果实际失效，必须降级重新验证。
+                    if float(card.get("response_efficacy", 0.5)) < 0.4 and card.get("status") in (
+                        "validated",
+                        "trusted",
+                    ):
+                        card["status"] = "candidate"
                     if int(stats.get("response_failures", 0)) >= 2 and float(card.get("response_efficacy", 0.5)) < 0.4:
                         ladder = ("jump_over", "evade", "retreat", "hold")
                         current = str(card.get("response", {}).get("skill") or "unknown")
