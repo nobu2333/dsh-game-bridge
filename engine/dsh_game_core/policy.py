@@ -358,7 +358,7 @@ class PolicyRunner:
         scenes = self._profile.get("scenes")
         self._scenes = scenes if isinstance(scenes, dict) else {}
         self._recover_interval_ms = max(200.0, _as_float(self._profile.get("scene", {}).get("recover_interval_ms") if isinstance(self._profile.get("scene"), dict) else None, 800.0) or 800.0)
-        self._recover_max_attempts = 8
+        self._recover_max_attempts = 40
         self._recover_scene: str | None = None
         self._recover_attempts = 0
         self._last_recover_at = 0.0
@@ -1216,6 +1216,7 @@ class PolicyRunner:
         steps = config.get("recover")
         if not isinstance(steps, (list, tuple)) or not steps:
             return
+        max_attempts = int(_as_float(config.get("max_attempts"), self._recover_max_attempts) or self._recover_max_attempts)
         now = self._clock()
         if (now - self._last_recover_at) * 1000.0 < self._recover_interval_ms:
             return
@@ -1231,7 +1232,7 @@ class PolicyRunner:
                 return
         self._recover_attempts += 1
         self._last_recover_at = now
-        if self._recover_attempts > self._recover_max_attempts:
+        if self._recover_attempts > max_attempts:
             self._stop_reason = f"scene unrecoverable: {scene}"
             self._stop_event.set()
 

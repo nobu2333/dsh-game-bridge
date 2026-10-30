@@ -74,14 +74,16 @@
         {
           "press": "confirm"
         }
-      ]
+      ],
+      "max_attempts": 40
     },
     "equip": {
       "recover": [
         {
           "press": "ESC"
         }
-      ]
+      ],
+      "max_attempts": 10
     },
     "cutscene": {
       "recover": [
