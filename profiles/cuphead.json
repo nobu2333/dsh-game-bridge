@@ -123,7 +123,9 @@
         "Z"
       ]
     },
-    "danger_reflex": true
+    "danger_reflex": true,
+    "face_back": false,
+    "engage_max_ms": 2500
   },
   "colors": {
     "parry": {
