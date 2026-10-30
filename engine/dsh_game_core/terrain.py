@@ -43,6 +43,16 @@ def ground_mask(frame_bgr: Any, profile: Any = None) -> np.ndarray | None:
                 if high is not None:
                     current &= values <= _number(high, 255)
             mask |= current
+        region = terrain.get("ground_region")
+        if isinstance(region, (list, tuple)) and len(region) >= 4:
+            height, width = mask.shape[:2]
+            left = int(max(0.0, min(1.0, _number(region[0], 0.0))) * width)
+            top = int(max(0.0, min(1.0, _number(region[1], 0.0))) * height)
+            rw = int(max(0.0, min(1.0, _number(region[2], 1.0))) * width)
+            rh = int(max(0.0, min(1.0, _number(region[3], 1.0))) * height)
+            limited = np.zeros_like(mask)
+            limited[top : top + rh, left : left + rw] = mask[top : top + rh, left : left + rw]
+            mask = limited
         return mask
     except Exception:  # noqa: BLE001
         return None
