@@ -74,14 +74,38 @@ test('game_selftest reports a failed engine instead of pretending', async () => 
   const ctx = fakeCtx()
   apply(ctx)
   const definition = tool(ctx, 'game_selftest')
-  const value = await definition.execute({}, {})
+  // 单元测试不该依赖调用者 shell 里的后端选择。
+  const savedControl = process.env.DSH_GAME_BRIDGE_CONTROL
+  delete process.env.DSH_GAME_BRIDGE_CONTROL
+  let value
+  try {
+    value = await definition.execute({}, {})
+  } finally {
+    if (savedControl !== undefined) process.env.DSH_GAME_BRIDGE_CONTROL = savedControl
+  }
   assert.equal(value.plugin, 'dsh-game-bridge')
   assert.equal(value.engine_ready, false)
   assert.equal(value.engine.includes('failed'), true)
+  // 新诊断字段：安装来源与后端就绪状态即使引擎不可用也要有。
+  assert.equal(typeof value.install, 'object')
+  assert.equal(typeof value.install.package_dir, 'string')
+  assert.ok(
+    ['registry', 'local-file', 'link', 'github', 'unknown'].includes(value.install.source),
+    `unexpected install source ${value.install.source}`,
+  )
+  assert.ok(Array.isArray(value.install.warnings))
+  assert.equal(typeof value.backend, 'object')
+  assert.equal(value.backend.name, 'dry-run')
+  assert.equal(value.backend.ready, false)
+  assert.ok(Array.isArray(value.backend.warnings))
+  assert.equal(value.report, undefined, 'no engine selftest report when the engine is off')
   JSON.stringify(value) // 输出值必须是无损 JSON
   const blocks = definition.output.render({}, value)
   assert.equal(blocks.length, 1)
   assert.equal(blocks[0].type, 'text')
+  assert.match(blocks[0].text, /engine: failed/)
+  assert.match(blocks[0].text, /backend: dry-run/)
+  assert.match(blocks[0].text, /install: /)
 })
 
 test('game_snapshot falls back to the synthetic frame when the engine is off', async () => {
@@ -93,12 +117,124 @@ test('game_snapshot falls back to the synthetic frame when the engine is off', a
   assert.equal(value.height, 180)
   assert.equal(value.source, 'synthetic fallback')
   assert.equal(value.attachment.attachmentId, 'att_m0_test')
+  // 没有引擎就没有前台/遮挡信息：字段应整个缺省，而不是塞一个假值。
+  assert.equal(value.foreground, undefined)
+  assert.equal(value.occluded, undefined)
   JSON.stringify(value) // 图片引用必须是可序列化的，不能带原始字节
   const blocks = definition.output.render({}, value)
   assert.equal(blocks.length, 2)
   assert.equal(blocks[0].type, 'text')
   assert.equal(blocks[1].type, 'image')
   assert.equal(blocks[1].attachment.attachmentId, 'att_m0_test')
+})
+
+test('renders keep the integration substrings and surface the new diagnostics', () => {
+  const ctx = fakeCtx()
+  apply(ctx)
+  const control = {
+    backend: 'dry-run',
+    ready: true,
+    detail: 'records actions only',
+    xinput_slot: null,
+    warnings: [],
+  }
+  const foreground = { hwnd: 11, title: 'Fixture Game', process: 'fixture.exe' }
+
+  const [attachBlock] = tool(ctx, 'game_attach').output.render(
+    {},
+    { attached: { window: 'Fixture Game' }, backend: 'dry-run', safety: { allowed: true, reasons: [] }, control, foreground },
+  )
+  assert.ok(attachBlock.text.startsWith('Attached to Fixture Game'))
+  assert.match(attachBlock.text, /Safety: allowed/)
+  assert.match(attachBlock.text, /Control: dry-run ready/)
+  assert.match(attachBlock.text, /Foreground: Fixture Game \(hwnd 11\)/)
+
+  const [actBlock] = tool(ctx, 'game_act').output.render(
+    {},
+    {
+      action: { backend: 'dry-run', button: 'A', duration_ms: 80, dry_run: true },
+      safety: { allowed: true, reasons: [] },
+      actions_total: 1,
+      delivery: { checked: true, foreground: true, hwnd: 11, title: 'Fixture Game' },
+    },
+  )
+  assert.match(actBlock.text, /^DRY-RUN: would press A for 80ms/)
+  assert.match(actBlock.text, /Delivery: target window is in the foreground/)
+
+  const [pressedBlock] = tool(ctx, 'game_act').output.render(
+    {},
+    {
+      action: { backend: 'vgamepad', button: 'B', duration_ms: 40, dry_run: false },
+      safety: { allowed: true, reasons: [] },
+      actions_total: 2,
+      delivery: { checked: true, foreground: false, hwnd: 11, title: 'Editor' },
+    },
+  )
+  assert.ok(pressedBlock.text.startsWith('Pressed B for 40ms'))
+  assert.match(pressedBlock.text, /NOT in the foreground \(now: Editor\)/)
+
+  const [planBlock] = tool(ctx, 'game_plan').output.render(
+    {},
+    {
+      plan: { id: 'plan-123', mode: 'hold', button: 'DPAD_RIGHT', duration_ms: 300, status: 'running' },
+      safety: { allowed: true, reasons: [] },
+      control,
+      foreground,
+    },
+  )
+  assert.ok(planBlock.text.startsWith('Plan plan-123: hold DPAD_RIGHT'))
+  assert.match(planBlock.text, /Foreground: Fixture Game \(hwnd 11\)/)
+
+  const [statusBlock] = tool(ctx, 'game_status').output.render(
+    {},
+    {
+      attached: { window: 'Fixture Game' },
+      backend: 'dry-run',
+      safety: { allowed: true, reasons: [] },
+      actions_total: 0,
+      control,
+      foreground,
+    },
+  )
+  assert.match(statusBlock.text, /backend: dry-run;/)
+  assert.match(statusBlock.text, /Foreground: Fixture Game \(hwnd 11\)/)
+
+  const [snapshotBlock] = tool(ctx, 'game_snapshot').output.render(
+    {},
+    {
+      width: 16,
+      height: 9,
+      source: 'window via dsh-game-core',
+      note: 'OCR: fixture text (0.9)',
+      attachment: { attachmentId: 'att_render', mediaType: 'image/png', bytes: 1, width: 16, height: 9 },
+      foreground,
+      occluded: {
+        available: true,
+        occluded_ratio: 0.62,
+        occluded: true,
+        covered_by: [{ hwnd: 22, title: 'Editor', ratio: 0.62 }],
+      },
+    },
+  )
+  assert.match(snapshotBlock.text, /^Frame 16x9 \(window via dsh-game-core\)\./)
+  assert.match(snapshotBlock.text, /OCR: fixture text/)
+  assert.match(snapshotBlock.text, /Foreground: Fixture Game \(hwnd 11\)/)
+  assert.match(snapshotBlock.text, /⚠ target window is 62% occluded \(mostly by Editor\)/)
+
+  const [clearSnapshot] = tool(ctx, 'game_snapshot').output.render(
+    {},
+    {
+      width: 16,
+      height: 9,
+      source: 'screen via dsh-game-core',
+      note: 'OCR: no text found',
+      attachment: { attachmentId: 'att_render', mediaType: 'image/png', bytes: 1, width: 16, height: 9 },
+      occluded: { available: true, occluded_ratio: 0.0, occluded: false, covered_by: [] },
+    },
+  )
+  assert.match(clearSnapshot.text, /screen via dsh-game-core/)
+  assert.match(clearSnapshot.text, /Occlusion: 0% covered/)
+  assert.doesNotMatch(clearSnapshot.text, /⚠/)
 })
 
 test('dry-run registers no approval hook', () => {

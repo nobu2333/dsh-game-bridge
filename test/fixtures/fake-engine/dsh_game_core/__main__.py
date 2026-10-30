@@ -15,12 +15,59 @@ SAFETY = {
     "takeover": False,
 }
 
+# 1x1 transparent PNG: enough for the plugin's screenshot → attachment pipeline.
+TINY_PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+FOREGROUND = {
+    "hwnd": 4242,
+    "title": "Fixture Game",
+    "process": "fixture.exe",
+    "left": 0,
+    "top": 0,
+    "width": 1280,
+    "height": 720,
+}
+
+CONTROL = {
+    "backend": "dry-run",
+    "ready": True,
+    "detail": "records actions only",
+    "xinput_slot": None,
+    "warnings": [],
+}
+
+
+def backend_report():
+    """selftest 的 backend 报告用 `name`（与真实引擎 selftest 一致）。"""
+    report = dict(CONTROL)
+    report.pop("backend", None)
+    report["name"] = "dry-run"
+    return report
+
+OCCLUDED = {
+    "available": True,
+    "occluded_ratio": 0.0,
+    "occluded": False,
+    "covered_by": [],
+}
+
 
 def handle(method, params, state):
     if method == "ping":
         return {"ok": True, "version": "0.0.1"}
     if method == "selftest":
-        return {"engine": "fixture", "deps": {}, "monitors": [], "ocr_ready": False}
+        return {
+            "engine": "fixture",
+            "version": "0.0.1",
+            "deps": {"vgamepad": "MISSING: fixture engine has no real gamepad"},
+            "monitors": [],
+            "ocr_ready": False,
+            "xinput_slots_connected": [],
+            "backend": backend_report(),
+            "foreground": dict(FOREGROUND),
+        }
     if method == "windows":
         return {
             "count": 2,
@@ -33,9 +80,28 @@ def handle(method, params, state):
         return {"backend": "dry-run", "buttons": ["A", "B", "W", "SPACE"], "note": "fixture control list"}
     if method == "events":
         return {"event": "changed", "mean_diff": 3.25, "changed_ratio": 0.0412, "elapsed_ms": 220, "width": 160, "height": 90}
+    if method == "snapshot":
+        return {
+            "width": 16,
+            "height": 9,
+            "png_b64": TINY_PNG_B64,
+            "region": None,
+            "ocr": [{"text": "fixture text", "score": 0.9}],
+            "foreground": dict(FOREGROUND),
+            "occluded": dict(OCCLUDED),
+        }
     if method == "attach":
-        state["attached"] = {"window": params.get("window") or "fixture-game"}
-        return {"attached": state["attached"], "backend": "dry-run", "safety": SAFETY}
+        state["attached"] = {
+            "window": params.get("window") or "fixture-game",
+            "hwnd": FOREGROUND["hwnd"],
+        }
+        return {
+            "attached": state["attached"],
+            "backend": "dry-run",
+            "safety": SAFETY,
+            "control": dict(CONTROL),
+            "foreground": dict(FOREGROUND),
+        }
     if method == "act":
         state["actions"] = state.get("actions", 0) + 1
         return {
@@ -46,7 +112,14 @@ def handle(method, params, state):
                 "dry_run": True,
             },
             "safety": SAFETY,
+            "attached": state.get("attached"),
             "actions_total": state["actions"],
+            "delivery": {
+                "checked": True,
+                "foreground": True,
+                "hwnd": FOREGROUND["hwnd"],
+                "title": FOREGROUND["title"],
+            },
         }
     if method == "plan":
         state["plan"] = {
@@ -58,7 +131,12 @@ def handle(method, params, state):
             "ticks": 0,
             "hz": 0,
         }
-        return {"plan": dict(state["plan"]), "safety": SAFETY}
+        return {
+            "plan": dict(state["plan"]),
+            "safety": SAFETY,
+            "control": dict(CONTROL),
+            "foreground": dict(FOREGROUND),
+        }
     if method == "stop":
         state["attached"] = None
         if "plan" in state:
@@ -73,6 +151,8 @@ def handle(method, params, state):
             "safety": SAFETY,
             "actions_total": state.get("actions", 0),
             "plan": state.get("plan"),
+            "control": dict(CONTROL),
+            "foreground": dict(FOREGROUND),
         }
     return {}
 
