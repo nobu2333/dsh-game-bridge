@@ -221,6 +221,8 @@ def test_hp_drop_saves_damage_episode():
     session._maybe_record_hp(3)
     assert saved == []
     session._maybe_record_hp(2)
+    assert saved == []  # 单次低读数只挂起，等下一次确认
+    session._maybe_record_hp(2)
     assert saved == ["forest-follies-damage"]
     session.close()
 
@@ -250,6 +252,7 @@ def test_hp_drop_creates_candidate_danger_card(tmp_path, monkeypatch):
     session._record_level = "forest-follies"
     session._start_recorder = lambda: None
     session._maybe_record_hp(3)
+    session._maybe_record_hp(2)
     session._maybe_record_hp(2)
     assert saved == ["forest-follies-damage"]
     from dsh_game_core.memory import KnowledgeStore
@@ -294,6 +297,7 @@ def test_hp_drop_attributes_damage_to_nearest_track(tmp_path, monkeypatch):
     session._start_recorder = lambda: None
     session._maybe_record_hp(3)
     session._maybe_record_hp(2)
+    session._maybe_record_hp(2)
     from dsh_game_core.memory import KnowledgeStore
 
     cards = KnowledgeStore(tmp_path / "knowledge").load("cuphead", "forest-follies")["cards"]
@@ -302,4 +306,96 @@ def test_hp_drop_attributes_damage_to_nearest_track(tmp_path, monkeypatch):
     assert card["trigger"]["kind"] == "threat"
     assert card["trigger"]["relation"] == "ahead"
     assert card["event"]["cause"] == "contact"
+    session.close()
+
+
+def _memory_session(tmp_path, monkeypatch, saved, status=None):
+    monkeypatch.setenv("DSH_GAME_BRIDGE_DATA_DIR", str(tmp_path))
+    session = GameSession(
+        engine=FakeEngine(),
+        gate=SafetyGate(process_source=lambda: [], takeover_source=lambda: False, process_ttl_s=0),
+    )
+
+    class Recorder:
+        def add_event(self, event):
+            pass
+
+        def save(self, tag):
+            saved.append(tag)
+            return str(tmp_path / tag)
+
+    class PolicyStatus:
+        def status(self):
+            return status or {"scroll_s": 3.5, "danger": None}
+
+    session._recorder = Recorder()
+    session._policy = PolicyStatus()
+    session._record_game = "cuphead"
+    session._record_level = "forest-follies"
+    # 保存后立即重启录制：用同一个假录制器，模拟真实的「续录下一段」。
+    recorder = session._recorder
+    session._start_recorder = lambda: setattr(session, "_recorder", recorder)
+    return session
+
+
+def _cards(tmp_path):
+    from dsh_game_core.memory import KnowledgeStore
+
+    return KnowledgeStore(tmp_path / "knowledge").load("cuphead", "forest-follies")["cards"]
+
+
+def test_single_hp_misread_does_not_create_card(tmp_path, monkeypatch):
+    saved = []
+    session = _memory_session(tmp_path, monkeypatch, saved)
+    session._maybe_record_hp(3)
+    session._maybe_record_hp(2)  # OCR 误读
+    session._maybe_record_hp(3)
+    session._maybe_record_hp(3)
+    assert saved == []
+    assert _cards(tmp_path) == []
+    session.close()
+
+
+def test_death_creates_card_for_killing_hit(tmp_path, monkeypatch):
+    saved = []
+    session = _memory_session(tmp_path, monkeypatch, saved)
+    session._maybe_record_hp(1)
+    session._maybe_record_scene("death")
+    assert saved == ["forest-follies-death"]
+    cards = _cards(tmp_path)
+    assert len(cards) == 1
+    assert cards[0]["event"]["type"] == "death"
+    assert cards[0]["event"]["hp_before"] == 1
+    assert cards[0]["event"]["hp_after"] == 0
+    assert cards[0]["place"]["scroll_s"] == 3.5
+    session.close()
+
+
+def test_death_screen_saves_one_episode_and_one_card_per_life(tmp_path, monkeypatch):
+    saved = []
+    session = _memory_session(tmp_path, monkeypatch, saved)
+    calls = []
+    session._record_damage_card = lambda *args, **kwargs: calls.append(kwargs.get("event_type"))
+    session._maybe_record_hp(2)
+    for _ in range(4):  # 死亡画面停留多个 OCR 周期
+        session._maybe_record_scene("death")
+    session._maybe_record_scene("unknown")  # 闪烁
+    session._maybe_record_scene("death")
+    assert saved.count("forest-follies-death") == 2  # 场景确实切换过才重录
+    assert calls == ["death"]  # 同一条命只建一张死亡卡
+    session._maybe_record_scene("gameplay")
+    session._maybe_record_scene("death")
+    assert calls == ["death", "death"]  # 新的一条命再死一次，重新建卡
+    session.close()
+
+
+def test_death_confirms_pending_hp_reading(tmp_path, monkeypatch):
+    saved = []
+    session = _memory_session(tmp_path, monkeypatch, saved)
+    session._maybe_record_hp(2)
+    session._maybe_record_hp(1)  # 尚未确认就死了
+    session._maybe_record_scene("death")
+    cards = _cards(tmp_path)
+    assert len(cards) == 1
+    assert cards[0]["event"]["hp_before"] == 1
     session.close()
