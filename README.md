@@ -2,11 +2,13 @@
 
 **给 DeepSeek Harness 装上眼睛和手：让 DSH 看得懂游戏、也能替你玩。**
 
-[English](README.en.md) · [现状与交班](docs/STATUS.md)
+[English](README.en.md) · [状态模型](docs/STATE.md) · [现状与交班](docs/STATUS.md)
 
 > 状态：**0.0.1 已发布**（npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`）；
 > **0.0.2 已本地打包并安装验证（未发布）**：引擎自举、桌面 profile 安装、真实抓屏/OCR、前台/遮挡诊断。
 > 已实测：从 registry 的 tarball 安装 → 引擎自举（PyPI）→ 真实抓屏/OCR → 20 Hz 闭环。
+> **通用玩法基线**（WorldState 视觉状态 + 60 Hz 状态策略 + 本地档案层）已落地；
+> memory / API provider 仍是设计位，**未实现**（详见 [docs/STATE.md](docs/STATE.md)）。
 > **默认 dry-run 后端（只记录、不碰设备）**；真实注入已实机验证（2026-10-29：手柄 A + XInput 回读、键盘 W + `AsyncKeyState` 回读）；仅 Windows。
 
 ## 这是什么
@@ -16,16 +18,54 @@ DSH 有大脑（模型、工具、会话），但没有「眼睛和手」：它�
 
 dsh-game-bridge 把一块薄薄的插件壳装进 DSH，背后接一个本地引擎：
 
-- **眼睛**：抓屏（DXcam）、帧差分、OCR 语义层、20 Hz 实体/弹幕追踪；
+- **眼睛**：抓屏（DXcam）、帧差分、OCR 语义层、通用世界状态 WorldState（`game_state`）；
 - **手**：虚拟手柄（XInput）、虚拟键鼠、窗口焦点与输入法看护；
-- **小脑**：本地 20 Hz 闭环（导航、避障、走位、弹反），模型只给目标，不逐步按键；
-- **安全**：夺回热键、反作弊游戏硬拒绝；真实后端需 DSH 审批。
+- **小脑**：本地闭环——`game_plan` 20 Hz 方向原语、`game_policy` 60 Hz 状态策略（射击/前进/闪避/脱困），模型只给目标，不逐步按键；
+- **安全**：夺回热键、反作弊游戏硬拒绝；真实后端需 DSH 审批；
+- **档案**：游戏差异只写 JSON profile（键位/HUD/阈值），引擎零游戏代码。
 
 ## 为什么是「目标级工具」而不是「每步调一次工具」
 
 模型一次工具调用要 3~5 秒。如果让模型逐步决定「往右走一步」，游戏里它就是个植物人。
 所以工具面只暴露**目标级**接口（绑定窗口、看一眼、跑一个目标的循环、停下来），
 即时反应由本地循环完成。这条约束来自被实测反复验证的延迟事实，不是口味问题。
+
+## 工具（13 个）
+
+| 工具 | 用途 |
+|:--|:--|
+| `game_selftest` | 插件装没装上、装在哪、引擎/后端就绪度 |
+| `game_snapshot` | 看一眼：一帧图 + OCR 文本 + 前台/遮挡元数据 |
+| `game_events` | 廉价帧差事件（baseline / static / changed / scene_cut） |
+| `game_windows` | 列出可见窗口（标题/进程/尺寸） |
+| `game_controls` | 当前后端接受的按钮/按键名 |
+| `game_attach` | 绑定窗口（用户授权步骤；可带 `profile`） |
+| `game_state` | 读一次通用世界状态 WorldState（场景 / HP / 实体 / UI 文本） |
+| `game_policy` | 起停本地 60 Hz 状态策略（按 profile 射击/前进/闪避/脱困） |
+| `game_memory` | 本地游戏档案（profile）的增删改查与选用——**不读游戏内存** |
+| `game_act` | 单步按键（默认 dry-run，只记录） |
+| `game_plan` | 本地 20 Hz 有界方向闭环（hold / tap / advance 撞墙侧移脱困） |
+| `game_status` | 绑定状态、安全判定、闭环/策略进度、审计尾巴 |
+| `game_stop` | 停一切、松手、解绑 |
+
+## 通用玩法基线（WorldState）
+
+插件不内置任何一款游戏的代码，而是把「看得见」和「知道游戏规则」分开：
+
+- **视觉是地板**：`game_state` 每帧从抓屏 + OCR 产出通用世界状态（场景、HP、威胁、
+  弹反点、UI 文本）。没有档案、没有内存、没有网络也能工作；坐标一律归一化到 0..1，
+  未知就是 `null`，提取器出错返回默认值而不是抛异常。
+- **档案是数据**：键位、HUD 区域、场景关键词、闪避半径等游戏差异写在 JSON profile 里
+  （`DSH_GAME_BRIDGE_PROFILE_DIR`，默认在用户缓存目录的 `profiles/`）；引擎只认字段、
+  不认游戏名。`game_memory` 管的就是这份本地档案库。
+- **内存/API provider 是可选项**：状态层设计上预留了 provider 位，但**当前版本只实现
+  视觉 provider**。缺失时基线照常工作；将来加入时也必须默认关闭、显式启用、不绕过安全闸。
+- **Cuphead 是 dogfood 样例**：仓库只放通用字段的样例 profile（键位/HUD/阈值），
+  不含内存偏移、CT 表或攻略数据。样例不会自动加载：把 `DSH_GAME_BRIDGE_PROFILE_DIR`
+  指向仓库的 `profiles/`，或用 `game_memory save` 写进本地档案库。
+
+数据形状、provider 优先级、confidence/stale 语义与降级规则见
+[docs/STATE.md](docs/STATE.md)。
 
 ## 安装（三种宿主，各有各的 profile）
 
@@ -221,6 +261,7 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR / 前台
 | M1 ✅ | 真实抓屏/OCR + 引擎自举 | 隔离 harness 里拿到真实屏幕帧 + OCR 文本；uv 自举可跑 |
 | M2 ✅ | 安全闸 + 输出通道 + 单步 act | 两道安全闸单测钉死；attach → act 端到端通过；真实后端需审批 |
 | M3 ✅（dry-run 已验证） | 20 Hz 本地闭环 | 闭环 ~20 Hz、逐拍安全复检、stop 立即松手 |
+| M4 ✅（单测通过） | 通用玩法基线：WorldState + 60 Hz 策略 + 档案层 | 引擎 state/policy 单测、插件工具与档案库测试通过（`npm test` 44/44、`pytest` 154/154）；Cuphead 样例 profile 可跑 dry-run；集成/真实对局待复验；memory/API provider 未实现 |
 | 发布 ✅ | npm + PyPI + 插件市场 | 0.0.1 已发布，发布产物安装/M1/M3 实测通过；市场收录待提交 |
 
 ## 已知限制（v1）
@@ -242,7 +283,12 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR / 前台
   但还没有「连续 20 Hz 操作真实游戏」的实机录像；默认仍是 dry-run。
 - **新的前台/遮挡元数据与拒绝逻辑**已通过单元/集成测试，但**尚未在真实游戏里复验**
   （实机证据是修复前的行为，见 `docs/FIELD-2026-10-29.md`）。
-- **游戏内语义未校准**：帧差分阈值、OCR 区域都还是通用值，没有按具体游戏调过。
+- **游戏内语义未校准**：帧差分阈值、OCR 区域、弹反颜色与闪避半径都还是通用值；
+  Cuphead 只是 dogfood 样例，没有在真实对局里系统标定。
+- **memory/API provider 未实现**：状态层目前只有视觉 provider；`game_memory` 管的是
+  本地档案，不是游戏内存。`game_state` 里的 `player.x/y` 等字段要等 provider 落地才能填。
+- **60 Hz 状态策略未在真实游戏复验**：`PolicyRunner` 有单测（安全中止、闪避冷却、
+  脱困、松手），但真实后端下的长时间对局验证还没做；默认仍是 dry-run。
 
 ## 安全承诺（发布版必须成立）
 
@@ -255,7 +301,9 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR / 前台
 5. **前台校验**：真实后端在 `game_act` / `game_plan` 前校验 attached 窗口是否在前台，
    不在前台直接拒绝（`FOREGROUND_MISMATCH`），不制造「成功但无效」的动作；
 6. **可审计**：打开 `DSH_GAME_BRIDGE_AUDIT_LOG` 后，每一次 attach/act/plan/stop
-   与每一次被拒绝的尝试都落本地 JSONL，可自证。
+   与每一次被拒绝的尝试都落本地 JSONL，可自证；
+7. **档案是数据**：仓库只发布通用样例 profile（键位/HUD/阈值），不含内存偏移/攻略表；
+   用户档案留在用户本地，默认不读游戏内存。
 
 > 「无人不自娱」（无键鼠输入即停手）这条闸继承自宿主项目，对 dsh-game-bridge
 > 不适用（误杀手柄玩家、又会被注入输入自我遮蔽），已于 2026-10-30 移除。

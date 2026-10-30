@@ -1,0 +1,55 @@
+{
+  "id": "cuphead",
+  "name": "Cuphead",
+  "self_pos": [0.28, 0.75],
+  "controls": {
+    "left": "LEFT",
+    "right": "RIGHT",
+    "up": "UP",
+    "down": "DOWN",
+    "jump": "Z",
+    "shoot": "X",
+    "dash": "SHIFT",
+    "confirm": "Z"
+  },
+  "hud": {
+    "hp": {
+      "box": [0.0, 0.88, 0.22, 0.14],
+      "prefix": "HP"
+    }
+  },
+  "scene": {
+    "menu_keywords": ["START", "OPTIONS", "EXIT", "DLC", "CONTINUE", "RESUME"],
+    "death_keywords": ["DEAD", "GAME OVER", "RETRY"],
+    "loading_max_texts": 1
+  },
+  "combat": {
+    "hold": ["X"],
+    "advance": "RIGHT",
+    "dodge": {
+      "keys": ["Z"],
+      "threat_radius": 0.18,
+      "cooldown_ms": 350,
+      "press_ms": 160
+    },
+    "jump_every_ms": 550,
+    "dash_every_ms": 0,
+    "engage_radius": 0.30,
+    "engage_hold_ms": 220,
+    "stuck": {
+      "static_mean_diff": 0.9,
+      "after_ms": 600,
+      "probe_ms": 350,
+      "probe_keys": ["Z"]
+    }
+  },
+  "colors": {
+    "parry": {
+      "r_min": 175,
+      "b_min": 175,
+      "rb_minus_g_min": 25,
+      "min_pixels": 6
+    }
+  },
+  "notes": "Cuphead keyboard defaults: arrows/WASD move, Z jump/confirm, X shoot, SHIFT dash. HUD HP sits bottom-left (HP.3). Profile contains only UI/input data, no memory offsets."
+}

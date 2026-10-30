@@ -9,16 +9,25 @@
 > (it records actions instead of injecting input); real injection was verified on
 > hardware on 2026-10-29 (gamepad A read back via XInput, keyboard W read back via
 > AsyncKeyState), but a long 20 Hz loop has not yet been run on a real game. Windows only.
+>
+> **General play baseline** (WorldState visual state + 60 Hz reactive policy + local
+> profile store) has landed; memory / API providers remain design placeholders and are
+> **not implemented** — see [docs/STATE.md](docs/STATE.md).
 
 DSH has a brain (models, tools, sessions) but no eyes or hands: it can read files,
 run commands and browse the web, yet it cannot see the game you are playing or press
 a button. dsh-game-bridge plugs a thin plugin shell into DSH and backs it with a
 local engine:
 
-- **eyes** — screen capture (DXcam), frame differencing, OCR (RapidOCR), 20 Hz entity tracking (planned);
-- **hands** — virtual gamepad (XInput via ViGEmBus), keyboard/mouse (planned);
-- **cerebellum** — a local ~20 Hz closed loop; the model picks goals, not keystrokes;
-- **safety** — takeover hotkey, anti-cheat refusal, local audit log.
+- **eyes** — screen capture (DXcam), frame differencing, OCR (RapidOCR), and a per-frame
+  WorldState (`game_state`);
+- **hands** — virtual gamepad (XInput via ViGEmBus), keyboard/mouse (keyboard via SendInput;
+  mouse planned);
+- **cerebellum** — local loops: a 20 Hz bounded direction primitive (`game_plan`) and a
+  60 Hz profile-driven policy (`game_policy`); the model picks goals, not keystrokes;
+- **safety** — takeover hotkey, anti-cheat refusal, local audit log;
+- **profiles** — game differences live in JSON (keys/HUD/thresholds); the engine contains
+  no game-specific code.
 
 ## Why target-level tools, not per-step tools
 
@@ -136,11 +145,38 @@ Call it after restarting: it answers both "did I install it into the right place
 | `game_controls` | Button/key names accepted by the current backend |
 | `game_windows` | List visible windows (title, process, size) |
 | `game_events` | Cheap frame-difference event (baseline / static / changed / scene_cut) |
-| `game_attach` | Attach to a window (the user-authorization step) |
+| `game_attach` | Attach to a window (the user-authorization step; optional `profile` parameter) |
+| `game_state` | Read one general WorldState (scene, HP, entities, UI text) from the current frame |
+| `game_policy` | Start / stop / status the local 60 Hz reactive policy driven by the loaded game profile |
+| `game_memory` | Manage local game profiles (list / get / save / delete / use) — data only, **not** OS memory reading |
 | `game_act` | Press one gamepad button (dry-run by default; real backends refuse when the attached window is not foreground) |
 | `game_plan` | Bounded local ~20 Hz loop (hold / tap / advance with stuck-detection sidestep) |
 | `game_status` | Attach state, safety verdict, loop progress, audit tail |
 | `game_stop` | Stop the loop, release everything, detach |
+
+## General play baseline (WorldState)
+
+The plugin ships no game-specific code. It separates "what the screen shows" from "what
+this game means":
+
+- **Vision is the floor** — `game_state` turns one captured frame plus OCR into a generic
+  WorldState (scene, HP, threats, parry points, UI text). It works without a profile,
+  without memory access and without a network; coordinates are normalized 0..1, unknown
+  values are `null`, and extractors return defaults instead of raising.
+- **Profiles are data** — keys, HUD boxes, scene keywords and dodge radii live in JSON
+  profiles (`DSH_GAME_BRIDGE_PROFILE_DIR`, default `<cache-root>/profiles`); the engine
+  interprets fields, never game names. `game_memory` manages this local profile store.
+- **Memory / API providers are optional** — the state layer reserves provider slots, but
+  this release only implements the vision provider. The baseline works without them; a
+  future provider must be off by default, explicitly enabled, and must not bypass the
+  safety gates.
+- **Cuphead is the dogfood sample** — the repo ships a generic sample profile
+  (keys/HUD/thresholds) with no memory offsets, cheat tables or guide data. Samples are
+  not loaded automatically: point `DSH_GAME_BRIDGE_PROFILE_DIR` at the repo's `profiles/`
+  directory, or `game_memory save` them into the local store.
+
+Schemas, provider precedence, confidence/staleness and fallback rules:
+[docs/STATE.md](docs/STATE.md).
 
 ## Known limits (v1)
 
@@ -160,6 +196,12 @@ Call it after restarting: it answers both "did I install it into the right place
 - **The new foreground/occlusion metadata and refusal logic are covered by unit and
   integration tests, but have not been re-verified on a real game yet** (the field
   evidence predates the fix).
+- **The 60 Hz reactive policy is not re-verified on a real game yet**: `PolicyRunner` has
+  unit tests (safety abort, dodge cooldown, stuck escape, release-all) but no long
+  real-backend session has been run; the default backend stays dry-run.
+- **Memory / API providers are not implemented**: `game_memory` is a local profile store,
+  not a memory reader; fields such as `game_state`'s `player.x/y` need a provider to be
+  filled.
 - Windows only; multi-monitor edge cases and per-game threshold calibration are still
   open (see [docs/STATUS.md](docs/STATUS.md)).
 
@@ -169,7 +211,10 @@ Call it after restarting: it answers both "did I install it into the right place
 2. **No anti-cheat games** — EAC / BattlEye / Vanguard / ACE processes hard-block all output;
 3. **Read-only default** — capture + gamepad only; no memory reading, no injection;
 4. **Foreground check** — real backends verify the attached window is in the foreground
-   before acting and refuse otherwise.
+   before acting and refuse otherwise;
+5. **Profiles are data** — the repo only ships generic sample profiles (keys/HUD/thresholds)
+   with no memory offsets or guide tables; user profiles stay local and memory reading
+   stays off.
 
 Unattended play is allowed by design: the "stop when nobody is at the keyboard" guard
 inherited from the host project was removed on 2026-10-30 because it misfires for

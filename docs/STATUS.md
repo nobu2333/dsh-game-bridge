@@ -1,13 +1,13 @@
 # 现状与交班（STATUS）
 
-> 更新：2026-10-30（第 19 轮，0.0.2 本地打包并完成桌面安装验证）。**当前工程状态以本文件 + `git log` 为准**；
-> 设计理由看 `docs/DESIGN.md`，发布步骤看 `docs/RELEASE.md`。
+> 更新：2026-10-30（第 20 轮，通用玩法基线：WorldState + 60 Hz 状态策略 + 本地档案层）。**当前工程状态以本文件 + `git log` 为准**；
+> 设计理由看 `docs/DESIGN.md`，数据形状与降级规则看 `docs/STATE.md`，发布步骤看 `docs/RELEASE.md`。
 
 ## 一句话
 
 `dsh-game-bridge`：给 DeepSeek Harness 装上眼睛和手的 npm 插件（MIT，Windows-only v1）。
-模型只给目标（看一眼 / 绑窗口 / 跑一段有界动作 / 停），抓屏、OCR、20 Hz 闭环都在本地
-Python 引擎里；默认 dry-run（只记录不注入）。
+模型只给目标（看一眼 / 绑窗口 / 跑一段有界动作 / 起停策略 / 停），抓屏、OCR、60 Hz 状态策略
+都在本地 Python 引擎里；状态是「视觉保底 + 档案数据 + 可选 provider」；默认 dry-run（只记录不注入）。
 
 ## 现在到哪了
 
@@ -19,16 +19,18 @@ Python 引擎里；默认 dry-run（只记录不注入）。
 | M3 20 Hz 闭环 | ✅（dry-run 已验证） | 实测 21.3 Hz；逐拍安全复检；stop 一拍内松手；真实后端已接线 |
 | 发布 | ✅ 2026-10-29 | npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`；发布版安装+自举+M1/M3 实测通过 |
 | 0.0.2 本地打包 | ✅ 2026-10-30 | wheel/sdist/tarball 构建校验；桌面 profile 安装 0.0.2（引擎缓存 0.0.2）；`game_selftest` 报 0.0.2；**未发布** |
+| 通用玩法基线 | ✅ 单测通过（真实对局待复验） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 44/44、`pytest engine/tests` 154/154；memory/API provider **未实现**；集成/真实对局未复验 |
 | 市场收录 | ⏳ 待提交 | 仓库已 public，按 MARKETPLACE 提交 |
 
-工具面（10 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
-`game_events` · `game_attach` · `game_act` · `game_plan` · `game_status` · `game_stop`。
+工具面（13 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
+`game_events` · `game_attach` · `game_state` · `game_policy` · `game_memory` · `game_act` ·
+`game_plan` · `game_status` · `game_stop`。
 
 ## 一次跑完的验证
 
 ```powershell
-npm test                                   # 契约 + 版本 + 平台 + 本轮新增后端/安装来源单测
-cd engine; python -m pytest tests -q       # 引擎单测（含本轮新增前台/遮挡/槽位用例）
+npm test                                   # 契约 + 版本 + 平台 + 工具/档案库渲染单测
+cd engine; python -m pytest tests -q       # 引擎单测（含 state/policy/grab_raw、前台/遮挡、槽位）
 cd ..
 $env:DSH_HOME='<repo>/.dsh-test'
 $env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'
@@ -36,9 +38,11 @@ npm run test:all                           # 全量 PASS（约 110 秒）
 pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm tarball 并校验
 ```
 
-另外两条已实测：
+另外几条已实测：
 - **打包产物真实安装**：`npm pack` → `dsh plugin add <tarball>` → M1/M3 集成 PASS；
 - **真实引擎自举**：本地 wheel + 阿里云镜像，19.9 秒装完，缓存内 Python 直接起引擎。
+- **通用基线单测**（2026-10-30）：`npm test` 44/44、`pytest engine/tests` 154/154；
+  全量集成（`test:all`）与真实对局由发布前/Leader 验收时跑。
 
 ## 安全边界（已实现，不是口号）
 
@@ -50,7 +54,9 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
    引擎侧 attach 预检失败 → `BACKEND_UNAVAILABLE` fail-fast（不再等到第一次 act 才炸）；
 4. 真实后端动作前校验前台窗口：attached 窗口不在前台 → `FOREGROUND_MISMATCH` 拒绝；
    `game_plan` 逐拍检查，丢前台即中止；
-5. 默认 dry-run，不碰设备；审计日志默认关闭、路径用户指定。
+5. 默认 dry-run，不碰设备；审计日志默认关闭、路径用户指定；
+6. 档案边界：被跟踪 profile 只含通用字段（键位/HUD/阈值），不含内存偏移/攻略数据；
+   memory/API provider 默认关闭且**未实现**，将来接入也不得绕开上面 1–5。
 
 ## 已知限制
 
@@ -66,10 +72,32 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
   最多 2 次并给 warning，不保证游戏接受非 0 槽位。2026-10-30 本机实测（清理幽灵节点后
   仍）新建手柄落在 slot 1/2，疑似 ViGEmBus 驱动/总线状态，需重启后复验；
 - 真实注入已回读通过（vgamepad / keyboard），但**长闭环尚未在真实游戏里跑**；默认仍 dry-run；
+- **memory/API provider 未实现**：`game_memory` 是本地档案存储，不是内存读取器；
+  `game_state` 的 `player.x/y` 等字段要等 provider 落地才能填；
+- **60 Hz 状态策略只有单测/dry-run 覆盖**（安全中止、闪避冷却、脱困、松手、status 形状），
+  真实后端下的长对局尚未复验；
+- **通用状态语义未逐游戏标定**：场景关键词、HP 区域、弹反颜色、威胁半径都还是通用默认值；
+  Cuphead 样例 profile 只用于 dogfood，不是校准结果；
 - 帧差阈值、OCR 区域未按具体游戏校准。
 
 ## 变更记录
 
+- **2026-10-30（通用玩法基线：WorldState + 60 Hz 状态策略 + 档案层）**：
+  - 引擎新增 `state.py`（WorldState 提取：场景 / HP / 弹反点 / 移动威胁 / UI 文本；
+    坐标归一化、提取器不抛异常）与 `policy.py`（60 Hz `PolicyRunner`：按 profile
+    hold / advance / dodge / stuck，逐拍复检安全闸，退出必 `release_all`）；
+    `engine.py` 增加 `grab_raw()`（单次抓帧、不 OCR）；`session` 接线 `state` /
+    `policy_start` / `policy_stop`。
+  - 插件新增 `game_state` / `game_policy` / `game_memory` 与 `lib/profile-store.js`；
+    `game_attach` 支持可选 `profile`；profile 目录 `$DSH_GAME_BRIDGE_PROFILE_DIR`
+    或缓存根 `profiles/`，id 白名单校验、拒绝路径穿越。
+  - 仓库放入 Cuphead 样例 profile（`profiles/cuphead.json`，只含键位/HUD/阈值，
+    无内存偏移/攻略数据）。
+  - **诚实边界**：memory/API provider 仍是设计位、**未实现**；`game_memory` 只管理本地
+    档案，不读游戏内存；`game_state` 的 `player.x/y` 需要 provider；60 Hz 策略只有
+    单测/dry-run 验证，真实对局未复验；通用状态语义未逐游戏标定。提交前会跑全量回归。
+  - 文档：新增 `docs/STATE.md`（WorldState / GameProfile / provider / 降级 / 安全）；
+    README / README.en 工具表 10→13 并增加「通用玩法基线」；DESIGN 新增 §2.6；本文件同步。
 - **2026-10-30（0.0.2 打包与安装验证）**：版本号在四处 bump 到 0.0.2；本地产出
   wheel/sdist/npm tarball 并安装进桌面 profile 验证（`game_selftest` 报 plugin/engine
   0.0.2；dry-run `attach → snapshot → act → plan → stop` 通过；attach 到被 DSH 窗口
@@ -113,6 +141,9 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
    替代「整屏 grab + 窗口矩形裁剪」，并逐游戏实机复验新的前台/遮挡拒绝路径；
 7. **发布 0.0.2**：wheel/sdist + npm tarball 已本地构建并安装验收；发布后把当前桌面
    profile 的临时 tarball 换回 registry 来源。
+8. **通用玩法基线的真实对局验证**：在真实游戏里跑 `game_state` → `game_policy` 长对局，
+   标定 Cuphead 样例 profile 的 HP 区域/颜色阈值；在 memory/API provider 落地前，
+   文档必须保持「未实现」的表述。
 
 ## 已知环境问题（2026-10-29 实测）
 
@@ -134,6 +165,9 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
   否则会挂住 DSH 事件循环（实测 headless 永不退出）。
 - **严格 semver**：`engines.dsh` / peer 必须匹配带预发布标签的运行时版本。
 - **默认 dry-run + 真实后端审批**：最便宜的安全默认。
+- **视觉保底 + 档案数据**：引擎零游戏代码；游戏差异只进 JSON profile，仓库只放通用样例。
+- **内存是可选加速器**：provider 缺失/失败只降级为 `stale` + 视觉状态，基线照常工作；
+  安全闸与状态来源无关，provider 不绕闸。
 
 
 
