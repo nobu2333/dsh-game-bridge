@@ -606,6 +606,38 @@ class GameSession:
             "cause": cause,
         }
 
+    def _danger_outcome(self, card_id: str, outcome: str) -> None:
+        """危险卡执行结果回写：avoided / response_failures → efficacy 升降。"""
+        if not card_id or outcome not in ("avoided", "failed"):
+            return
+        try:
+            from .memory import KnowledgeStore
+
+            store = KnowledgeStore(os.path.join(self._data_root(), "knowledge"))
+            book = store.load(self._record_game, self._record_level)
+            for card in book["cards"]:
+                if card["id"] != card_id:
+                    continue
+                stats = card["stats"]
+                stats["response_tries"] = int(stats.get("response_tries", 0)) + 1
+                delta = 0.1 if outcome == "avoided" else -0.1
+                card["response_efficacy"] = round(
+                    min(1.0, max(0.0, float(card.get("response_efficacy", 0.5)) + delta)), 3
+                )
+                if outcome == "avoided":
+                    stats["avoided"] = int(stats.get("avoided", 0)) + 1
+                    card["hazard_confidence"] = round(
+                        min(1.0, float(card.get("hazard_confidence", card.get("confidence", 0.3))) + 0.03), 3
+                    )
+                else:
+                    stats["response_failures"] = int(stats.get("response_failures", 0)) + 1
+                break
+            else:
+                return
+            store.save(self._record_game, self._record_level, book["cards"])
+        except Exception:  # noqa: BLE001 - 结果回写失败不影响玩法
+            pass
+
     def _record_damage_card(
         self, hp_before: int, hp_after: int, episode: str | None, *, event_type: str = "damage"
     ) -> None:
@@ -976,6 +1008,8 @@ class GameSession:
             foreground_ok=lambda: self._foreground_is_attached(self._foreground()),
             focus_window=self._focus_attached,
             scene_source=lambda: self._scene_cache.get("scene"),
+            hp_source=lambda: self._scene_cache.get("hp"),
+            on_danger_outcome=self._danger_outcome,
         )
         started = self._policy.start()
         if params.get("scene_watch", True):
