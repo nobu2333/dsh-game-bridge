@@ -53,6 +53,55 @@ OCCLUDED = {
     "covered_by": [],
 }
 
+# 通用 WorldState 罐头值（形状与 docs/STATE.md / 契约一致）：插件只做渲染，
+# 引擎里真正的视觉提取由 engine/tests/test_state.py 覆盖。
+STATE = {
+    "schema": 1,
+    "t": 1793329000.123,
+    "scene": "gameplay",
+    "confidence": 0.82,
+    "player": {"x": 0.31, "y": 0.72, "hp": 3, "max_hp": 3, "state": "idle"},
+    "entities": [
+        {"kind": "threat", "x": 0.42, "y": 0.61, "score": 0.81},
+        {"kind": "parry", "x": 0.70, "y": 0.30, "score": 0.64},
+        {"kind": "enemy", "x": 0.55, "y": 0.40, "score": 0.52},
+    ],
+    "ui": {
+        "texts": [{"text": "HP.3", "score": 0.99, "x": 0.05, "y": 0.95}],
+        "prompt": "CONFIRM Z",
+        "hp_text": "3",
+    },
+    "game": {"profile": None, "provider": "vision", "stale": False},
+}
+
+POLICY_RUNNING = {
+    "running": True,
+    "ticks": 6,
+    "hz": 60.0,
+    "actions": 12,
+    "escapes": 1,
+    "stop_reason": None,
+    "scene": "gameplay",
+    "last_entities": 2,
+}
+
+
+def _state(params, state):
+    """返回 WorldState，并把本次请求的 profile id 回声到 game.profile。"""
+    profile = params.get("profile")
+    profile_id = None
+    if isinstance(profile, dict):
+        profile_id = profile.get("id")
+    elif isinstance(profile, str):
+        profile_id = profile
+    world = json.loads(json.dumps(STATE))
+    world["game"]["profile"] = profile_id
+    world["game"]["provider"] = "vision"
+    world["foreground"] = dict(FOREGROUND)
+    world["occluded"] = dict(OCCLUDED)
+    world["backend"] = "dry-run"
+    return world
+
 
 def handle(method, params, state):
     if method == "ping":
@@ -91,17 +140,32 @@ def handle(method, params, state):
             "occluded": dict(OCCLUDED),
         }
     if method == "attach":
+        profile = params.get("profile")
+        state["profile"] = profile
         state["attached"] = {
             "window": params.get("window") or "fixture-game",
             "hwnd": FOREGROUND["hwnd"],
         }
+        if profile:
+            state["attached"]["profile"] = profile
         return {
             "attached": state["attached"],
+            "profile": profile,
             "backend": "dry-run",
             "safety": SAFETY,
             "control": dict(CONTROL),
             "foreground": dict(FOREGROUND),
         }
+    if method == "state":
+        return _state(params, state)
+    if method == "policy_start":
+        state["policy"] = dict(POLICY_RUNNING)
+        return {"policy": dict(state["policy"]), "attached": state.get("attached"), "backend": "dry-run"}
+    if method == "policy_stop":
+        policy = dict(state.get("policy") or POLICY_RUNNING)
+        policy.update({"running": False, "stop_reason": "stopped"})
+        state["policy"] = policy
+        return {"stopped": True, "policy": dict(policy)}
     if method == "act":
         state["actions"] = state.get("actions", 0) + 1
         return {
@@ -139,6 +203,8 @@ def handle(method, params, state):
         }
     if method == "stop":
         state["attached"] = None
+        # 与真实 session.stop 一致：停手会先停掉反射策略，之后 status 里没有 policy。
+        state.pop("policy", None)
         if "plan" in state:
             state["plan"]["status"] = "stopped"
         return {"stopped": True, "actions_total": state.get("actions", 0), "plan": state.get("plan")}
@@ -151,6 +217,7 @@ def handle(method, params, state):
             "safety": SAFETY,
             "actions_total": state.get("actions", 0),
             "plan": state.get("plan"),
+            "policy": state.get("policy"),
             "control": dict(CONTROL),
             "foreground": dict(FOREGROUND),
         }

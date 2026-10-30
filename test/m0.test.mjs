@@ -11,6 +11,9 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 // 单元测试不许触发真实引擎自举（会去建 venv / 装包）：显式关掉。
 process.env.DSH_GAME_BRIDGE_PYTHON = 'off'
@@ -59,7 +62,21 @@ test('apply() registers the current tool surface', () => {
   apply(ctx)
   assert.deepEqual(
     ctx.registered.map((definition) => definition.name).sort(),
-    ['game_act', 'game_attach', 'game_controls', 'game_events', 'game_plan', 'game_selftest', 'game_snapshot', 'game_status', 'game_stop', 'game_windows'],
+    [
+      'game_act',
+      'game_attach',
+      'game_controls',
+      'game_events',
+      'game_memory',
+      'game_plan',
+      'game_policy',
+      'game_selftest',
+      'game_snapshot',
+      'game_state',
+      'game_status',
+      'game_stop',
+      'game_windows',
+    ],
   )
 })
 
@@ -68,6 +85,47 @@ test('game_attach refuses loudly when the engine is unavailable', async () => {
   apply(ctx)
   const definition = tool(ctx, 'game_attach')
   await assert.rejects(() => definition.execute({ window: 'SomeGame' }, {}), /not ready/)
+})
+
+test('game_state and game_policy refuse loudly when the engine is unavailable', async () => {
+  const ctx = fakeCtx()
+  apply(ctx)
+  await assert.rejects(() => tool(ctx, 'game_state').execute({}, {}), /not ready/)
+  await assert.rejects(() => tool(ctx, 'game_policy').execute({ action: 'status' }, {}), /not ready/)
+})
+
+test('game_memory works without an engine and validates the profile id', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-game-bridge-profiles-'))
+  const previous = process.env.DSH_GAME_BRIDGE_PROFILE_DIR
+  process.env.DSH_GAME_BRIDGE_PROFILE_DIR = dir
+  try {
+    const ctx = fakeCtx()
+    apply(ctx)
+    const memory = tool(ctx, 'game_memory')
+
+    const saved = await memory.execute(
+      { action: 'save', id: 'fixture', data: { name: 'Fixture Game', controls: { jump: 'Z' } } },
+      {},
+    )
+    assert.equal(saved.result.saved, true)
+    assert.match(readFileSync(join(dir, 'fixture.json'), 'utf8'), /"id": "fixture"/)
+
+    const listed = await memory.execute({ action: 'list' }, {})
+    assert.deepEqual(listed.result.profiles.map((profile) => profile.id), ['fixture'])
+    const [block] = memory.output.render({}, listed)
+    assert.equal(block.type, 'text')
+    assert.match(block.text, /Profiles \(1\): fixture \(Fixture Game\)/)
+
+    // save 校验 id：路径穿越必须被拒绝（也不会在目录外留下文件）。
+    await assert.rejects(
+      () => memory.execute({ action: 'save', id: '../escape', data: {} }, {}),
+      /invalid profile id/,
+    )
+  } finally {
+    if (previous === undefined) delete process.env.DSH_GAME_BRIDGE_PROFILE_DIR
+    else process.env.DSH_GAME_BRIDGE_PROFILE_DIR = previous
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('game_selftest reports a failed engine instead of pretending', async () => {

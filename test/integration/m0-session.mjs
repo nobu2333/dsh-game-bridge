@@ -279,6 +279,7 @@ async function main() {
   const sawWindows = allRequestText.includes('Visible windows')
   const sawEvent = allRequestText.includes('Frame event')
   const sawControls = allRequestText.includes('Controls (backend')
+  const sawState = allRequestText.includes('scene=')
   const expectApprovalDenied = process.env.DSH_GAME_BRIDGE_EXPECT_APPROVAL_DENIED === '1'
   const sawApprovalDenied = allRequestText.includes('requires approval')
   const expectRecovery = process.env.DSH_GAME_BRIDGE_EXPECT_RECOVERY === '1'
@@ -297,7 +298,7 @@ async function main() {
   if (sequence.includes('game_act')) console.log(`dry-run action seen: ${sawDryRun}`)
 
   assert.equal(run.code, 0, `headless exited ${run.code}\nstderr:\n${run.stderr}\nstdout:\n${run.stdout}`)
-  for (const name of ['game_selftest', 'game_snapshot', 'game_attach', 'game_act', 'game_stop']) {
+  for (const name of ['game_selftest', 'game_snapshot', 'game_attach', 'game_act', 'game_stop', 'game_state', 'game_policy', 'game_memory']) {
     assert.ok(toolNames.includes(name), `${name} was not exposed to the model`)
   }
   assert.ok(sawToolResult, 'the tool result did not come back to the model')
@@ -324,11 +325,13 @@ async function main() {
   if (sequence.includes('game_windows')) assert.ok(sawWindows, 'game_windows did not list visible windows')
   if (sequence.includes('game_events')) assert.ok(sawEvent, 'game_events did not report a frame-difference event')
   if (sequence.includes('game_controls')) assert.ok(sawControls, 'game_controls did not list backend buttons')
+  if (sequence.includes('game_state')) assert.ok(sawState, 'game_state did not report a WorldState scene')
   assert.ok(run.stdout.includes('M0-INTEGRATION-OK'), 'final assistant text missing from headless output')
   let mode
   if (expectRecovery) mode = 'RECOVERY PASS (engine restarted after exit)'
   else if (expectApprovalDenied) mode = 'APPROVAL PASS (real backend without responder fails closed)'
   else if (sequence.includes('game_plan')) mode = 'M3 PASS (attach → plan → status → stop, dry-run loop)'
+  else if (sequence.includes('game_state')) mode = 'STATE PASS (vision WorldState)'
   else if (sequence.includes('game_act')) mode = 'M2 PASS (attach → dry-run act, no real input)'
   else if (sequence.includes('game_controls')) mode = 'CONTROLS PASS (backend button list)'
   else if (sequence.includes('game_events')) mode = 'EVENTS PASS (frame differencing)'

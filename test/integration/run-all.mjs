@@ -61,6 +61,12 @@ const cases = [
     requiresPython: true,
   },
   {
+    name: 'state (vision WorldState)',
+    env: { ...real, FAKE_WINDOW: 'unspecified', FAKE_SEQUENCE: 'game_attach,game_state' },
+    expect: 'STATE PASS',
+    requiresPython: true,
+  },
+  {
     name: 'events (real frame differencing)',
     env: { ...real, FAKE_SEQUENCE: 'game_events' },
     expect: 'EVENTS PASS',
