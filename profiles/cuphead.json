@@ -28,7 +28,7 @@
   },
   "player": {
     "track": true,
-    "every_n_ticks": 3,
+    "every_n_ticks": 6,
     "colors": [
       {
         "r_min": 170,
@@ -64,7 +64,7 @@
       "RETRY"
     ],
     "loading_max_texts": 1,
-    "refresh_ms": 3000,
+    "refresh_ms": 4000,
     "recover_interval_ms": 700,
     "ocr_max_width": 640
   },
