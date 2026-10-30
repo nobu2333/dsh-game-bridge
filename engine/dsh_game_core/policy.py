@@ -207,6 +207,7 @@ class PolicyRunner:
         focus_window: Callable[[], Any] | None = None,
         hp_source: Callable[[], Any] | None = None,
         on_danger_outcome: Callable[[str, str], Any] | None = None,
+        prompt_source: Callable[[Any, Any], Any] | None = None,
     ):
         self._capture = capture
         self._controller = controller
@@ -224,6 +225,16 @@ class PolicyRunner:
         # 可选：缓存 HP + 危险卡结果回调（结果回写由会话持久化）。
         self._hp_source = hp_source if callable(hp_source) else None
         self._on_danger_outcome = on_danger_outcome if callable(on_danger_outcome) else None
+        self._prompt_source = prompt_source if callable(prompt_source) else None
+        # walk-until-affordance：按住方向走，检测到交互图标就停步确认（地图入口）。
+        navigation = self._profile.get("navigation")
+        navigation = navigation if isinstance(navigation, dict) else {}
+        self._nav_mode = bool(navigation.get("walk_to_affordance", False))
+        nav_direction = navigation.get("direction")
+        self._nav_direction = str(nav_direction) if nav_direction else None
+        nav_confirm = navigation.get("confirm")
+        self._nav_confirm = str(nav_confirm) if nav_confirm else "confirm"
+        self._nav_every = max(1, int(_as_float(navigation.get("prompt_every_n_ticks"), 5) or 5))
         self._danger_armed: dict | None = None
         self._danger_armed_at = 0.0
         self._timings = {
@@ -648,6 +659,13 @@ class PolicyRunner:
             frame = self._grab()
             self._mark_timing("grab", grab_started)
             self._latest_frame = frame
+            if frame is not None and self._nav_mode:
+                self._run_navigation(frame)
+                self._ticks += 1
+                delay = self._period
+                if delay > 0:
+                    self._sleep(delay)
+                continue
             entities: list[dict] = []
             if frame is None:
                 # 看不到画面时不盲按：先松开持续键，等下一拍恢复再重新按住。
@@ -771,6 +789,39 @@ class PolicyRunner:
             )
         except Exception:  # noqa: BLE001 - 对象记忆失败只损失语义
             self._entity_roles = []
+
+    def _run_navigation(self, frame: np.ndarray) -> None:
+        """按住方向走，检测交互图标；出现即停步、确认、结束策略。"""
+        direction = self._resolve_key(self._nav_direction) if self._nav_direction else None
+        if direction is None:
+            return
+        for key in list(self._held):
+            if key != direction:
+                self._release_key(key)
+        if direction not in self._held:
+            self._controller.hold(direction)
+            self._held.add(direction)
+            self._actions += 1
+        if self._ticks % self._nav_every != 0 and self._ticks > 1:
+            return
+        found = None
+        try:
+            if self._prompt_source is not None:
+                found = self._prompt_source(frame, self._profile)
+            else:
+                from .state import detect_prompt_icon
+
+                found = detect_prompt_icon(frame, self._profile)
+        except Exception:  # noqa: BLE001
+            found = None
+        if not isinstance(found, dict) or not found.get("key"):
+            return
+        self._release_all_keys()
+        key = self._resolve_key(self._nav_confirm) if self._nav_confirm else None
+        if key:
+            self._tap(key, 140.0)
+        self._stop_reason = "affordance_confirm"
+        self._stop_event.set()
 
     def _maybe_static_hazard(self, frame: np.ndarray) -> None:
         """地面静态危险物：靠近且在前方时跳一次（颜色区域检测，profile 驱动）。"""
