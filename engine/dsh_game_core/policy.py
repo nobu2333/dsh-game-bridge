@@ -345,6 +345,7 @@ class PolicyRunner:
         self._danger_window = max(0.1, _as_float(self._profile.get("danger_window"), 1.2) or 1.2)
         self._nearby_danger: dict | None = None
         self._scroll_s = 0.0
+        self._last_danger_id: str | None = None
 
         # ── 线程内状态 ──
         self._held: set[str] = set()
@@ -455,6 +456,7 @@ class PolicyRunner:
         self._player_candidate = None
         self._nearby_danger = None
         self._scroll_s = 0.0
+        self._last_danger_id = None
         self._last_error = None
 
     def _status_locked(self) -> dict:
@@ -867,6 +869,20 @@ class PolicyRunner:
             "skill": str(response.get("skill") or "")[:32],
             "status": str(card.get("status") or "candidate")[:16],
         }
+        # 已人工/评测确认的危险点才执行预设技能；candidate 只提示，不盲动。
+        status = str(card.get("status") or "candidate")
+        skill = str(response.get("skill") or "")
+        card_id = self._nearby_danger["id"]
+        if (
+            status in ("validated", "trusted")
+            and skill == "jump_over"
+            and distance <= 0.35
+            and card_id != self._last_danger_id
+        ):
+            jump = self._jump_keys[0] if self._jump_keys else None
+            if jump:
+                self._tap(jump, 140.0)
+            self._last_danger_id = card_id
 
     def _update_tracks(self, entities: list[dict]) -> None:
         if self._tracker is None:

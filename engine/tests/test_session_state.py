@@ -199,3 +199,27 @@ def test_policy_start_refuses_when_real_backend_target_not_foreground(monkeypatc
     with pytest.raises(EngineError) as error:
         session.policy_start({"profile": {}})
     assert error.value.code == "FOREGROUND_MISMATCH"
+
+def test_hp_drop_saves_damage_episode():
+    session = GameSession(
+        engine=FakeEngine(),
+        gate=SafetyGate(process_source=lambda: [], takeover_source=lambda: False, process_ttl_s=0),
+    )
+    saved = []
+
+    class Recorder:
+        def add_event(self, event):
+            pass
+
+        def save(self, tag):
+            saved.append(tag)
+            return "/tmp/episode"
+
+    session._recorder = Recorder()
+    session._record_level = "forest-follies"
+    session._start_recorder = lambda: None
+    session._maybe_record_hp(3)
+    assert saved == []
+    session._maybe_record_hp(2)
+    assert saved == ["forest-follies-damage"]
+    session.close()

@@ -73,6 +73,7 @@ class GameSession:
         self._record_game = "unknown"
         self._record_level = "level"
         self._last_recorded_scene = None
+        self._last_hp: int | None = None
 
     # ── 窗口 ──────────────────────────────────────────────────────────
     def _resolve_window(self, match: str) -> dict | None:
@@ -514,6 +515,19 @@ class GameSession:
             self._save_episode(scene)
             self._start_recorder()  # 继续录下一段
 
+    def _maybe_record_hp(self, hp: int | None) -> None:
+        """HP 下降时立刻落盘，不依赖慢环识别到 death（死亡前往往还有受击）。"""
+        if hp is None:
+            return
+        previous, self._last_hp = self._last_hp, int(hp)
+        if self._recorder is None or previous is None or hp >= previous:
+            return
+        self._recorder.add_event(
+            {"type": "damage", "hp_before": previous, "hp_after": int(hp)}
+        )
+        self._save_episode("damage")
+        self._start_recorder()
+
     def _start_recorder(self) -> None:
         if self._recorder is not None:
             return
@@ -605,8 +619,10 @@ class GameSession:
                 self._scene_cache = {
                     "scene": scene,
                     "confidence": float(confidence),
+                    "hp": hp,
                     "ts": time.time(),
                 }
+                self._maybe_record_hp(hp)
                 self._maybe_record_scene(scene)
             except Exception:  # noqa: BLE001 - 单次 OCR 失败不终止慢环
                 continue
@@ -771,6 +787,7 @@ class GameSession:
         profile = dict(profile) if isinstance(profile, dict) else {}
         self._record_game = str(params.get("game") or profile.get("id") or "unknown")[:48]
         self._record_level = str(params.get("level") or "level")[:48]
+        self._last_hp = None
         if params.get("knowledge", True):
             try:
                 from .memory import KnowledgeStore
