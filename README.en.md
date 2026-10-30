@@ -3,6 +3,7 @@
 **Give DeepSeek Harness eyes and hands on your games.**
 
 > Status: **released 0.0.1** (npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`).
+> **0.0.2 is packaged and installed locally (not published yet)**; publishing is pending.
 > Verified end to end from the published artifact: install → engine bootstrap from PyPI →
 > real screen capture + OCR → 20 Hz closed loop. Control is **dry-run by default**
 > (it records actions instead of injecting input); real injection was verified on

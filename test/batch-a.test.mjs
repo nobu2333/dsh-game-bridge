@@ -169,6 +169,30 @@ test('describeInstall prefers DSH_PROFILE over the profile directory name', () =
   assert.equal(install.profile, 'web')
 })
 
+test('describeInstall infers the profile directory from an installed package path', () => {
+  const install = describeInstall({
+    env: {},
+    packageDir: '/home/user/.dsh/profiles/desktop/node_modules/dsh-game-bridge',
+    readJson: fakeReadJson({ dependencies: { 'dsh-game-bridge': '^0.0.2' } }),
+  })
+  assert.equal(install.profile_dir, '/home/user/.dsh/profiles/desktop')
+  assert.equal(install.profile, 'desktop')
+  assert.equal(install.source, 'registry')
+  assert.deepEqual(install.warnings, [])
+})
+
+test('describeInstall falls back to the host argv when the package path cannot tell', () => {
+  const install = describeInstall({
+    env: {},
+    packageDir: 'plugin-package',
+    argv: ['node', 'dsh.js', '/home/user/.dsh/profiles/desktop'],
+    readJson: fakeReadJson({ dependencies: { 'dsh-game-bridge': 'file:/home/user/vendor/pkg.tgz' } }),
+  })
+  assert.equal(install.profile_dir, '/home/user/.dsh/profiles/desktop')
+  assert.equal(install.profile, 'desktop')
+  assert.equal(install.source, 'local-file')
+})
+
 test('classifyInstallSource covers the documented source set', () => {
   assert.equal(classifyInstallSource('0.0.1'), 'registry')
   assert.equal(classifyInstallSource('latest'), 'registry')

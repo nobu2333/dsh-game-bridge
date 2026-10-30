@@ -1,4 +1,4 @@
-# Unreleased (after v0.0.1)
+# v0.0.2 (packaged locally, not published yet)
 
 ## Removed: the inherited "no unattended self-play" gate (2026-10-30)
 
@@ -10,8 +10,9 @@
   removed rather than patched.
 - Anti-cheat refusal and the F12 takeover latch remain; real output backends still
   require a one-shot DSH approval.
-- Package version numbers were not bumped yet; bump them (4 places, see RELEASE.md)
-  at release time.
+- Version 0.0.2 is bumped in all four places (`package.json`, `lib/bootstrap.js`,
+  `engine/pyproject.toml`, `engine/dsh_game_core/__init__.py`); publishing to npm/PyPI
+  is still pending.
 
 ## Added: `game_selftest` readiness report (2026-10-30)
 
@@ -69,6 +70,17 @@ evidence predates the fix.
 # v0.0.1
 
 First public release of **dsh-game-bridge** — it gives DeepSeek Harness eyes and hands on games.
+
+## Packaging (local, 2026-10-30)
+
+- Built `dsh_game_core-0.0.2` wheel + sdist and `dsh-game-bridge-0.0.2.tgz` with
+  `scripts/release.ps1`; the npm tarball ships 11 files including `README.en.md`,
+  `docs/STATUS.md` and `docs/CONTROLS.md`.
+- Installed the tarball into the desktop profile and verified it live: `game_selftest`
+  reports plugin 0.0.2 / engine 0.0.2, `game_snapshot` flags a fully occluded target,
+  and dry-run `attach → snapshot → act → plan → stop` works.
+- The local install comes from a temporary tarball path, so `game_selftest` warns until
+  the registry version is installed.
 
 ## What it does
 

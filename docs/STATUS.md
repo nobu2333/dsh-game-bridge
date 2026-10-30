@@ -1,6 +1,6 @@
 # 现状与交班（STATUS）
 
-> 更新：2026-10-30（第 18 轮，公开前收尾）。**当前工程状态以本文件 + `git log` 为准**；
+> 更新：2026-10-30（第 19 轮，0.0.2 本地打包并完成桌面安装验证）。**当前工程状态以本文件 + `git log` 为准**；
 > 设计理由看 `docs/DESIGN.md`，发布步骤看 `docs/RELEASE.md`。
 
 ## 一句话
@@ -18,6 +18,7 @@ Python 引擎里；默认 dry-run（只记录不注入）。
 | M2 手 + 安全闸 | ✅（含真实注入） | 两道闸单测；attach→act 端到端；真实后端需审批；手柄 A / 键盘 W 已实机回读 |
 | M3 20 Hz 闭环 | ✅（dry-run 已验证） | 实测 21.3 Hz；逐拍安全复检；stop 一拍内松手；真实后端已接线 |
 | 发布 | ✅ 2026-10-29 | npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`；发布版安装+自举+M1/M3 实测通过 |
+| 0.0.2 本地打包 | ✅ 2026-10-30 | wheel/sdist/tarball 构建校验；桌面 profile 安装 0.0.2（引擎缓存 0.0.2）；`game_selftest` 报 0.0.2；**未发布** |
 | 市场收录 | ⏳ 待提交 | 仓库已 public，按 MARKETPLACE 提交 |
 
 工具面（10 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
@@ -58,15 +59,23 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 - **抓屏是「整屏 grab + 窗口矩形裁剪」，不是真正的窗口级抓屏**：别的窗口盖住游戏时
   snapshot 拍到的是遮盖物。已用 `foreground` / `occluded` 元数据 + `⚠` 标注暴露问题；
   真窗口抓屏（`PrintWindow(PW_RENDERFULLCONTENT)` / WGC）是后续工作（见 DESIGN §3.5）；
-- **前台/遮挡元数据与拒绝逻辑已通过单元/集成测试，尚未在真实游戏里复验**（实机证据
-  `docs/FIELD-2026-10-29.md` 记录的是修复前行为）；
+- **前台/遮挡元数据与拒绝逻辑已通过单元/集成测试**；桌面实机已复核「attach Cuphead 但被
+  DSH 窗口完全遮挡」时 `foreground`/`occluded` 标记正确；前台正向路径（目标窗口在前台）
+  与真实后端拒绝路径仍待真实对局复验；
 - **XInput 槽位只报告、不保证**：虚拟手柄可能落到 slot 1+（= 玩家 2）；会尝试重建
-  最多 2 次并给 warning，不保证游戏接受非 0 槽位；
+  最多 2 次并给 warning，不保证游戏接受非 0 槽位。2026-10-30 本机实测（清理幽灵节点后
+  仍）新建手柄落在 slot 1/2，疑似 ViGEmBus 驱动/总线状态，需重启后复验；
 - 真实注入已回读通过（vgamepad / keyboard），但**长闭环尚未在真实游戏里跑**；默认仍 dry-run；
 - 帧差阈值、OCR 区域未按具体游戏校准。
 
 ## 变更记录
 
+- **2026-10-30（0.0.2 打包与安装验证）**：版本号在四处 bump 到 0.0.2；本地产出
+  wheel/sdist/npm tarball 并安装进桌面 profile 验证（`game_selftest` 报 plugin/engine
+  0.0.2；dry-run `attach → snapshot → act → plan → stop` 通过；attach 到被 DSH 窗口
+  完全遮挡的 Cuphead 时，`occluded` 标记正确）。修正两处诊断缺口：`lib/index.js` 的
+  `VERSION` 常量漏 bump、桌面宿主不注入 `DSH_PROFILE_DIR` 导致安装来源显示 unknown
+  （现在从安装路径/宿主 argv 推断 profile）。安装来源仍是临时 tarball，发布后应换 registry。
 - **2026-10-30（公开前加固）**：
   - `game_selftest` 升级为就绪报告：安装来源（`registry` / `local-file` / `link` /
     `github` / `unknown`）、profile 与依赖、所选后端就绪度（含 `xinput_slot` /
@@ -101,7 +110,9 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 5. 可选：把 PyPI sdist 补传（0.0.1 当前只有 wheel；下次发布脚本已会同时发 sdist），
    并把账号级 PyPI token 换成项目级；
 6. 后续：真正的窗口级抓屏（`PrintWindow(PW_RENDERFULLCONTENT)` / Windows Graphics Capture）
-   替代「整屏 grab + 窗口矩形裁剪」，并逐游戏实机复验新的前台/遮挡拒绝路径。
+   替代「整屏 grab + 窗口矩形裁剪」，并逐游戏实机复验新的前台/遮挡拒绝路径；
+7. **发布 0.0.2**：wheel/sdist + npm tarball 已本地构建并安装验收；发布后把当前桌面
+   profile 的临时 tarball 换回 registry 来源。
 
 ## 已知环境问题（2026-10-29 实测）
 

@@ -22,10 +22,12 @@ function read(relative) {
 test('plugin, engine and bootstrap pin share one version', () => {
   const pkg = JSON.parse(read('package.json')).version
   const bootstrap = /export const ENGINE_VERSION = '([^']+)'/.exec(read('lib/bootstrap.js'))?.[1]
+  const plugin = /const VERSION = '([^']+)'/.exec(read('lib/index.js'))?.[1]
   const pyproject = /^version = "([^"]+)"/m.exec(read('engine/pyproject.toml'))?.[1]
   const moduleVersion = /__version__ = "([^"]+)"/.exec(read('engine/dsh_game_core/__init__.py'))?.[1]
 
   assert.equal(bootstrap, pkg, 'lib/bootstrap.js ENGINE_VERSION must match package.json')
+  assert.equal(plugin, pkg, 'lib/index.js VERSION must match package.json')
   assert.equal(pyproject, pkg, 'engine/pyproject.toml version must match package.json')
   assert.equal(moduleVersion, pkg, 'engine __version__ must match package.json')
 })

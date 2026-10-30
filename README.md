@@ -4,7 +4,8 @@
 
 [English](README.en.md) · [现状与交班](docs/STATUS.md)
 
-> 状态：**已发布 0.0.1**（npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`）。
+> 状态：**0.0.1 已发布**（npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`）；
+> **0.0.2 已本地打包并安装验证（未发布）**：引擎自举、桌面 profile 安装、真实抓屏/OCR、前台/遮挡诊断。
 > 已实测：从 registry 的 tarball 安装 → 引擎自举（PyPI）→ 真实抓屏/OCR → 20 Hz 闭环。
 > **默认 dry-run 后端（只记录、不碰设备）**；真实注入已实机验证（2026-10-29：手柄 A + XInput 回读、键盘 W + `AsyncKeyState` 回读）；仅 Windows。
 

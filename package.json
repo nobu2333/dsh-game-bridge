@@ -1,6 +1,6 @@
 {
   "name": "dsh-game-bridge",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Give DeepSeek Harness eyes and hands on your games: candidate-level tools backed by a local capture + control engine, so the model picks goals while a 20 Hz loop plays.",
   "type": "module",
   "main": "./lib/index.js",
