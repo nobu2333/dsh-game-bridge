@@ -21,7 +21,16 @@
   "scene": {
     "menu_keywords": ["START", "OPTIONS", "EXIT", "DLC", "CONTINUE", "RESUME"],
     "death_keywords": ["DEAD", "GAME OVER", "RETRY"],
-    "loading_max_texts": 1
+    "loading_max_texts": 1,
+    "refresh_ms": 700,
+    "recover_interval_ms": 700
+  },
+  "scenes": {
+    "death": {"recover": [{"press": "confirm"}]},
+    "equip": {"recover": [{"press": "back"}]},
+    "cutscene": {"recover": [{"press": "confirm"}]},
+    "menu": {"recover": []},
+    "loading": {"recover": []}
   },
   "combat": {
     "hold": ["X"],

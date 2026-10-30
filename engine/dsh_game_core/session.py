@@ -65,6 +65,9 @@ class GameSession:
         self._plan_thread: threading.Thread | None = None
         self._plan_stop = threading.Event()
         self._policy = None
+        self._scene_cache = {"scene": None, "confidence": 0.0, "ts": 0.0}
+        self._scene_stop = None
+        self._scene_thread = None
 
     # ── 窗口 ──────────────────────────────────────────────────────────
     def _resolve_window(self, match: str) -> dict | None:
@@ -477,12 +480,68 @@ class GameSession:
 
     def _stop_policy(self) -> None:
         """停掉本地反射策略并确保所有按键已释放。"""
+        self._stop_scene_watcher()
         policy, self._policy = self._policy, None
         if policy is not None:
             try:
                 policy.stop()
             except Exception:  # noqa: BLE001 - 收尾失败不掩盖主流程
                 pass
+
+    # ── 异步场景识别（慢环写缓存，60Hz 快环只读） ──────────────────────
+    def _scene_interval_s(self, profile: dict | None) -> float:
+        section = (profile or {}).get("scene") if isinstance(profile, dict) else None
+        try:
+            value = float((section or {}).get("refresh_ms") or 700) / 1000.0
+        except (TypeError, ValueError, AttributeError):
+            value = 0.7
+        return max(0.25, min(value, 2.0))
+
+    def _start_scene_watcher(self, profile: dict | None) -> None:
+        self._stop_scene_watcher()
+        self._scene_cache = {"scene": None, "confidence": 0.0, "ts": time.time()}
+        self._scene_stop = threading.Event()
+        self._scene_thread = threading.Thread(
+            target=self._scene_loop,
+            args=(profile if isinstance(profile, dict) else {}, self._scene_stop),
+            name="dsh-game-scene",
+            daemon=True,
+        )
+        self._scene_thread.start()
+
+    def _stop_scene_watcher(self) -> None:
+        stop, self._scene_stop = self._scene_stop, None
+        if stop is not None:
+            stop.set()
+        thread, self._scene_thread = self._scene_thread, None
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=1.5)
+
+    def _scene_loop(self, profile: dict, stop: threading.Event) -> None:
+        try:
+            from .ocr import Ocr
+            from .state import detect_scene
+
+            ocr = Ocr()
+            ocr.warmup()
+        except Exception:  # noqa: BLE001 - OCR 不可用时场景保持 unknown
+            return
+        interval = self._scene_interval_s(profile)
+        while not stop.wait(interval):
+            policy = self._policy
+            frame = policy.latest_frame() if policy is not None else None
+            if frame is None:
+                continue
+            try:
+                lines = [line.to_dict() for line in ocr.read(frame)]
+                scene, confidence = detect_scene(lines, profile=profile)
+                self._scene_cache = {
+                    "scene": scene,
+                    "confidence": float(confidence),
+                    "ts": time.time(),
+                }
+            except Exception:  # noqa: BLE001 - 单次 OCR 失败不终止慢环
+                continue
 
     def stop(self) -> dict:
         self._stop_policy()
@@ -659,8 +718,11 @@ class GameSession:
             tick_hz=int(params.get("tick_hz") or 60),
             foreground_ok=lambda: self._foreground_is_attached(self._foreground()),
             focus_window=self._focus_attached,
+            scene_source=lambda: self._scene_cache.get("scene"),
         )
         started = self._policy.start()
+        if params.get("scene_watch", True):
+            self._start_scene_watcher(profile)
         self.audit.write({"event": "policy_start", "profile": (profile or {}).get("id")})
         return {"policy": started, "attached": self.attached, "backend": self.backend}
 

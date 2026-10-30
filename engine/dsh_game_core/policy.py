@@ -321,6 +321,15 @@ class PolicyRunner:
         self._track_radius = max(0.01, _as_float(combat.get("track_match_radius"), 0.08) or 0.08)
         self._tracker = None
         self._tracks: list[Any] = []
+        # 场景门控/恢复：profile.scenes = {scene: {"recover": [{"press": "confirm"}], ...}}
+        scenes = self._profile.get("scenes")
+        self._scenes = scenes if isinstance(scenes, dict) else {}
+        self._recover_interval_ms = max(200.0, _as_float(self._profile.get("scene", {}).get("recover_interval_ms") if isinstance(self._profile.get("scene"), dict) else None, 800.0) or 800.0)
+        self._recover_max_attempts = 8
+        self._recover_scene: str | None = None
+        self._recover_attempts = 0
+        self._last_recover_at = 0.0
+        self._latest_frame = None
 
         # 玩家追踪：profile.player.track=true 时定期用 state.find_player 更新锚点，
         # 让闪避/交战半径跟着角色走，而不是固定 self_pos。
@@ -433,6 +442,9 @@ class PolicyRunner:
         self._pending_releases = []
         self._held = set()
         self._tracks = []
+        self._recover_scene = None
+        self._recover_attempts = 0
+        self._last_recover_at = 0.0
         self._last_error = None
 
     def _status_locked(self) -> dict:
@@ -524,6 +536,7 @@ class PolicyRunner:
 
             # 2) 一帧原始 BGR（不 OCR、不编码）。
             frame = self._grab()
+            self._latest_frame = frame
             entities: list[dict] = []
             if frame is None:
                 # 看不到画面时不盲按：先松开持续键，等下一拍恢复再重新按住。
@@ -532,6 +545,17 @@ class PolicyRunner:
                 previous_frame = None
                 self._last_entities = 0
             else:
+                self._read_scene()
+                # 2.5) 场景门控：非 gameplay 只做恢复，不跑战斗策略。
+                if self._scene is not None and self._scene != "gameplay":
+                    entities = self._entities(frame, previous_frame)
+                    self._release_all_keys()
+                    self._maybe_recover()
+                    self._ticks += 1
+                    delay = self._period
+                    if delay > 0:
+                        self._sleep(delay)
+                    continue
                 entities = self._entities(frame, previous_frame)
                 self._last_entities = len(entities)
                 self._update_tracks(entities)
@@ -828,6 +852,37 @@ class PolicyRunner:
         x = previous_x * 0.35 + x * 0.65
         y = previous_y * 0.35 + y * 0.65
         self._anchor = (min(max(x, 0.0), 1.0), min(max(y, 0.0), 1.0))
+
+    def latest_frame(self) -> np.ndarray | None:
+        """最近一帧原始 BGR（给异步 OCR/场景线程读取；不要修改它）。"""
+        return self._latest_frame
+
+    def _maybe_recover(self) -> None:
+        """非 gameplay 场景的恢复脚本：按 profile.scenes[scene].recover 逐个按键。"""
+        scene = self._scene
+        if scene != self._recover_scene:
+            self._recover_scene = scene
+            self._recover_attempts = 0
+            self._last_recover_at = 0.0
+        config = self._scenes.get(scene) if isinstance(self._scenes, dict) else None
+        if not isinstance(config, dict):
+            return
+        steps = config.get("recover")
+        if not isinstance(steps, (list, tuple)) or not steps:
+            return
+        now = self._clock()
+        if (now - self._last_recover_at) * 1000.0 < self._recover_interval_ms:
+            return
+        step = steps[min(self._recover_attempts, len(steps) - 1)]
+        press = step.get("press") if isinstance(step, dict) else step
+        key = self._resolve_key(str(press)) if press is not None else None
+        if key:
+            self._tap(key, 140.0)
+        self._recover_attempts += 1
+        self._last_recover_at = now
+        if self._recover_attempts > self._recover_max_attempts:
+            self._stop_reason = f"scene unrecoverable: {scene}"
+            self._stop_event.set()
 
     def _read_scene(self) -> None:
         if self._scene_source is None:

@@ -32,6 +32,7 @@ DEFAULT_NEAR_BLACK_MEAN = 12.0
 
 DEFAULT_DEATH_KEYWORDS = ("GAME OVER", "YOU DIED", "DEAD", "RETRY")
 DEFAULT_MENU_KEYWORDS = ("START", "OPTIONS", "EXIT", "CONTINUE")
+DEFAULT_EQUIP_KEYWORDS = ("UNEQUIP", "EQUIP CARD")
 
 DEFAULT_PARRY = {
     "r_min": 175,
@@ -342,12 +343,15 @@ def detect_scene(
 ) -> tuple[str, float]:
     """Classify the scene from OCR text (pure; no frame needed).
 
-    Precedence: death keywords -> death; menu keywords -> menu; HP found ->
-    gameplay; ``0 < len(lines) <= loading_max_texts`` -> loading; other OCR text
-    -> dialogue; no OCR text -> unknown. Never raises.
+    Precedence: equip keywords -> equip; death keywords -> death; menu keywords ->
+    menu; HP found -> gameplay; ``0 < len(lines) <= loading_max_texts`` -> loading;
+    other OCR text -> dialogue; no OCR text -> unknown. Never raises.
     """
     try:
         lines = _coerce_lines(ocr_lines)
+        equip_score = _keyword_match(lines, _keywords(profile, "equip_keywords", DEFAULT_EQUIP_KEYWORDS))
+        if equip_score is not None:
+            return "equip", _keyword_confidence(equip_score, 0.85)
         death_score = _keyword_match(lines, _keywords(profile, "death_keywords", DEFAULT_DEATH_KEYWORDS))
         if death_score is not None:
             return "death", _keyword_confidence(death_score, 0.85)

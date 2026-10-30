@@ -457,3 +457,11 @@ def test_detect_prompt_icon_template():
     assert abs(found["y"] - 100 / 180.0) < 0.06
     assert state_module.detect_prompt_icon(None, profile) is None
     assert state_module.detect_prompt_icon(frame, {}) is None
+
+def test_detect_scene_equip_precedes_death_keywords():
+    lines = [
+        {"text": "DEAD", "score": 0.99, "left": 0, "top": 0, "right": 1, "bottom": 1},
+        {"text": "UNEQUIP SHIFT", "score": 0.99, "left": 0, "top": 0, "right": 1, "bottom": 1},
+    ]
+    scene, _confidence = state_module.detect_scene(lines)
+    assert scene == "equip"
