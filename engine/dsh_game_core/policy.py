@@ -735,13 +735,18 @@ class PolicyRunner:
         return find_player
 
     def _update_player(self, frame: np.ndarray) -> None:
-        """定期更新角色屏幕坐标；找不到时保留上一个可信锚点。"""
+        """定期更新角色屏幕坐标；低置信度/跳变过大时保留上一个可信锚点。"""
         if not self._track_player or self._player_source is None:
             return
         if self._ticks % self._player_every != 0:
             return
         try:
-            found = self._player_source(frame, self._profile)
+            found = self._player_source(frame, self._profile, previous=self._anchor)
+        except TypeError:
+            try:
+                found = self._player_source(frame, self._profile)
+            except Exception:  # noqa: BLE001
+                return
         except Exception:  # noqa: BLE001 - 追踪失败只损失本拍精度
             return
         if not isinstance(found, dict):
@@ -749,8 +754,16 @@ class PolicyRunner:
         x = _as_float(found.get("x"), None)
         y = _as_float(found.get("y"), None)
         score = _as_float(found.get("score"), 0.0) or 0.0
-        if x is None or y is None or score < 0.25:
+        if x is None or y is None or score < 0.35:
             return
+        previous_x, previous_y = self._anchor
+        distance = math.hypot(x - previous_x, y - previous_y)
+        # 单帧模板可能误匹配到别的精灵：大幅度跳变只接受很高分的结果。
+        if distance > 0.35 and score < 0.85:
+            return
+        # 轻量平滑，避免锚点抖动导致闪避/交战判定抖。
+        x = previous_x * 0.35 + x * 0.65
+        y = previous_y * 0.35 + y * 0.65
         self._anchor = (min(max(x, 0.0), 1.0), min(max(y, 0.0), 1.0))
 
     def _read_scene(self) -> None:

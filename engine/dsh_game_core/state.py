@@ -703,12 +703,102 @@ def _find_player_color(frame: np.ndarray, profile: Any) -> dict | None:
         return None
 
 
+def _previous_point(previous: Any) -> tuple[float, float] | None:
+    if isinstance(previous, Mapping):
+        x = _number(previous.get("x"), float("nan"))
+        y = _number(previous.get("y"), float("nan"))
+    elif isinstance(previous, (list, tuple)) and len(previous) >= 2:
+        x = _number(previous[0], float("nan"))
+        y = _number(previous[1], float("nan"))
+    else:
+        return None
+    if math.isnan(x) or math.isnan(y):
+        return None
+    return (_clamp(x, 0.0, 1.0), _clamp(y, 0.0, 1.0))
+
+
+def _match_player_template(
+    frame: np.ndarray,
+    section: Mapping,
+    template: np.ndarray,
+    *,
+    previous: tuple[float, float] | None,
+) -> dict | None:
+    """Template match, preferring a crop around the previous position (continuity)."""
+    import cv2
+
+    h, w = frame.shape[:2]
+    search_width = max(120, min(int(_number(section.get("search_width"), 480)), w))
+    scale = search_width / float(w)
+    size = section.get("template_size")
+    if isinstance(size, (list, tuple)) and len(size) >= 2:
+        tw = max(8, int(round(w * _number(size[0], 0.15) * scale)))
+        th = max(8, int(round(h * _number(size[1], 0.3) * scale)))
+    else:
+        tw = max(8, int(round(template.shape[1] * scale)))
+        th = max(8, int(round(template.shape[0] * scale)))
+    threshold = _number(section.get("match_threshold"), 0.6)
+    radius = _number(section.get("search_radius"), 0.30)
+
+    def match(image: np.ndarray) -> tuple[float, int, int, int, int] | None:
+        if image.size == 0 or image.shape[0] <= th or image.shape[1] <= tw:
+            return None
+        resized = cv2.resize(
+            image, (max(1, int(round(image.shape[1] * scale))), max(1, int(round(image.shape[0] * scale)))),
+            interpolation=cv2.INTER_AREA,
+        )
+        if resized.shape[0] <= th or resized.shape[1] <= tw:
+            return None
+        scaled = cv2.resize(template, (tw, th), interpolation=cv2.INTER_AREA)
+        result = cv2.matchTemplate(resized, scaled, cv2.TM_CCOEFF_NORMED)
+        _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(result)
+        if not math.isfinite(max_val):
+            return None
+        return float(max_val), int(max_loc[0]), int(max_loc[1]), resized, image
+
+    if previous is not None:
+        px, py = previous
+        x0 = max(0, int((px - radius) * w))
+        y0 = max(0, int((py - radius) * h))
+        x1 = min(w, int((px + radius) * w))
+        y1 = min(h, int((py + radius) * h))
+        if x1 - x0 >= 32 and y1 - y0 >= 32:
+            found = match(frame[y0:y1, x0:x1])
+            if found is not None:
+                score, loc_x, loc_y, resized, crop = found
+                if score >= threshold:
+                    center_x = (x0 + (loc_x + tw / 2.0) / scale) / w
+                    center_y = (y0 + (loc_y + th / 2.0) / scale) / h
+                    return {
+                        "x": round(_clamp(center_x, 0.0, 1.0), 4),
+                        "y": round(_clamp(center_y, 0.0, 1.0), 4),
+                        "score": round(score, 4),
+                        "method": "template-track",
+                    }
+
+    found = match(frame)
+    if found is None:
+        return None
+    score, loc_x, loc_y, resized, _crop = found
+    if score < threshold:
+        return None
+    center_x = (loc_x + tw / 2.0) / resized.shape[1]
+    center_y = (loc_y + th / 2.0) / resized.shape[0]
+    return {
+        "x": round(_clamp(center_x, 0.0, 1.0), 4),
+        "y": round(_clamp(center_y, 0.0, 1.0), 4),
+        "score": round(score, 4),
+        "method": "template",
+    }
+
+
 def find_player(frame_bgr: Any, profile: Any = None, previous: Any = None) -> dict | None:
     """Locate the controllable character in one BGR frame (profile-driven, never raises).
 
     Two generic modes:
     - template: ``profile.player.template_png_base64`` + optional ``template_size``
-      (normalized width/height ratios), ``search_width``, ``match_threshold``;
+      (normalized width/height ratios), ``search_width``, ``match_threshold``,
+      ``search_radius`` (prefer a crop around ``previous`` to avoid false positives);
     - color: ``profile.player.colors`` (list of r/g/b min/max ranges), largest blob.
     Returns ``{"x","y","score","method"}`` normalized to the frame, or None.
     """
@@ -721,36 +811,9 @@ def find_player(frame_bgr: Any, profile: Any = None, previous: Any = None) -> di
             return None
         template = _player_template(profile)
         if template is not None:
-            import cv2
-
-            h, w = frame.shape[:2]
-            search_width = int(_number(section.get("search_width"), 480))
-            search_width = max(120, min(search_width, w))
-            scale = search_width / float(w)
-            search = cv2.resize(frame, (search_width, max(1, int(round(h * scale)))), interpolation=cv2.INTER_AREA)
-            size = section.get("template_size")
-            if isinstance(size, (list, tuple)) and len(size) >= 2:
-                tw = max(8, int(round(w * _number(size[0], 0.15) * scale)))
-                th = max(8, int(round(h * _number(size[1], 0.3) * scale)))
-            else:
-                tw = max(8, int(round(template.shape[1] * scale)))
-                th = max(8, int(round(template.shape[0] * scale)))
-            if tw >= search.shape[1] or th >= search.shape[0]:
-                return None
-            scaled = cv2.resize(template, (tw, th), interpolation=cv2.INTER_AREA)
-            result = cv2.matchTemplate(search, scaled, cv2.TM_CCOEFF_NORMED)
-            _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(result)
-            threshold = _number(section.get("match_threshold"), 0.55)
-            if not math.isfinite(max_val) or max_val < threshold:
-                return _find_player_color(frame, profile)
-            center_x = (max_loc[0] + tw / 2.0) / search_width
-            center_y = (max_loc[1] + th / 2.0) / search.shape[0]
-            return {
-                "x": round(_clamp(center_x, 0.0, 1.0), 4),
-                "y": round(_clamp(center_y, 0.0, 1.0), 4),
-                "score": round(float(max_val), 4),
-                "method": "template",
-            }
+            found = _match_player_template(frame, section, template, previous=_previous_point(previous))
+            if found is not None:
+                return found
         return _find_player_color(frame, profile)
     except Exception:  # noqa: BLE001 - perception must never raise
         return None
