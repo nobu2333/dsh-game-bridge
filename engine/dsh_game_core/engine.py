@@ -145,6 +145,31 @@ class GameEngine:
             result["ocr_error"] = lines_error
         return result
 
+    def grab_raw(self, monitor: dict | None = None, region: dict | None = None) -> np.ndarray:
+        """抓一帧原始 BGR 图像（不缩放、不编码、不跑 OCR）。
+
+        供本地闭环使用：60 Hz 路径只需要像素，PNG 编码和 OCR 都是纯开销。
+        `region` 语义与 snapshot 一致（相对该显示器的像素坐标，越界自动裁到帧内），
+        坏帧 / 非法 region 抛 EngineError，由 stdio 层翻译成 {"ok": false}。
+        """
+        output_idx = self._resolve_output(monitor)
+        frame = self._capturer_for(output_idx).grab()
+        if not isinstance(frame, np.ndarray) or frame.ndim != 3 or frame.size == 0:
+            raise EngineError("BAD_FRAME", f"抓到的不是三通道图像：{type(frame)}")
+
+        if region:
+            try:
+                left = max(0, int(region["left"]))
+                top = max(0, int(region["top"]))
+                right = min(frame.shape[1], left + int(region["width"]))
+                bottom = min(frame.shape[0], top + int(region["height"]))
+            except (KeyError, TypeError, ValueError) as error:
+                raise EngineError("BAD_REGION", f"region 参数不合法：{region!r}") from error
+            if right - left < 8 or bottom - top < 8:
+                raise EngineError("BAD_REGION", f"region 裁剪后太小：{region!r}")
+            frame = frame[top:bottom, left:right]
+        return frame
+
     def grab_diff(self, monitor: dict | None = None) -> dict:
         """抓一帧并和上一帧做差分，返回廉价事件（不跑 OCR）。
 

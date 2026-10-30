@@ -225,6 +225,12 @@ def serve(stdin=None, stdout=None) -> int:
                 result = session.act(params)
             elif method == "plan":
                 result = session.plan(params)
+            elif method == "state":
+                result = session.state(params)
+            elif method == "policy_start":
+                result = session.policy_start(params)
+            elif method == "policy_stop":
+                result = session.policy_stop(params)
             elif method == "status":
                 result = session.status()
             elif method == "stop":

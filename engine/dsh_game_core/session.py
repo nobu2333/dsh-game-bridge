@@ -64,6 +64,7 @@ class GameSession:
         self._plan: dict | None = None
         self._plan_thread: threading.Thread | None = None
         self._plan_stop = threading.Event()
+        self._policy = None
 
     # ── 窗口 ──────────────────────────────────────────────────────────
     def _resolve_window(self, match: str) -> dict | None:
@@ -474,7 +475,17 @@ class GameSession:
             self._plan_thread.join(timeout=1.5)
         self._plan_thread = None
 
+    def _stop_policy(self) -> None:
+        """停掉本地反射策略并确保所有按键已释放。"""
+        policy, self._policy = self._policy, None
+        if policy is not None:
+            try:
+                policy.stop()
+            except Exception:  # noqa: BLE001 - 收尾失败不掩盖主流程
+                pass
+
     def stop(self) -> dict:
+        self._stop_policy()
         self._stop_plan(join=True)
         if self._controller is not None:
             try:
@@ -504,6 +515,7 @@ class GameSession:
             "audit": {"path": self.audit.path, "tail": self.audit.tail(5)},
             "control": self.backend_status(),
             "foreground": self._foreground(),
+            "policy": self._policy.status() if self._policy is not None else None,
         }
 
     # ── 眼 ────────────────────────────────────────────────────────────
@@ -546,7 +558,8 @@ class GameSession:
         monitor = (self.attached or {}).get("monitor")
         return self.engine.grab_diff(monitor=monitor)
 
-    def snapshot(self, *, ocr: bool = True, max_width: int | None = None) -> dict:
+    def _capture_geometry(self) -> tuple[dict | None, dict | None]:
+        """返回 (region, monitor)：attach 窗口在屏幕/显示器上的裁剪区。"""
         region = None
         monitor = None
         attached = self.attached or {}
@@ -567,16 +580,90 @@ class GameSession:
                     }
                 else:
                     region = {"left": left, "top": top, "width": right - left, "height": bottom - top}
+        return region, monitor
+
+    def snapshot(self, *, ocr: bool = True, max_width: int | None = None) -> dict:
+        region, monitor = self._capture_geometry()
         frame = self.engine.snapshot(ocr=ocr, max_width=max_width, region=region, monitor=monitor)
         if isinstance(frame, dict):
             # 「我拍到的画面是不是目标窗口」：前台 + 遮挡元数据，让模型/用户能看出
             # 截到的是被别的窗口盖住的画面（整屏抓 + 裁剪的已知限制）。
             frame["foreground"] = self._foreground()
+            hwnd = (self.attached or {}).get("hwnd")
             if hwnd:
                 frame["occluded"] = self._occlusion(hwnd)
         return frame
 
+    # ── 通用状态 / 反射策略 ─────────────────────────────────────────────
+    def state(self, params: dict | None = None) -> dict:
+        """抓一帧并提取通用 WorldState（视觉保底；profile 只提供键位/HUD/阈值）。"""
+        params = params or {}
+        profile = params.get("profile")
+        if not isinstance(profile, dict):
+            profile = None
+        region, monitor = self._capture_geometry()
+        captured = self.engine.snapshot(
+            ocr=True,
+            max_width=params.get("max_width") or 960,
+            region=region,
+            monitor=monitor,
+        )
+        import base64
+
+        import cv2
+        import numpy as np
+
+        raw = base64.b64decode(captured.get("png_b64") or "")
+        frame = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR) if raw else None
+        from .state import extract_visual_state
+
+        state = extract_visual_state(frame, captured.get("ocr") or [], profile=profile)
+        state["foreground"] = self._foreground()
+        hwnd = (self.attached or {}).get("hwnd")
+        if hwnd:
+            state["occluded"] = self._occlusion(hwnd)
+        game = state.setdefault("game", {})
+        game["profile"] = (profile or {}).get("id")
+        state["backend"] = self.backend
+        return state
+
+    def policy_start(self, params: dict | None = None) -> dict:
+        """启动本地 60 Hz 反射策略（profile 驱动：射击/前进/闪避/卡住脱困）。"""
+        params = params or {}
+        if self.attached is None:
+            raise EngineError("NOT_ATTACHED", "还没有 attach 任何窗口：先调 game_attach，再调 game_policy")
+        profile = params.get("profile")
+        if not isinstance(profile, dict):
+            profile = {}
+        foreground = self._foreground()
+        delivery = self._delivery(foreground)
+        if self._foreground_required() and delivery["checked"] and not delivery["foreground"]:
+            raise EngineError("FOREGROUND_MISMATCH", self._foreground_message(foreground))
+        self._stop_policy()
+        region, monitor = self._capture_geometry()
+        from .policy import PolicyRunner
+
+        self._policy = PolicyRunner(
+            capture=lambda: self.engine.grab_raw(monitor=monitor, region=region),
+            controller=self._controller_instance(),
+            gate=self.gate,
+            profile=profile,
+            tick_hz=int(params.get("tick_hz") or 60),
+        )
+        started = self._policy.start()
+        self.audit.write({"event": "policy_start", "profile": (profile or {}).get("id")})
+        return {"policy": started, "attached": self.attached, "backend": self.backend}
+
+    def policy_stop(self, params: dict | None = None) -> dict:
+        policy, self._policy = self._policy, None
+        if policy is None:
+            return {"stopped": False, "policy": None}
+        status = policy.stop()
+        self.audit.write({"event": "policy_stop", **status})
+        return {"stopped": True, "policy": status}
+
     def close(self) -> None:
+        self._stop_policy()
         self._stop_plan(join=True)
         if self._controller is not None:
             try:

@@ -18,14 +18,9 @@ from typing import Protocol
 
 # 键盘后端支持的按键（模型传这些名字；大小写不敏感）。
 VK_CODES: dict[str, int] = {
-    "W": 0x57,
-    "A": 0x41,
-    "S": 0x53,
-    "D": 0x44,
-    "Q": 0x51,
-    "E": 0x45,
-    "F": 0x46,
-    "R": 0x52,
+    # 字母（A–Z）：VK 码与 ASCII 一致。覆盖 Cuphead 等游戏的默认键位
+    # （跳跃 Z、射击 X、锁定 C、大招 V、冲刺 Shift…），也方便按游戏键位表自由组合。
+    **{chr(code): code for code in range(ord("A"), ord("Z") + 1)},
     "SPACE": 0x20,
     "ENTER": 0x0D,
     "ESC": 0x1B,
@@ -37,10 +32,7 @@ VK_CODES: dict[str, int] = {
     "DOWN": 0x28,
     "LEFT": 0x25,
     "RIGHT": 0x27,
-    "1": 0x31,
-    "2": 0x32,
-    "3": 0x33,
-    "4": 0x34,
+    **{str(digit): 0x30 + digit for digit in range(10)},
 }
 
 _KEYEVENTF_KEYUP = 0x0002
