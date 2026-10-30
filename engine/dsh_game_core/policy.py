@@ -349,6 +349,8 @@ class PolicyRunner:
         self._entity_roles = []
         self._turn_until = 0.0
         self._last_hazard_jump = 0.0
+        self._macro_used = set()
+        self._macro_state = None
         # 实体跟踪 / 交战细节（通用，可按游戏关闭）。
         self._ignore_own_bullets = bool(combat.get("ignore_own_bullets", True))
         self._face_back = bool(combat.get("face_back", True))
@@ -370,6 +372,10 @@ class PolicyRunner:
         self._hazard_cooldown_ms = max(200.0, _as_float(combat.get("hazard_cooldown_ms"), 700.0) or 700.0)
         self._hazard_distance = max(0.05, _as_float(combat.get("hazard_distance"), 0.32) or 0.32)
         self._last_hazard_jump = 0.0
+        macros = self._profile.get("macros")
+        self._macros = macros if isinstance(macros, list) else []
+        self._macro_used = set()
+        self._macro_state = None
         self._tracker = None
         self._tracks: list[Any] = []
         # 场景门控/恢复：profile.scenes = {scene: {"recover": [{"press": "confirm"}], ...}}
@@ -424,6 +430,8 @@ class PolicyRunner:
         self._entity_roles = []
         self._turn_until = 0.0
         self._last_hazard_jump = 0.0
+        self._macro_used = set()
+        self._macro_state = None
         self._tracks = []
         # 非阻塞点按：press() 会 sleep 按住时长，60 Hz 环里不能调用它；
         # 这里改用 hold + 到期 release，避免跳跃/闪避把整拍拖慢。
@@ -527,6 +535,8 @@ class PolicyRunner:
         self._entity_roles = []
         self._turn_until = 0.0
         self._last_hazard_jump = 0.0
+        self._macro_used = set()
+        self._macro_state = None
         self._pending_releases = []
         self._held = set()
         self._tracks = []
@@ -717,6 +727,12 @@ class PolicyRunner:
                 self._update_memory(previous_frame, frame)
                 self._mark_timing("memory", memory_started)
                 self._check_danger_outcome()
+                if self._route_macro_tick():
+                    self._ticks += 1
+                    delay = self._period
+                    if delay > 0:
+                        self._sleep(delay)
+                    continue
                 self._maybe_engage(entities)
                 self._maybe_turn_shoot()
 
@@ -848,6 +864,69 @@ class PolicyRunner:
             self._tap(self._jump_keys[0], 140.0)
             self._last_hazard_jump = now
             return
+
+    def _route_macro_tick(self) -> bool:
+        """在 profile.macros 指定的 scroll_s 附近执行一段按键序列；返回是否接管本拍。"""
+        state = self._macro_state
+        now = self._clock()
+        if state is None:
+            if not self._macros:
+                return False
+            for index, macro in enumerate(self._macros):
+                if index in self._macro_used or not isinstance(macro, dict):
+                    continue
+                try:
+                    target = float(macro.get("scroll_s"))
+                    window = float(macro.get("window") or 0.8)
+                except (TypeError, ValueError):
+                    continue
+                if abs(self._scroll_s - target) > window:
+                    continue
+                steps = macro.get("steps")
+                if not isinstance(steps, list) or not steps:
+                    continue
+                self._macro_used.add(index)
+                self._release_all_keys()
+                self._macro_state = {"steps": steps, "index": 0, "step_started": None, "holds": []}
+                state = self._macro_state
+                break
+            else:
+                return False
+        steps = state["steps"]
+        if state["index"] >= len(steps):
+            self._macro_state = None
+            return False
+        step = steps[state["index"]]
+        if not isinstance(step, dict):
+            state["index"] += 1
+            return True
+        if state["step_started"] is None:
+            self._release_all_keys()
+            holds = [self._resolve_key(str(key)) for key in (step.get("hold") or [])]
+            holds = [key for key in holds if key]
+            for key in holds:
+                self._controller.hold(key)
+                self._held.add(key)
+            state["holds"] = holds
+            for key in step.get("tap") or []:
+                resolved = self._resolve_key(str(key))
+                if resolved:
+                    self._tap(resolved, 120.0)
+            state["step_started"] = now
+            self._actions += 1
+            return True
+        duration_ms = max(50.0, _as_float(step.get("duration_ms"), 400.0) or 400.0)
+        if (now - state["step_started"]) * 1000.0 < duration_ms:
+            return True
+        for key in state["holds"]:
+            if key in self._held:
+                self._release_key(key)
+        state["holds"] = []
+        state["step_started"] = None
+        state["index"] += 1
+        if state["index"] >= len(steps):
+            self._macro_state = None
+        return True
 
     def _maybe_turn_shoot(self) -> None:
         """背后有 approaching/chaser 时：停步、短点转向持续射击，再恢复推进。
