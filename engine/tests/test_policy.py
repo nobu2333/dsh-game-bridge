@@ -165,6 +165,7 @@ def build_runner(
     scene_source=None,
     hp_source=None,
     on_danger_outcome=None,
+    prompt_source=None,
 ):
     """构造一个由「虚拟时间 + 拍数预算」自动收尾的 runner。"""
     controller = controller or FakeController()
@@ -190,6 +191,7 @@ def build_runner(
         scene_source=scene_source,
         hp_source=hp_source,
         on_danger_outcome=on_danger_outcome,
+        prompt_source=prompt_source,
     )
     holder["runner"] = runner
     controller.clock = virtual.clock
@@ -484,3 +486,23 @@ def test_danger_outcome_failed_on_hp_drop():
     assert outcomes
     assert outcomes[0][0] == "cuphead/forest-follies/danger-fail"
     assert outcomes[0][1] == "failed"
+
+def test_walk_to_affordance_stops_and_confirms():
+    profile = make_profile()
+    profile["navigation"] = {
+        "walk_to_affordance": True,
+        "direction": "RIGHT",
+        "prompt_every_n_ticks": 2,
+        "confirm": "Z",
+    }
+    counter = {"n": 0}
+
+    def prompt_source(frame, profile):
+        counter["n"] += 1
+        return {"key": "Z"} if counter["n"] >= 2 else None
+
+    runner, _, controller = build_runner(budget_ticks=30, profile=profile, prompt_source=prompt_source)
+    status = run_to_completion(runner)
+    assert status["stop_reason"] == "affordance_confirm"
+    assert any(call["action"] == "hold" and call["button"] == "RIGHT" for call in controller.calls)
+    assert any(call["action"] == "hold" and call["button"] == "Z" for call in controller.calls)
