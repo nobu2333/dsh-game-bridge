@@ -529,14 +529,60 @@ class GameSession:
         self._record_damage_card(previous, int(hp), episode)
         self._start_recorder()
 
+    def _attribute_damage(self, policy_status: dict) -> dict:
+        """受击归因：找离玩家最近的轨迹，粗分 contact/projectile。"""
+        player = policy_status.get("player") if isinstance(policy_status.get("player"), dict) else {}
+        tracks = policy_status.get("tracks") if isinstance(policy_status.get("tracks"), list) else []
+        try:
+            px = float(player.get("x"))
+            py = float(player.get("y"))
+        except (TypeError, ValueError):
+            return {"kind": "unknown", "template": "", "relation": "unknown", "cause": "unknown"}
+        best = None
+        for track in tracks:
+            if not isinstance(track, dict):
+                continue
+            try:
+                tx = float(track.get("x"))
+                ty = float(track.get("y"))
+            except (TypeError, ValueError):
+                continue
+            distance = ((tx - px) ** 2 + (ty - py) ** 2) ** 0.5
+            if best is None or distance < best[0]:
+                best = (distance, track)
+        if best is None or best[0] > 0.28:
+            return {"kind": "unknown", "template": "", "relation": "unknown", "cause": "unknown"}
+        distance, track = best
+        dx = float(track.get("x", px)) - px
+        if abs(dx) <= 0.04:
+            relation = "same"
+        elif abs(dx) >= abs(float(track.get("y", py)) - py):
+            relation = "ahead" if dx > 0 else "behind"
+        else:
+            relation = "below" if float(track.get("y", py)) > py else "above"
+        speed = abs(float(track.get("speed") or 0.0))
+        if distance <= 0.12:
+            cause = "contact"
+        elif speed >= 0.3:
+            cause = "projectile"
+        else:
+            cause = "unknown"
+        return {
+            "kind": str(track.get("kind") or "threat")[:32],
+            "template": "",
+            "relation": relation,
+            "cause": cause,
+        }
+
     def _record_damage_card(self, hp_before: int, hp_after: int, episode: str | None) -> None:
-        """把一次受击写成带关卡坐标的 candidate 卡；同区域已有卡则累加统计。"""
+        """把一次受击写成带关卡坐标/归因的 candidate 卡；同区域已有卡则累加统计。"""
         try:
             from .memory import KnowledgeStore
 
             policy_status = self._policy.status() if self._policy is not None else {}
             scroll_s = float(policy_status.get("scroll_s") or 0.0)
             nearby = policy_status.get("danger") if isinstance(policy_status.get("danger"), dict) else None
+            attribution = self._attribute_damage(policy_status)
             store = KnowledgeStore(os.path.join(self._data_root(), "knowledge"))
             if nearby and nearby.get("id"):
                 book = store.load(self._record_game, self._record_level)
@@ -546,6 +592,16 @@ class GameSession:
                     card["stats"]["damage_events"] = int(card["stats"].get("damage_events", 0)) + 1
                     card["stats"]["encounters"] = int(card["stats"].get("encounters", 0)) + 1
                     card["confidence"] = round(min(1.0, float(card.get("confidence", 0.3)) + 0.1), 3)
+                    if attribution["cause"] != "unknown":
+                        card["event"]["cause"] = attribution["cause"]
+                    if card["trigger"].get("kind") in ("", "unknown") and attribution["kind"] != "unknown":
+                        card["trigger"].update(
+                            {
+                                "kind": attribution["kind"],
+                                "template": attribution["template"],
+                                "relation": attribution["relation"],
+                            }
+                        )
                     if episode:
                         card["evidence"] = (card.get("evidence") or [])[-7:] + [episode]
                     store.save(self._record_game, self._record_level, book["cards"])
@@ -556,11 +612,17 @@ class GameSession:
                 "place": {
                     "scroll_s": scroll_s,
                     "segment": int(scroll_s // 1.0),
-                    "player_x": 0.4,
+                    "player_x": policy_status.get("player", {}).get("x", 0.4)
+                    if isinstance(policy_status.get("player"), dict)
+                    else 0.4,
                     "player_y": 0.8,
                 },
-                "trigger": {"kind": "unknown", "template": "", "relation": "unknown"},
-                "event": {"type": "damage", "cause": "unknown", "hp_before": hp_before, "hp_after": hp_after},
+                "trigger": {
+                    "kind": attribution["kind"],
+                    "template": attribution["template"],
+                    "relation": attribution["relation"],
+                },
+                "event": {"type": "damage", "cause": attribution["cause"], "hp_before": hp_before, "hp_after": hp_after},
                 "response": {"skill": "unknown"},
                 "evidence": [episode] if episode else [],
                 "stats": {"encounters": 1, "damage_events": 1, "avoided": 0},

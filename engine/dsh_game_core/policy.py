@@ -477,6 +477,19 @@ class PolicyRunner:
             "last_entities": int(self._last_entities),
             "scroll_s": round(float(self._scroll_s), 3),
             "danger": self._nearby_danger,
+            "player": {"x": round(float(self._anchor[0]), 4), "y": round(float(self._anchor[1]), 4)},
+            "tracks": [
+                {
+                    "id": int(track.id),
+                    "kind": str(track.kind),
+                    "x": round(float(track.x), 4),
+                    "y": round(float(track.y), 4),
+                    "vx": round(float(track.vx), 4),
+                    "vy": round(float(track.vy), 4),
+                    "speed": round(float(track.speed), 4),
+                }
+                for track in getattr(self, "_tracks", [])[:8]
+            ],
         }
 
     # ── 线程主体 ──────────────────────────────────────────────────────

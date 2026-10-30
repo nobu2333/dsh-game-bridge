@@ -264,3 +264,91 @@ class LevelLocator:
             "segment": int(self.scroll_s // self.segment_width),
             "updated_at": self._last_at,
         }
+
+
+GUIDE_SCHEMA = 1
+
+
+def normalize_guide_card(raw: Any, *, now: Any = None) -> dict | None:
+    """Optional external knowledge card (offline import, no network here)."""
+    if not isinstance(raw, dict):
+        return None
+    game = _safe_id(raw.get("game"), "unknown")
+    level = _safe_id(raw.get("level"), "")
+    if not level:
+        return None
+    facts = raw.get("facts")
+    if not isinstance(facts, list):
+        facts = []
+    clean_facts = []
+    for fact in facts[:12]:
+        if not isinstance(fact, dict):
+            continue
+        text = str(fact.get("text") or "").strip()
+        if not text:
+            continue
+        clean_facts.append({"type": str(fact.get("type") or "note")[:24], "text": text[:240]})
+    source = str(raw.get("source_url") or "").strip()
+    if source and not source.lower().startswith(("http://", "https://")):
+        source = ""
+    status = str(raw.get("status") or "unverified").lower()
+    if status not in ("unverified", "verified", "stale"):
+        status = "unverified"
+    card = {
+        "schema": GUIDE_SCHEMA,
+        "id": _safe_id(raw.get("id"), f"{game}/{level}/guide-{uuid.uuid4().hex[:8]}"),
+        "game": game,
+        "level": level,
+        "title": str(raw.get("title") or "")[:120],
+        "source_url": source[:300],
+        "fetched_at": _now(raw.get("fetched_at") or now),
+        "facts": clean_facts,
+        "confidence": round(_clamp(raw.get("confidence"), 0.0, 1.0, 0.4), 3),
+        "status": status,
+        "verified_in_game": bool(raw.get("verified_in_game")),
+    }
+    return card
+
+
+class GuideStore:
+    """Local-only guide book. The caller (model/user) supplies fetched facts."""
+
+    def __init__(self, root: str | os.PathLike[str]) -> None:
+        self.root = Path(root)
+
+    def _path(self, game: str, level: str) -> Path:
+        return self.root / _safe_id(game, "unknown") / f"{_safe_id(level, 'unknown')}.guides.json"
+
+    def load(self, game: str, level: str) -> list[dict]:
+        try:
+            data = json.loads(self._path(game, level).read_text(encoding="utf-8"))
+            cards = data.get("cards") if isinstance(data, dict) else []
+        except Exception:  # noqa: BLE001
+            cards = []
+        result = []
+        for raw in cards if isinstance(cards, list) else []:
+            card = normalize_guide_card(raw)
+            if card is not None:
+                result.append(card)
+        return result
+
+    def upsert(self, card: Any) -> dict | None:
+        normalized = normalize_guide_card(card)
+        if normalized is None:
+            return None
+        try:
+            path = self._path(normalized["game"], normalized["level"])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            cards = self.load(normalized["game"], normalized["level"])
+            cards = [existing for existing in cards if existing["id"] != normalized["id"]]
+            cards.append(normalized)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(
+                json.dumps({"schema": GUIDE_SCHEMA, "cards": cards}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            os.replace(tmp, path)
+            return normalized
+        except Exception:  # noqa: BLE001 - optional knowledge must never break play
+            return None
+

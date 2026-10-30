@@ -80,3 +80,30 @@ def test_level_locator_accumulates_and_resets():
     assert locator.position()["scroll_s"] == 1.2
     locator.reset()
     assert locator.position()["scroll_s"] == 0.0
+
+from dsh_game_core.memory import GuideStore, normalize_guide_card
+
+
+def test_guide_normalization_and_store(tmp_path):
+    assert normalize_guide_card(None) is None
+    assert normalize_guide_card({"game": "cuphead"}) is None
+    bad = normalize_guide_card(
+        {"game": "cuphead", "level": "forest-follies", "source_url": "javascript:alert(1)", "facts": [{"text": "jump"}]}
+    )
+    assert bad["source_url"] == ""
+    good = normalize_guide_card(
+        {
+            "game": "cuphead",
+            "level": "forest-follies",
+            "title": "walkthrough",
+            "source_url": "https://example.com/guide",
+            "facts": [{"type": "hazard", "text": "mushrooms pop up"}],
+            "confidence": 0.5,
+        }
+    )
+    store = GuideStore(tmp_path)
+    assert store.upsert(good) is not None
+    cards = store.load("cuphead", "forest-follies")
+    assert len(cards) == 1
+    assert cards[0]["facts"][0]["text"] == "mushrooms pop up"
+    assert cards[0]["status"] == "unverified"
