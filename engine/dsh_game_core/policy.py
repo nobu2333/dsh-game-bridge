@@ -763,24 +763,23 @@ class PolicyRunner:
             self._entity_roles = []
 
     def _maybe_turn_shoot(self) -> None:
-        """背后有 approaching/chaser 时：停步、面向后持续射击，再恢复推进。"""
+        """背后有 approaching/chaser 时：停步、短点转向持续射击，再恢复推进。
+
+        不能持续按住左键：横版关卡左侧可能是墙，会把自己顶在墙边。
+        """
         if not self._turn_and_shoot:
             return
         now = self._clock()
         left = self._resolve_key("left") or "LEFT"
+        advance = self._advance_key
         if now < self._turn_until:
-            if left not in self._held:
-                self._controller.hold(left)
-                self._held.add(left)
-                self._actions += 1
-            advance = self._advance_key
             if advance is not None and advance in self._held:
                 self._release_key(advance)
+            if left in self._held:
+                self._release_key(left)
             return
         if self._turn_until:
             self._turn_until = 0.0
-            if left in self._held:
-                self._release_key(left)
         for observation in self._entity_roles:
             if observation.get("role") not in ("chaser", "approaching"):
                 continue
@@ -789,13 +788,9 @@ class PolicyRunner:
             if float(observation.get("distance") or 1.0) > 0.6:
                 continue
             self._turn_until = now + self._turn_shoot_ms / 1000.0
-            advance = self._advance_key
             if advance is not None and advance in self._held:
                 self._release_key(advance)
-            if left not in self._held:
-                self._controller.hold(left)
-                self._held.add(left)
-                self._actions += 1
+            self._tap(left, 90.0)
             return
 
     def _maybe_engage(self, entities: list[dict]) -> None:
