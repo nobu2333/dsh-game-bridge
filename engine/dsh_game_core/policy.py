@@ -382,6 +382,10 @@ class PolicyRunner:
         self._gap_every = max(1, int(_as_float(terrain.get("gap_every_n_ticks"), 6) or 6))
         self._gap_cooldown_ms = max(200.0, _as_float(terrain.get("gap_cooldown_ms"), 600.0) or 600.0)
         self._last_gap_jump = 0.0
+        self._ledge_jump = bool(terrain.get("ledge_jump", False))
+        self._ledge_every = max(1, int(_as_float(terrain.get("ledge_every_n_ticks"), 6) or 6))
+        self._ledge_margin = max(0.02, _as_float(terrain.get("ledge_margin"), 0.22) or 0.22)
+        self._last_ledge_jump = 0.0
         self._tracker = None
         self._tracks: list[Any] = []
         # 场景门控/恢复：profile.scenes = {scene: {"recover": [{"press": "confirm"}], ...}}
@@ -727,6 +731,7 @@ class PolicyRunner:
                 self._update_entity_memory(frame)
                 self._maybe_static_hazard(frame)
                 self._maybe_gap_jump(frame)
+                self._maybe_ledge_jump(frame)
                 player_started = self._clock()
                 self._update_player(frame)
                 self._mark_timing("player", player_started)
@@ -861,6 +866,28 @@ class PolicyRunner:
             if detect_gap_ahead(frame, self._profile, self._anchor):
                 self._tap(self._jump_keys[0], 140.0)
                 self._last_gap_jump = now
+        except Exception:  # noqa: BLE001
+            return
+
+    def _maybe_ledge_jump(self, frame: np.ndarray) -> None:
+        """玩家站在平台边缘附近且前方有断口时起跳（需 profile.terrain.ledge_jump）。"""
+        if not self._ledge_jump or not self._jump_keys:
+            return
+        if self._ticks % self._ledge_every != 0:
+            return
+        now = self._clock()
+        if (now - self._last_ledge_jump) * 1000.0 < 500.0:
+            return
+        try:
+            from .terrain import ledge_under_player
+
+            ledge = ledge_under_player(frame, self._profile, self._anchor)
+            if not ledge:
+                return
+            distance = float(ledge.get("edge_x", 0.0)) - float(self._anchor[0])
+            if 0.02 <= distance <= self._ledge_margin:
+                self._tap(self._jump_keys[0], 140.0)
+                self._last_ledge_jump = now
         except Exception:  # noqa: BLE001
             return
 
