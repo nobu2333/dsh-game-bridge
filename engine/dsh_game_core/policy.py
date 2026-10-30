@@ -877,7 +877,12 @@ class PolicyRunner:
         press = step.get("press") if isinstance(step, dict) else step
         key = self._resolve_key(str(press)) if press is not None else None
         if key:
-            self._tap(key, 140.0)
+            try:
+                self._tap(key, 140.0)
+            except Exception as error:  # noqa: BLE001 - 非法恢复键不能炸掉整条闭环
+                self._stop_reason = f"recovery: {type(error).__name__}: {error}"
+                self._stop_event.set()
+                return
         self._recover_attempts += 1
         self._last_recover_at = now
         if self._recover_attempts > self._recover_max_attempts:

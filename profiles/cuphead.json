@@ -27,7 +27,7 @@
   },
   "scenes": {
     "death": {"recover": [{"press": "confirm"}]},
-    "equip": {"recover": [{"press": "back"}]},
+    "equip": {"recover": [{"press": "ESC"}]},
     "cutscene": {"recover": [{"press": "confirm"}]},
     "menu": {"recover": []},
     "loading": {"recover": []}
