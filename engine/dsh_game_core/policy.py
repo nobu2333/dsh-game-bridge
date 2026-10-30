@@ -817,7 +817,9 @@ class PolicyRunner:
         if self._turn_until:
             self._turn_until = 0.0
         for observation in self._entity_roles:
-            if observation.get("role") not in ("chaser", "approaching"):
+            role = observation.get("role")
+            harmful = int(observation.get("harmful_hits") or 0) > 0
+            if role not in ("chaser", "approaching") and not harmful:
                 continue
             if not observation.get("behind"):
                 continue
