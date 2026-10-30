@@ -757,6 +757,95 @@ def find_player(frame_bgr: Any, profile: Any = None, previous: Any = None) -> di
 
 
 # ── WorldState assembly ──────────────────────────────────────────────────────
+_PROMPT_ICON_CACHE: dict[int, np.ndarray] = {}
+
+
+def _prompt_icons(profile: Any) -> list[dict]:
+    """Return decoded prompt-icon templates from profile.ui.prompt_icons."""
+    ui = _section(profile, "ui")
+    icons = ui.get("prompt_icons")
+    if not isinstance(icons, (list, tuple)):
+        return []
+    decoded: list[dict] = []
+    for icon in icons:
+        if not isinstance(icon, Mapping):
+            continue
+        encoded = icon.get("template_png_base64")
+        if not isinstance(encoded, str) or not encoded.strip():
+            continue
+        key = hash(encoded)
+        template = _PROMPT_ICON_CACHE.get(key)
+        if template is None:
+            try:
+                import base64
+
+                import cv2
+
+                raw = base64.b64decode(encoded, validate=True)
+                template = cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
+            except Exception:  # noqa: BLE001 - bad template disables that icon
+                template = None
+            if template is None:
+                continue
+            _PROMPT_ICON_CACHE[key] = template
+        decoded.append({"spec": icon, "template": template})
+    return decoded
+
+
+def detect_prompt_icon(frame_bgr: Any, profile: Any = None) -> dict | None:
+    """Detect an on-screen key/interaction prompt icon via profile templates.
+
+    Returns ``{"key": str, "x": float, "y": float, "score": float}`` or None.
+    This is the general "you can interact now" signal; OCR text is not required.
+    """
+    try:
+        frame = _coerce_frame(frame_bgr)
+        if frame is None:
+            return None
+        icons = _prompt_icons(profile)
+        if not icons:
+            return None
+        import cv2
+
+        h, w = frame.shape[:2]
+        best: dict | None = None
+        for entry in icons:
+            spec = entry["spec"]
+            template = entry["template"]
+            search_width = int(_number(spec.get("search_width"), 480))
+            search_width = max(120, min(search_width, w))
+            scale = search_width / float(w)
+            search = cv2.resize(
+                frame, (search_width, max(1, int(round(h * scale)))), interpolation=cv2.INTER_AREA
+            )
+            size = spec.get("size")
+            if isinstance(size, (list, tuple)) and len(size) >= 2:
+                tw = max(6, int(round(w * _number(size[0], 0.05) * scale)))
+                th = max(6, int(round(h * _number(size[1], 0.08) * scale)))
+            else:
+                tw = max(6, int(round(template.shape[1] * scale)))
+                th = max(6, int(round(template.shape[0] * scale)))
+            if tw >= search.shape[1] or th >= search.shape[0]:
+                continue
+            scaled = cv2.resize(template, (tw, th), interpolation=cv2.INTER_AREA)
+            result = cv2.matchTemplate(search, scaled, cv2.TM_CCOEFF_NORMED)
+            _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(result)
+            threshold = _number(spec.get("match_threshold"), 0.55)
+            if not math.isfinite(max_val) or max_val < threshold:
+                continue
+            candidate = {
+                "key": str(spec.get("key") or "?"),
+                "x": round(_clamp((max_loc[0] + tw / 2.0) / search_width, 0.0, 1.0), 4),
+                "y": round(_clamp((max_loc[1] + th / 2.0) / search.shape[0], 0.0, 1.0), 4),
+                "score": round(float(max_val), 4),
+            }
+            if best is None or candidate["score"] > best["score"]:
+                best = candidate
+        return best
+    except Exception:  # noqa: BLE001 - perception must never raise
+        return None
+
+
 def _profile_id(profile: Any) -> str | None:
     value = _mapping(profile).get("id")
     if isinstance(value, str) and value.strip():
@@ -782,9 +871,9 @@ def _unknown_state(profile: Any, now: float) -> dict:
         "t": now,
         "scene": "unknown",
         "confidence": 0.0,
-        "player": {"x": None, "y": None, "hp": None, "max_hp": None, "state": "unknown"},
+        "player": {"x": None, "y": None, "hp": None, "max_hp": None, "state": "unknown", "confidence": None},
         "entities": [],
-        "ui": {"texts": [], "prompt": None, "hp_text": None},
+        "ui": {"texts": [], "prompt": None, "icon_prompt": None, "hp_text": None},
         "game": {"profile": _profile_id(profile), "provider": "vision", "stale": False},
         # Session wiring replaces these with foreground/occlusion metadata.
         "foreground": None,
@@ -817,16 +906,27 @@ def extract_visual_state(
         if frame is not None and scene in ("unknown", "dialogue") and _is_near_black(frame, profile):
             scene, confidence = "loading", 0.5
         max_hp = _max_hp(hp, hp_text, profile)
+        found = find_player(frame, profile) if frame is not None else None
+        player_x = found["x"] if isinstance(found, dict) else None
+        player_y = found["y"] if isinstance(found, dict) else None
         state = _unknown_state(profile, timestamp)
         state.update(
             {
                 "scene": scene,
                 "confidence": round(float(confidence), 3),
-                "player": {"x": None, "y": None, "hp": hp, "max_hp": max_hp, "state": "unknown"},
+                "player": {
+                    "x": player_x,
+                    "y": player_y,
+                    "hp": hp,
+                    "max_hp": max_hp,
+                    "state": "unknown",
+                    "confidence": (found or {}).get("score") if isinstance(found, dict) else None,
+                },
                 "entities": cheap_entities(frame, previous, profile) if frame is not None else [],
                 "ui": {
                     "texts": _texts_norm(lines, frame_size),
                     "prompt": _extract_prompt(lines, profile),
+                    "icon_prompt": detect_prompt_icon(frame, profile) if frame is not None else None,
                     "hp_text": hp_text,
                 },
             }

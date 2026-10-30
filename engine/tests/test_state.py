@@ -288,9 +288,16 @@ def test_world_state_default_shape():
     assert state["schema"] == STATE_SCHEMA == 1
     assert state["scene"] == "unknown"
     assert state["confidence"] == 0.0
-    assert state["player"] == {"x": None, "y": None, "hp": None, "max_hp": None, "state": "unknown"}
+    assert state["player"] == {
+        "x": None,
+        "y": None,
+        "hp": None,
+        "max_hp": None,
+        "state": "unknown",
+        "confidence": None,
+    }
     assert state["entities"] == []
-    assert state["ui"] == {"texts": [], "prompt": None, "hp_text": None}
+    assert state["ui"] == {"texts": [], "prompt": None, "icon_prompt": None, "hp_text": None}
     assert state["game"] == {"profile": None, "provider": "vision", "stale": False}
     assert state["foreground"] is None
     assert state["occluded"] is None
@@ -423,3 +430,30 @@ def test_find_player_color_fallback_and_garbage():
     assert abs(found["x"] - 130 / 240.0) < 0.08
     assert state_module.find_player(None, profile) is None
     assert state_module.find_player(frame, {"player": {"template_png_base64": "not-base64!!"}}) is None
+
+def test_detect_prompt_icon_template():
+    frame = np.zeros((180, 320, 3), dtype=np.uint8)
+    icon = np.zeros((40, 36, 3), dtype=np.uint8)
+    icon[4:36, 4:32] = (250, 250, 250)
+    icon[10:30, 12:24] = (10, 10, 10)
+    frame[80:120, 200:236] = icon
+    profile = {
+        "ui": {
+            "prompt_icons": [
+                {
+                    "key": "Z",
+                    "template_png_base64": _png_b64(icon),
+                    "size": [36 / 320.0, 40 / 180.0],
+                    "search_width": 320,
+                    "match_threshold": 0.6,
+                }
+            ]
+        }
+    }
+    found = state_module.detect_prompt_icon(frame, profile)
+    assert found is not None
+    assert found["key"] == "Z"
+    assert abs(found["x"] - 218 / 320.0) < 0.05
+    assert abs(found["y"] - 100 / 180.0) < 0.06
+    assert state_module.detect_prompt_icon(None, profile) is None
+    assert state_module.detect_prompt_icon(frame, {}) is None
