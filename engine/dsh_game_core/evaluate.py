@@ -139,52 +139,24 @@ def summarize_cards(cards: list[dict]) -> dict:
     }
 
 
-def summarize_coordinate_drift(
-    root: str | os.PathLike[str],
-    *,
-    game: str | None = None,
-    level: str | None = None,
-    budget: float = 0.2,
-) -> dict:
-    """Estimate level-coordinate drift per DangerCard across episodes.
+def summarize_coordinate_drift(cards: list[dict], *, budget: float = 0.2) -> dict:
+    """Coordinate consistency: spread of recorded damage_scrolls per DangerCard.
 
-    For each episode, take the median scroll_s while a card was active; compare
-    those medians across episodes for the same card. This is the P0 coordinate
-    consistency check (target spread <= 0.2 screen widths).
+    Each card stores the level coordinate at the actual hit (t_hit). Multiple
+    damage events for the same card should land within a small window; a large
+    spread means the locator or card matching is unstable.
     """
-    directory = Path(root)
-    per_card: dict[str, list[float]] = {}
-    if directory.is_dir():
-        for child in sorted(directory.iterdir()):
-            if not child.is_dir():
-                continue
-            episode = load_episode(child)
-            if episode is None:
-                continue
-            meta = episode.get("meta") or {}
-            if game and meta.get("game") != game:
-                continue
-            if level and meta.get("level") != level:
-                continue
-            active: dict[str, list[float]] = {}
-            for frame in episode.get("frames") or []:
-                state = frame.get("state") if isinstance(frame.get("state"), dict) else {}
-                card_id = state.get("danger")
-                if not card_id:
-                    continue
-                active.setdefault(str(card_id), []).append(_num(state.get("scroll_s"), 0.0))
-            for card_id, values in active.items():
-                values = sorted(values)
-                median = values[len(values) // 2]
-                per_card.setdefault(card_id, []).append(median)
-    spreads = {
-        card_id: round(max(values) - min(values), 3)
-        for card_id, values in per_card.items()
-        if len(values) >= 2
-    }
+    spreads: dict[str, float] = {}
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+        stats = card.get("stats") if isinstance(card.get("stats"), dict) else {}
+        scrolls = sorted(_num(value) for value in (stats.get("damage_scrolls") or []) if _num(value) == _num(value))
+        if len(scrolls) >= 2:
+            spreads[str(card.get("id") or "")] = round(scrolls[-1] - scrolls[0], 3)
     worst = max(spreads.values(), default=0.0)
     return {
-        "cards_with_multiple_visits": len(spreads),
+        "cards_with_multiple_hits": len(spreads),
         "mean_spread": round(sum(spreads.values()) / len(spreads), 3) if spreads else 0.0,
         "max_spread": round(worst, 3),
         "budget": budget,
@@ -218,7 +190,7 @@ def format_report(summary: dict) -> str:
     drift = summary.get("drift")
     if isinstance(drift, dict):
         lines.append(
-            "coordinate drift: cards={cards_with_multiple_visits} mean={mean_spread} max={max_spread} "
+            "coordinate drift: cards={cards_with_multiple_hits} mean={mean_spread} max={max_spread} "
             "budget={budget} ok={ok}".format(**drift)
         )
     return "\n".join(lines)
@@ -236,9 +208,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     episodes = summarize_episodes(os.path.join(args.data_root, "episodes"), game=args.game, level=args.level)
     cards = summarize_cards(load_cards(os.path.join(args.data_root, "knowledge"), args.game, args.level))
-    drift = summarize_coordinate_drift(
-        os.path.join(args.data_root, "episodes"), game=args.game, level=args.level
-    )
+    drift = summarize_coordinate_drift(cards)
     episodes["cards"] = cards
     episodes["drift"] = drift
     print(format_report(episodes))

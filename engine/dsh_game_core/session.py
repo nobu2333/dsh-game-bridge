@@ -707,6 +707,14 @@ class GameSession:
                         continue
                     card["stats"]["damage_events"] = int(card["stats"].get("damage_events", 0)) + 1
                     card["stats"]["encounters"] = int(card["stats"].get("encounters", 0)) + 1
+                    scrolls = list(card["stats"].get("damage_scrolls") or [])
+                    scrolls.append(round(float(scroll_s), 3))
+                    scrolls = sorted(scrolls)[-12:]
+                    card["stats"]["damage_scrolls"] = scrolls
+                    if scrolls:
+                        median = scrolls[len(scrolls) // 2]
+                        card["place"]["scroll_s"] = round(float(median), 3)
+                        card["place"]["segment"] = int(float(median) // 1.0)
                     card["confidence"] = round(min(1.0, float(card.get("confidence", 0.3)) + 0.1), 3)
                     if attribution["cause"] != "unknown":
                         card["event"]["cause"] = attribution["cause"]
@@ -752,7 +760,12 @@ class GameSession:
                     "skill": "jump_over" if attribution["cause"] == "contact" else ("evade" if attribution["cause"] == "projectile" else "unknown")
                 },
                 "evidence": [episode] if episode else [],
-                "stats": {"encounters": 1, "damage_events": 1, "avoided": 0},
+                "stats": {
+                    "encounters": 1,
+                    "damage_events": 1,
+                    "avoided": 0,
+                    "damage_scrolls": [round(float(scroll_s), 3)],
+                },
                 "confidence": 0.35,
                 "status": "candidate",
             }
