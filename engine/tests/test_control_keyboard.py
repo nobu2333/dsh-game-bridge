@@ -61,7 +61,7 @@ def test_unknown_key_is_rejected_before_injection():
 def test_session_accepts_keyboard_backend_alias():
     session = GameSession(
         engine=FakeEngine(),
-        gate=SafetyGate(unattended_after_s=180, process_source=lambda: [], idle_source=lambda: 1.0, takeover_source=lambda: False, process_ttl_s=0),
+        gate=SafetyGate(process_source=lambda: [], takeover_source=lambda: False, process_ttl_s=0),
         control_backend="keyboard",
     )
     controller = session._controller_instance()
@@ -78,7 +78,7 @@ def test_controls_lists_buttons_for_each_backend():
     for backend, button in expected.items():
         session = GameSession(
             engine=FakeEngine(),
-            gate=SafetyGate(unattended_after_s=180, process_source=lambda: [], idle_source=lambda: 1.0, takeover_source=lambda: False, process_ttl_s=0),
+            gate=SafetyGate(process_source=lambda: [], takeover_source=lambda: False, process_ttl_s=0),
             control_backend=backend,
         )
         data = session.controls()

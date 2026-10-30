@@ -15,11 +15,9 @@ class FakeEngine:
         pass
 
 
-def allowed_gate(*, idle=1.0, processes=()):
+def allowed_gate(*, processes=()):
     return SafetyGate(
-        unattended_after_s=180,
         process_source=lambda: list(processes),
-        idle_source=lambda: idle,
         takeover_source=lambda: False,
         process_ttl_s=0,
     )

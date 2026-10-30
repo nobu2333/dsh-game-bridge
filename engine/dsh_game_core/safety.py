@@ -1,14 +1,18 @@
-"""安全闸：反作弊硬阻断、无人不自娱、随时可夺回。
+"""安全闸：反作弊硬阻断、随时可夺回。
 
-三条规则来自项目铁律，必须在**输出通道**这一层实现，而不是靠文档或提示词：
+两条规则必须在**输出通道**这一层实现，而不是靠文档或提示词：
 
 1. **反作弊不接**：命中 EAC / BattlEye / Vanguard / ACE 等进程名即拒绝一切注入；
-2. **无人不自娱**：超过 `unattended_after_s` 没有任何键鼠输入，就停止输出
-   （agent 会话里没有真人在操作，这条最容易踩）；
-3. **随时可夺回**：F12 热键一按，立即松手（下一次 act 直接拒绝，并把状态标出来）。
+2. **随时可夺回**：F12 热键一按，立即松手（下一次 act 直接拒绝，并把状态标出来）。
 
-所有外部事实（进程列表 / 最后输入时间 / 热键状态）都通过可注入的函数获取，
-这样规则本身可以在没有 Windows、没有真实输入的环境里被单测钉死。
+历史上还有第三条「无人不自娱」（超过若干秒没有任何键鼠输入就停止输出）。这条规则
+是从宿主项目继承来的，对 dsh-game-bridge 不适用：本插件的正常用法就是让 agent 自己
+玩；用键鼠遥测判断「人在不在」既会误杀手柄玩家，又会被 keyboard 后端的注入反过来
+刷新时间戳（自我遮蔽），闸本身也不可靠。因此已移除；无人值守是否使用由用户自己
+决定，真实输出后端仍然有 DSH 审批闸兜底。
+
+所有外部事实（进程列表 / 热键状态）都通过可注入的函数获取，这样规则本身可以在
+没有 Windows 的环境里被单测钉死。
 """
 
 from __future__ import annotations
@@ -84,25 +88,6 @@ def scan_processes(names: Iterable[str]) -> list[str]:
     return hits
 
 
-def seconds_since_last_input() -> float | None:
-    """距离上一次键盘/鼠标输入过了多少秒；非 Windows 或调用失败返回 None。"""
-    if not hasattr(ctypes, "windll"):
-        return None
-
-    class LASTINPUTINFO(ctypes.Structure):
-        _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
-
-    info = LASTINPUTINFO()
-    info.cbSize = ctypes.sizeof(LASTINPUTINFO)
-    try:
-        if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
-            return None
-        now = ctypes.windll.kernel32.GetTickCount()
-        return max(0.0, (now - info.dwTime) / 1000.0)
-    except Exception:  # noqa: BLE001
-        return None
-
-
 def takeover_pressed(vk: int = TAKEOVER_VK) -> bool:
     if not hasattr(ctypes, "windll"):
         return False
@@ -117,7 +102,6 @@ class SafetyReport:
     allowed: bool
     reasons: list[str] = field(default_factory=list)
     anticheat: list[str] = field(default_factory=list)
-    idle_seconds: float | None = None
     takeover: bool = False
 
     def to_dict(self) -> dict:
@@ -125,27 +109,22 @@ class SafetyReport:
             "allowed": self.allowed,
             "reasons": self.reasons,
             "anticheat": self.anticheat,
-            "idle_seconds": None if self.idle_seconds is None else round(self.idle_seconds, 1),
             "takeover": self.takeover,
         }
 
 
 class SafetyGate:
-    """默认 fail-closed：拿不到人类在场证据就不许输出。"""
+    """命中任一硬闸即拒绝：反作弊进程、F12 夺回闩锁。"""
 
     def __init__(
         self,
-        unattended_after_s: float = 180.0,
         *,
         process_source: Callable[[], list[str]] = list_process_names,
-        idle_source: Callable[[], float | None] = seconds_since_last_input,
         takeover_source: Callable[[], bool] = takeover_pressed,
         process_ttl_s: float = 2.0,
     ):
-        self.unattended_after_s = unattended_after_s
         self.process_ttl_s = process_ttl_s
         self._process_source = process_source
-        self._idle_source = idle_source
         self._takeover_source = takeover_source
         self.takeover_latched = False
         self._process_cache: list[str] = []
@@ -174,16 +153,10 @@ class SafetyGate:
             self.takeover_latched = True
         if self.takeover_latched:
             reasons.append("takeover latched (F12); press again after re-attaching to resume")
-        idle = self._idle_source()
-        if idle is None:
-            reasons.append("cannot verify human presence (no input telemetry)")
-        elif idle > self.unattended_after_s:
-            reasons.append(f"unattended for {idle:.0f}s > {self.unattended_after_s:.0f}s")
         return SafetyReport(
             allowed=not reasons,
             reasons=reasons,
             anticheat=anticheat,
-            idle_seconds=idle,
             takeover=self.takeover_latched,
         )
 

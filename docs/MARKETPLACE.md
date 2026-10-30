@@ -20,15 +20,15 @@
 dsh-game-bridge 让 DSH 具备「看游戏 + 操作游戏」的能力：抓屏与 OCR 把画面变成
 模型可读的图像与文字，本地引擎以 ~20 Hz 运行闭环，模型只负责给目标（绑定窗口、
 看一眼、跑一段有界动作、停下来），不逐拍按键。默认 dry-run（只记录不注入），
-三条安全闸在引擎侧实现：反作弊进程硬阻断、无人时自动停手、F12 随时夺回。
+两道安全闸在引擎侧实现：反作弊进程硬阻断、F12 随时夺回；真实注入需 DSH 审批。
 
 ## Long description (English)
 
 dsh-game-bridge gives DeepSeek Harness eyes and hands on games. Capture and OCR turn
 the screen into images and text the model can read; a local engine runs a bounded
-~20 Hz loop while the model only chooses goals. Control is dry-run by default; three
-hard gates live in the engine: anti-cheat refusal, unattended guard and an F12
-takeover latch.
+~20 Hz loop while the model only chooses goals. Control is dry-run by default; two
+hard gates live in the engine: anti-cheat refusal and an F12 takeover latch; real
+injection requires a one-shot DSH approval.
 
 ## 风险标记（如实披露）
 
@@ -43,9 +43,9 @@ takeover latch.
 ## 安全边界（必须让用户一眼看到）
 
 1. 反作弊游戏（EAC / BattlEye / Vanguard / ACE…）一律拒绝输出通道；
-2. 无人时不自娱：超过阈值无键鼠输入即停手；拿不到输入遥测也拒绝；
-3. F12 本地夺回，不经过模型；
-4. 默认只读：不读内存、不注入进程；真实注入需用户显式设置环境变量。
+2. F12 本地夺回，不经过模型；
+3. 默认只读：不读内存、不注入进程；真实注入需用户显式设置环境变量并走 DSH 审批；
+4. 无人值守是预期用法（「无人即停手」闸已移除）；是否让 agent 自己玩由用户决定。
 
 ## 上架前检查
 

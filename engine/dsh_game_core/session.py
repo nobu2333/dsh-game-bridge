@@ -2,7 +2,7 @@
 
 M3 的闭环是一个**本地线程**，不是让模型每拍调一次工具：模型给一个目标
 （hold 某个方向 / 连点某个键，持续 N 毫秒），线程以约 20 Hz 运行，
-**每一拍都重新过安全闸**——F12、键鼠恢复、反作弊出现都能在一拍内停手。
+**每一拍都重新过安全闸**——F12 夺回或反作弊出现都能在一拍内停手。
 
 安全闸的实现与单步 act 完全共用，不允许出现「闭环路径绕过检查」。
 """
@@ -48,8 +48,7 @@ class GameSession:
         window_monitor_source=None,
     ):
         self.engine = engine or GameEngine()
-        unattended_after_s = float(os.environ.get("DSH_GAME_BRIDGE_UNATTENDED_S", "180"))
-        self.gate = gate or SafetyGate(unattended_after_s=unattended_after_s)
+        self.gate = gate or SafetyGate()
         self.backend = control_backend or os.environ.get("DSH_GAME_BRIDGE_CONTROL", "dry-run")
         self.audit = audit or AuditLog(os.environ.get("DSH_GAME_BRIDGE_AUDIT_LOG") or None)
         self._window_resolver = window_resolver

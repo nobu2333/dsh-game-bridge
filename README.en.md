@@ -17,7 +17,7 @@ local engine:
 - **eyes** — screen capture (DXcam), frame differencing, OCR (RapidOCR), 20 Hz entity tracking (planned);
 - **hands** — virtual gamepad (XInput via ViGEmBus), keyboard/mouse (planned);
 - **cerebellum** — a local ~20 Hz closed loop; the model picks goals, not keystrokes;
-- **safety** — takeover hotkey, anti-cheat refusal, unattended guard, local audit log.
+- **safety** — takeover hotkey, anti-cheat refusal, local audit log.
 
 ## Why target-level tools, not per-step tools
 
@@ -57,10 +57,13 @@ dsh plugin --profile web add dsh-game-bridge
 ## Safety commitments
 
 1. **Always take back control** — a local F12 hotkey latches takeover without the model;
-2. **No unattended self-play** — no human input for `DSH_GAME_BRIDGE_UNATTENDED_S`
-   (default 180 s), or no input telemetry at all, means output is refused;
-3. **No anti-cheat games** — EAC / BattlEye / Vanguard / ACE processes hard-block all output;
-4. **Read-only default** — capture + gamepad only; no memory reading, no injection.
+2. **No anti-cheat games** — EAC / BattlEye / Vanguard / ACE processes hard-block all output;
+3. **Read-only default** — capture + gamepad only; no memory reading, no injection.
+
+Unattended play is allowed by design: the "stop when nobody is at the keyboard" guard
+inherited from the host project was removed on 2026-10-30 because it misfires for
+gamepad players and is self-masked by injected keyboard input. Real output backends
+still require a one-shot DSH approval, and F12 still takes control back.
 
 ## Development
 

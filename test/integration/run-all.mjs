@@ -31,7 +31,6 @@ for (const key of Object.keys(baseEnv)) {
 }
 
 const real = { DSH_GAME_BRIDGE_PYTHON: python, DSH_GAME_BRIDGE_ENGINE_DIR: engineDir }
-const unattended = { DSH_GAME_BRIDGE_UNATTENDED_S: '86400' }
 
 const cases = [
   {
@@ -47,7 +46,7 @@ const cases = [
   },
   {
     name: 'M2 attach → dry-run act',
-    env: { ...real, ...unattended, FAKE_WINDOW: 'unspecified', FAKE_SEQUENCE: 'game_attach,game_act' },
+    env: { ...real, FAKE_WINDOW: 'unspecified', FAKE_SEQUENCE: 'game_attach,game_act' },
     expect: 'M2 PASS',
     requiresPython: true,
   },
@@ -55,7 +54,6 @@ const cases = [
     name: 'M3 attach → plan → status → stop',
     env: {
       ...real,
-      ...unattended,
       FAKE_WINDOW: 'unspecified',
       FAKE_SEQUENCE: 'game_attach,game_plan,game_status,game_stop',
     },

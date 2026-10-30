@@ -15,7 +15,7 @@ Python 引擎里；默认 dry-run（只记录不注入）。
 |:--|:--|:--|
 | M0 插件壳 | ✅ | 隔离 harness 里工具出现、截图作为 image block 进模型、进程干净退出 |
 | M1 引擎 + 自举 | ✅ | 真实抓屏 1280×800 + 54 行 OCR 进模型；uv 自举装 17 个包约 20 秒 |
-| M2 手 + 安全闸 | ✅（含真实注入） | 三道闸单测；attach→act 端到端；真实后端需审批；手柄 A / 键盘 W 已实机回读 |
+| M2 手 + 安全闸 | ✅（含真实注入） | 两道闸单测；attach→act 端到端；真实后端需审批；手柄 A / 键盘 W 已实机回读 |
 | M3 20 Hz 闭环 | ✅（dry-run 已验证） | 实测 21.3 Hz；逐拍安全复检；stop 一拍内松手；真实后端已接线 |
 | 发布 | ✅ 2026-10-29 | npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`；发布版安装+自举+M1/M3 实测通过 |
 | 市场收录 | ⏳ 待提交 | 先转 public，再按 MARKETPLACE 提交 |
@@ -27,11 +27,11 @@ Python 引擎里；默认 dry-run（只记录不注入）。
 
 ```powershell
 npm test                                   # 10 passed（契约 8 + 版本/平台 2）
-cd engine; python -m pytest tests -q       # 33 passed（抓屏/OCR/安全闸/闭环/审计/窗口/帧差）
+cd engine; python -m pytest tests -q       # 45 passed（抓屏/OCR/安全闸/闭环/审计/窗口/帧差）
 cd ..
 $env:DSH_HOME='<repo>/.dsh-test'
 $env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'
-npm run test:all                           # 9/9 PASS，约 100 秒
+npm run test:all                           # 10/10 PASS，约 110 秒
 pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm tarball 并校验
 ```
 
@@ -42,11 +42,10 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 ## 安全边界（已实现，不是口号）
 
 1. 反作弊进程（EAC/BattlEye/Vanguard/ACE…）→ 拒绝一切输出；
-2. 超时无键鼠输入 / 拿不到输入遥测 → 拒绝（fail-closed）；
-3. F12 → 闩锁拒绝，重新 attach 才解除；
-4. 真实后端（`vgamepad` 手柄 / `keyboard` SendInput 键盘）→ `game_attach` 走 DSH 审批；
+2. F12 → 闩锁拒绝，重新 attach 才解除；
+3. 真实后端（`vgamepad` 手柄 / `keyboard` SendInput 键盘）→ `game_attach` 走 DSH 审批；
    无审批应答者（headless/CI）→ 拒绝（已实测报文：`requires approval, but no approval channel is available`）；
-5. 默认 dry-run，不碰设备；审计日志默认关闭、路径用户指定。
+4. 默认 dry-run，不碰设备；审计日志默认关闭、路径用户指定。
 
 ## 已知限制
 
@@ -54,6 +53,15 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 - 多显示器基本支持（显示器枚举 + 分辨率/主屏映射；两块同分辨率非主屏仍可能选错）；
 - 真实注入已回读通过（vgamepad / keyboard），但**长闭环尚未在真实游戏里跑**；默认仍 dry-run；
 - 帧差阈值、OCR 区域未按具体游戏校准。
+
+## 变更记录
+
+- **2026-10-30**：移除「无人不自娱」闸（`GetLastInputInfo` 超时 / 无遥测 → 拒绝）。
+  原因：该规则继承自宿主项目的陪伴场景，对本项目不适用——会误杀用手柄的真人玩家，
+  而且 keyboard 后端的注入会刷新时间戳、让闸自我遮蔽。无人值守是否使用由用户决定；
+  真实后端仍有 DSH 审批与 F12 夺回兜底。`DSH_GAME_BRIDGE_UNATTENDED_S` 已删除，
+  工具输出的 `safety.idle_seconds` 同步移除。实机报告 `docs/FIELD-2026-10-29.md`
+  保留为当时实况（其 P2-3 的处置从「修信号」改为「删规则」）。
 
 ## 发布之后剩下的事
 

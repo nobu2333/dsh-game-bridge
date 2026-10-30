@@ -1,3 +1,18 @@
+# Unreleased (after v0.0.1)
+
+## Removed: the inherited "no unattended self-play" gate (2026-10-30)
+
+- The engine no longer reads `GetLastInputInfo`; `DSH_GAME_BRIDGE_UNATTENDED_S` and
+  the `safety.idle_seconds` field are gone.
+- Rationale: the rule came from the host project's companion scenario and does not
+  fit this plugin. Unattended play is the intended use; the gate misfired for human
+  gamepad players and could be self-masked by injected keyboard input, so it was
+  removed rather than patched.
+- Anti-cheat refusal and the F12 takeover latch remain; real output backends still
+  require a one-shot DSH approval.
+- Package version numbers were not bumped yet; bump them (4 places, see RELEASE.md)
+  at release time.
+
 # v0.0.1
 
 First public release of **dsh-game-bridge** — it gives DeepSeek Harness eyes and hands on games.

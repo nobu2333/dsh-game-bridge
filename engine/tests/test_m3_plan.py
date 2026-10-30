@@ -33,11 +33,9 @@ class DiffEngine(FakeEngine):
         return {"event": event}
 
 
-def allowed_gate(*, process_source=None, idle=1.0):
+def allowed_gate(*, process_source=None):
     return SafetyGate(
-        unattended_after_s=180,
         process_source=process_source or (lambda: []),
-        idle_source=lambda: idle,
         takeover_source=lambda: False,
         process_ttl_s=0,
     )

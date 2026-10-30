@@ -18,7 +18,7 @@ dsh-game-bridge 把一块薄薄的插件壳装进 DSH，背后接一个本地引
 - **眼睛**：抓屏（DXcam）、帧差分、OCR 语义层、20 Hz 实体/弹幕追踪；
 - **手**：虚拟手柄（XInput）、虚拟键鼠、窗口焦点与输入法看护；
 - **小脑**：本地 20 Hz 闭环（导航、避障、走位、弹反），模型只给目标，不逐步按键；
-- **安全**：夺回热键、无人不自娱、反作弊游戏硬拒绝。
+- **安全**：夺回热键、反作弊游戏硬拒绝；真实后端需 DSH 审批。
 
 ## 为什么是「目标级工具」而不是「每步调一次工具」
 
@@ -127,7 +127,6 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 - 输出后端：`DSH_GAME_BRIDGE_CONTROL=dry-run`（默认，只记录）/ `vgamepad`（Xbox 手柄）/
   `keyboard`（SendInput 键盘，按键名 W/A/S/D/SPACE/ENTER/ESC/ARROWS…）；
   非 dry-run 时 attach 需要 DSH 一次性审批；
-- 安全阈值：`DSH_GAME_BRIDGE_UNATTENDED_S`（默认 180 秒无输入即拒绝输出）；
 - 审计：设置 `DSH_GAME_BRIDGE_AUDIT_LOG=<path>` 后，attach/act/plan/stop/拦截
   都会写本地 JSONL（默认关闭；`game_status` 的 `audit` 字段带最近 5 条）。
 
@@ -137,7 +136,7 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 |:--|:--|:--|
 | M0 ✅ | 插件壳 + 合成帧工具 | 工具出现在列表；图片进上下文；进程干净退出 |
 | M1 ✅ | 真实抓屏/OCR + 引擎自举 | 隔离 harness 里拿到真实屏幕帧 + OCR 文本；uv 自举可跑 |
-| **M2（进行中）** | 安全闸 + 输出通道 + 单步 act | 三条安全闸单测钉死；attach → dry-run act 端到端通过 |
+| **M2（进行中）** | 安全闸 + 输出通道 + 单步 act | 两道安全闸单测钉死；attach → dry-run act 端到端通过 |
 | **M3（进行中）** | 20 Hz 本地闭环（dry-run 已验证）；发布未做 | 闭环 ~20 Hz、逐拍安全复检、stop 立即松手 |
 | 发布 | npm + PyPI + 插件市场 | 真实手柄注入实测、市场收录 |
 
@@ -153,15 +152,18 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR 预热 /
 
 ## 安全承诺（发布版必须成立）
 
-1. **随时可夺回**：本地热键/一动鼠标即松手，不经过模型、不经过会话；
-2. **无人不自娱**：没有人类输入且没有显式授权时，停止一切输出；
-3. **反作弊不接**：EAC / BattlEye / Vanguard 等游戏一律拒绝输出通道；
-4. **默认只读**：发布版默认只做抓屏 + 手柄，不读内存、不注入进程；
-5. **真实后端需批准**：`DSH_GAME_BRIDGE_CONTROL` 不是 dry-run（`vgamepad` / `keyboard`）时，`game_attach`
+1. **随时可夺回**：本地 F12 热键即闩锁夺回，不经过模型、不经过会话；
+2. **反作弊不接**：EAC / BattlEye / Vanguard 等游戏一律拒绝输出通道；
+3. **默认只读**：发布版默认只做抓屏 + 手柄，不读内存、不注入进程；
+4. **真实后端需批准**：`DSH_GAME_BRIDGE_CONTROL` 不是 dry-run（`vgamepad` / `keyboard`）时，`game_attach`
    会走 DSH 的 user-approval 一次性批准；没有批准应答者的部署（headless/CI）
    fail-closed 拒绝；
-6. **可审计**：打开 `DSH_GAME_BRIDGE_AUDIT_LOG` 后，每一次 attach/act/plan/stop
+5. **可审计**：打开 `DSH_GAME_BRIDGE_AUDIT_LOG` 后，每一次 attach/act/plan/stop
    与每一次被拒绝的尝试都落本地 JSONL，可自证。
+
+> 「无人不自娱」（无键鼠输入即停手）这条闸继承自宿主项目，对 dsh-game-bridge
+> 不适用（误杀手柄玩家、又会被注入输入自我遮蔽），已于 2026-10-30 移除。
+> 无人值守是预期用法；真实后端仍受 DSH 审批与 F12 夺回约束。
 
 ## 许可
 

@@ -12,7 +12,6 @@ SAFETY = {
     "allowed": True,
     "reasons": [],
     "anticheat": [],
-    "idle_seconds": 0.0,
     "takeover": False,
 }
 

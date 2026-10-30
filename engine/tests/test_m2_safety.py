@@ -2,8 +2,8 @@
 
 规则必须能被这些测试钉死：
 - 命中反作弊 → 拒绝；
-- 无人（输入静默过久）→ 拒绝；
 - F12 夺权闩锁 → 拒绝，重新 attach 才解除；
+- 「无人不自娱」已移除 → 没有输入遥测也必须放行（只剩反作弊与 F12）；
 - 默认 dry-run → 只记录动作，不调用任何设备 API。
 """
 
@@ -23,11 +23,9 @@ class FakeEngine:
         pass
 
 
-def make_gate(*, processes=(), idle=5.0, takeover=False):
+def make_gate(*, processes=(), takeover=False):
     return SafetyGate(
-        unattended_after_s=180,
         process_source=lambda: list(processes),
-        idle_source=lambda: idle,
         takeover_source=lambda: takeover,
     )
 
@@ -40,34 +38,25 @@ def test_scan_processes_matches_known_anticheat_prefixes():
 
 
 def test_anticheat_blocks_output():
-    report = make_gate(processes=["EasyAntiCheat.exe"], idle=1.0).evaluate()
+    report = make_gate(processes=["EasyAntiCheat.exe"]).evaluate()
     assert report.allowed is False
     assert report.anticheat
     assert any("anti-cheat" in reason for reason in report.reasons)
 
 
-def test_unattended_blocks_output():
-    report = make_gate(idle=999.0).evaluate()
-    assert report.allowed is False
-    assert any("unattended" in reason for reason in report.reasons)
-
-
-def test_unknown_presence_fails_closed():
-    gate = SafetyGate(
-        process_source=lambda: [],
-        idle_source=lambda: None,
-        takeover_source=lambda: False,
-    )
-    report = gate.evaluate()
-    assert report.allowed is False
-    assert any("cannot verify human presence" in reason for reason in report.reasons)
+def test_unattended_gate_is_gone():
+    """「无人不自娱」已移除：只靠反作弊与 F12，无输入遥测也放行。"""
+    report = SafetyGate(process_source=lambda: [], takeover_source=lambda: False).evaluate()
+    assert report.allowed is True
+    assert report.reasons == []
+    # 报告形状里也不再有 idle_seconds（插件 schema 已同步删掉）。
+    assert "idle_seconds" not in report.to_dict()
 
 
 def test_takeover_latches_until_reset():
     state = {"pressed": True}
     gate = SafetyGate(
         process_source=lambda: [],
-        idle_source=lambda: 1.0,
         takeover_source=lambda: state["pressed"],
     )
     assert gate.evaluate().allowed is False
@@ -78,8 +67,8 @@ def test_takeover_latches_until_reset():
     assert gate.evaluate().allowed is True
 
 
-def test_allowed_when_user_present_and_no_anticheat():
-    report = make_gate(idle=2.0).evaluate()
+def test_allowed_without_anticheat_or_takeover():
+    report = make_gate().evaluate()
     assert report.allowed is True
     assert report.reasons == []
 
@@ -103,7 +92,7 @@ def test_act_requires_attach():
 
 
 def test_act_is_blocked_by_safety_gate():
-    session = make_session(make_gate(processes=["vgk.exe"], idle=1.0))
+    session = make_session(make_gate(processes=["vgk.exe"]))
     session.attach({"window": "unspecified"})
     with pytest.raises(EngineError) as error:
         session.act({"button": "A", "duration_ms": 50})
@@ -111,7 +100,7 @@ def test_act_is_blocked_by_safety_gate():
 
 
 def test_act_runs_on_dry_run_backend_and_counts_actions():
-    session = make_session(make_gate(idle=1.0))
+    session = make_session(make_gate())
     session.attach({"window": "unspecified"})
     result = session.act({"button": "A", "duration_ms": 50})
     assert result["action"]["dry_run"] is True
@@ -121,11 +110,10 @@ def test_act_runs_on_dry_run_backend_and_counts_actions():
 
 
 def test_stop_releases_and_detaches():
-    session = make_session(make_gate(idle=1.0))
+    session = make_session(make_gate())
     session.attach({"window": "unspecified"})
     session.act({"button": "B", "duration_ms": 10})
     stopped = session.stop()
     assert stopped["stopped"] is True
     assert session.attached is None
     assert session.status()["attached"] is None
-

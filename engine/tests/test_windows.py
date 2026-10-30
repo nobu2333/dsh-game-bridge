@@ -23,7 +23,7 @@ class RecordingEngine:
 
 
 def allowed_gate():
-    return SafetyGate(process_source=lambda: [], idle_source=lambda: 1.0, takeover_source=lambda: False, process_ttl_s=0)
+    return SafetyGate(process_source=lambda: [], takeover_source=lambda: False, process_ttl_s=0)
 
 
 WINDOWS = [
