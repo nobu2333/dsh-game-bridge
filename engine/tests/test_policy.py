@@ -271,6 +271,19 @@ def test_far_threat_does_not_dodge():
     assert all(call["action"] != "press" for call in controller.calls)
 
 
+def test_estimate_scroll_dx_detects_horizontal_shift():
+    import numpy as np
+
+    from dsh_game_core.policy import _estimate_scroll_dx
+
+    frame = np.zeros((120, 240, 3), dtype=np.uint8)
+    frame[40:80, 40:120] = 200
+    shifted = np.roll(frame, 12, axis=1)
+    dx = _estimate_scroll_dx(frame, shifted)
+    assert dx is not None
+    assert abs(dx) > 3.0
+
+
 def test_stuck_escape_releases_advance_probes_and_resumes():
     runner, _, controller = build_runner(budget_ticks=50, entities=no_entities)
 
@@ -278,7 +291,7 @@ def test_stuck_escape_releases_advance_probes_and_resumes():
 
     assert status["ticks"] == 50
     assert status["escapes"] == 1
-    assert status["actions"] == 5  # 2 次初始 hold + release RIGHT / hold Z / hold RIGHT
+    assert status["actions"] == 5  # 2 初始 hold + release RIGHT / hold Z / re-hold RIGHT
 
     log = [(call["action"], call["button"]) for call in controller.calls]
     escape_at = log.index(("release", "RIGHT"))

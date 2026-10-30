@@ -151,6 +151,32 @@ def _static_metric(previous: np.ndarray, current: np.ndarray) -> float:
     return float(np.abs(after - before).mean())
 
 
+def _estimate_scroll_dx(previous: np.ndarray, current: np.ndarray) -> float | None:
+    """估计横版镜头/画面水平位移（下采样像素）。
+
+    整帧静止判定会被背景动画/弹幕骗过；镜头是否滚动更能说明「有没有在前进」。
+    用相位相关（cv2.phaseCorrelate）在 ~160x94 灰度图上做，约 1ms。
+    """
+    try:
+        import cv2
+
+        before = _frame_small(previous)
+        after = _frame_small(current)
+        if before.shape != after.shape or before.size == 0:
+            return None
+        # 纯色/几乎无纹理的画面相位相关会给出垃圾值，直接放弃让调用方退回整帧差分。
+        if float(before.std()) < 1.0 or float(after.std()) < 1.0:
+            return None
+        shift, response = cv2.phaseCorrelate(before, after)
+        if not math.isfinite(response) or response < 0.05:
+            return None
+        if abs(float(shift[0])) > 24.0:
+            return None
+        return float(shift[0])
+    except Exception:  # noqa: BLE001 - 滚动估计失败时退回整帧差分
+        return None
+
+
 class PolicyRunner:
     """60 Hz 本地反射策略：按住持续键 → 看威胁闪避 → 卡住脱困 → 安全闸收尾。"""
 
@@ -255,6 +281,8 @@ class PolicyRunner:
         )
         self._stuck_after_ms = max(0.0, _as_float(stuck.get("after_ms"), DEFAULT_STUCK_AFTER_MS) or 0.0)
         self._probe_ms = max(1.0, _as_float(stuck.get("probe_ms"), DEFAULT_PROBE_MS) or 1.0)
+        # 镜头水平位移小于该值（下采样像素）视为「没有前进」，比整帧静止更可靠。
+        self._scroll_min_px = max(0.0, _as_float(stuck.get("scroll_min_px"), 0.8) or 0.0)
         self._probe_keys = (
             tuple(self._resolve_keys(stuck.get("probe_keys")))
             if "probe_keys" in stuck
@@ -455,11 +483,15 @@ class PolicyRunner:
             if frame is not None:
                 self._maybe_dodge(entities)
                 if previous_frame is not None and self._is_advancing():
-                    metric = _static_metric(previous_frame, frame)
-                    if metric < self._stuck_static_mean_diff:
-                        static_ms += dt_ms
+                    dx = _estimate_scroll_dx(previous_frame, frame)
+                    if dx is not None:
+                        moving = abs(dx) >= self._scroll_min_px
                     else:
+                        moving = _static_metric(previous_frame, frame) >= self._stuck_static_mean_diff
+                    if moving:
                         static_ms = 0.0
+                    else:
+                        static_ms += dt_ms
                     if static_ms >= self._stuck_after_ms:
                         # 卡住：松开前进 → 短按脱困键 → 重新前进。
                         self._escape()
