@@ -346,6 +346,7 @@ class PolicyRunner:
         self._nearby_danger: dict | None = None
         self._scroll_s = 0.0
         self._last_danger_id: str | None = None
+        self._prev_scene: str | None = None
 
         # ── 线程内状态 ──
         self._held: set[str] = set()
@@ -457,6 +458,7 @@ class PolicyRunner:
         self._nearby_danger = None
         self._scroll_s = 0.0
         self._last_danger_id = None
+        self._prev_scene = None
         self._last_error = None
 
     def _status_locked(self) -> dict:
@@ -573,6 +575,20 @@ class PolicyRunner:
                 self._last_entities = 0
             else:
                 self._read_scene()
+                if self._scene != self._prev_scene:
+                    # 死亡/换装/菜单回到 gameplay = 新的一条命，关卡坐标从 0 重新累计。
+                    if self._scene == "gameplay" and self._prev_scene in (
+                        "death",
+                        "equip",
+                        "cutscene",
+                        "menu",
+                        "loading",
+                    ):
+                        self._scroll_s = 0.0
+                        self._last_danger_id = None
+                        if self._locator is not None:
+                            self._locator.reset()
+                    self._prev_scene = self._scene
                 # 2.5) 场景门控：非 gameplay 只做恢复，不跑战斗策略。
                 if self._scene is not None and self._scene != "gameplay":
                     entities = self._entities(frame, previous_frame)

@@ -53,9 +53,9 @@
       "cooldown_ms": 350,
       "press_ms": 160
     },
-    "jump_every_ms": 550,
+    "jump_every_ms": 0,
     "dash_every_ms": 0,
-    "engage_radius": 0.30,
+    "engage_radius": 0.20,
     "engage_hold_ms": 220,
     "stuck": {
       "static_mean_diff": 0.9,
