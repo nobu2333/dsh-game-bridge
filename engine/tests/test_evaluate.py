@@ -79,21 +79,13 @@ def test_load_cards_uses_knowledge_store(tmp_path):
     assert parsed is not None
     assert summarize_episode(parsed)["damage_events"] == 1
 
-def test_coordinate_drift_from_episode_frames(tmp_path):
+def test_coordinate_drift_from_damage_scrolls():
     from dsh_game_core.evaluate import summarize_coordinate_drift
 
-    for name, scroll in (("a", -1.00), ("b", -1.05), ("c", -1.40)):
-        directory = tmp_path / name
-        directory.mkdir()
-        (directory / "meta.json").write_text(
-            json.dumps({"game": "cuphead", "level": "forest-follies", "frame_count": 1, "event_count": 0}),
-            encoding="utf-8",
-        )
-        (directory / "frames.jsonl").write_text(
-            json.dumps({"index": 0, "t": 0, "state": {"danger": "card-a", "scroll_s": scroll}}) + "\n",
-            encoding="utf-8",
-        )
-    summary = summarize_coordinate_drift(tmp_path, game="cuphead", level="forest-follies")
-    assert summary["cards_with_multiple_visits"] == 1
+    cards = [{"id": "card-a", "stats": {"damage_scrolls": [-1.0, -1.05, -1.4]}}]
+    summary = summarize_coordinate_drift(cards)
+    assert summary["cards_with_multiple_hits"] == 1
     assert summary["max_spread"] == 0.4
     assert summary["ok"] is False
+    stable = [{"id": "card-b", "stats": {"damage_scrolls": [-1.0, -1.05]}}]
+    assert summarize_coordinate_drift(stable)["ok"] is True

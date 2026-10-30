@@ -104,6 +104,14 @@ def normalize_danger_card(raw: Any, *, now: Any = None) -> dict | None:
     if not isinstance(evidence, list):
         evidence = []
     evidence = [str(item)[:200] for item in evidence[:8] if str(item).strip()]
+    damage_scrolls = stats.get("damage_scrolls")
+    clean_scrolls = []
+    if isinstance(damage_scrolls, list):
+        for value in damage_scrolls[:12]:
+            try:
+                clean_scrolls.append(round(float(value), 3))
+            except (TypeError, ValueError):
+                continue
 
     card = {
         "schema": DANGER_SCHEMA,
@@ -143,6 +151,7 @@ def normalize_danger_card(raw: Any, *, now: Any = None) -> dict | None:
             "avoided": max(0, int(_num(stats.get("avoided"), 0))),
             "response_tries": max(0, int(_num(stats.get("response_tries"), 0))),
             "response_failures": max(0, int(_num(stats.get("response_failures"), 0))),
+            "damage_scrolls": clean_scrolls,
         },
         "confidence": round(_clamp(raw.get("confidence"), 0.0, 1.0, 0.3), 3),
         "hazard_confidence": round(_clamp(raw.get("hazard_confidence", raw.get("confidence")), 0.0, 1.0, 0.3), 3),
@@ -220,11 +229,16 @@ class KnowledgeStore:
             if existing["id"] == normalized["id"] or (same_place and same_trigger):
                 merged = dict(existing)
                 merged["updated_at"] = normalized["updated_at"]
-                merged["stats"] = {
-                    "encounters": max(existing["stats"]["encounters"], normalized["stats"]["encounters"]),
-                    "damage_events": max(existing["stats"]["damage_events"], normalized["stats"]["damage_events"]),
-                    "avoided": max(existing["stats"]["avoided"], normalized["stats"]["avoided"]),
-                }
+                merged_stats = dict(existing.get("stats") or {})
+                for key in ("encounters", "damage_events", "avoided", "response_tries", "response_failures"):
+                    merged_stats[key] = max(
+                        int(_num(merged_stats.get(key), 0)), int(_num(normalized["stats"].get(key), 0))
+                    )
+                merged_stats["damage_scrolls"] = sorted(
+                    set((existing.get("stats") or {}).get("damage_scrolls") or [])
+                    | set(normalized["stats"].get("damage_scrolls") or [])
+                )[-12:]
+                merged["stats"] = merged_stats
                 merged["confidence"] = round(min(1.0, max(existing["confidence"], normalized["confidence"]) + 0.05), 3)
                 if normalized["status"] in ("validated", "trusted"):
                     merged["status"] = normalized["status"]
