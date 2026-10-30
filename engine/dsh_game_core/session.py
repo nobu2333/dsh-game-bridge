@@ -74,6 +74,10 @@ class GameSession:
         self._record_level = "level"
         self._last_recorded_scene = None
         self._last_hp: int | None = None
+        # HP 下降要连续两次 OCR 读数一致才确认，避免单次误读（3→2→3）生成假卡。
+        self._pending_hp: int | None = None
+        # 本条命的死亡是否已建卡；回到 gameplay 才清零，防止死亡画面闪烁重复建卡。
+        self._death_carded = False
 
     # ── 窗口 ──────────────────────────────────────────────────────────
     def _resolve_window(self, match: str) -> dict | None:
@@ -507,26 +511,54 @@ class GameSession:
         return recorder.save(f"{self._record_level}-{tag}")
 
     def _maybe_record_scene(self, scene: str) -> None:
+        if scene == "gameplay":
+            self._death_carded = False
         if self._recorder is None or scene == self._last_recorded_scene:
             return
         self._last_recorded_scene = scene
         if scene in ("death", "equip", "cutscene"):
             self._recorder.add_event({"type": "scene", "scene": scene})
-            self._save_episode(scene)
+            episode = self._save_episode(scene)
+            if scene == "death":
+                self._record_death_card(episode)
             self._start_recorder()  # 继续录下一段
 
+    def _record_death_card(self, episode: str | None) -> None:
+        """死亡画面没有 HP 读数，致命一击不会走 HP 下降路径；这里补建一张卡。"""
+        if self._death_carded:
+            return
+        self._death_carded = True
+        # 未确认的低读数也算：死亡本身就证实了那次掉血。
+        hp_before = self._pending_hp if self._pending_hp is not None else self._last_hp
+        self._last_hp = None
+        self._pending_hp = None
+        self._record_damage_card(
+            hp_before if hp_before is not None else 1, 0, episode, event_type="death"
+        )
+
     def _maybe_record_hp(self, hp: int | None) -> None:
-        """HP 下降时立刻落盘，并生成/更新一张 candidate DangerCard。"""
+        """HP 下降经两次读数确认后落盘，并生成/更新一张 candidate DangerCard。"""
         if hp is None:
             return
-        previous, self._last_hp = self._last_hp, int(hp)
-        if self._recorder is None or previous is None or hp >= previous:
+        hp = int(hp)
+        previous = self._last_hp
+        if previous is None or hp >= previous:
+            self._last_hp = hp
+            self._pending_hp = None
+            return
+        if self._pending_hp != hp:
+            # 第一次读到更低的值：先挂起，等下一次读数确认。
+            self._pending_hp = hp
+            return
+        self._last_hp = hp
+        self._pending_hp = None
+        if self._recorder is None:
             return
         self._recorder.add_event(
-            {"type": "damage", "hp_before": previous, "hp_after": int(hp)}
+            {"type": "damage", "hp_before": previous, "hp_after": hp}
         )
         episode = self._save_episode("damage")
-        self._record_damage_card(previous, int(hp), episode)
+        self._record_damage_card(previous, hp, episode)
         self._start_recorder()
 
     def _attribute_damage(self, policy_status: dict) -> dict:
@@ -574,7 +606,9 @@ class GameSession:
             "cause": cause,
         }
 
-    def _record_damage_card(self, hp_before: int, hp_after: int, episode: str | None) -> None:
+    def _record_damage_card(
+        self, hp_before: int, hp_after: int, episode: str | None, *, event_type: str = "damage"
+    ) -> None:
         """把一次受击写成带关卡坐标/归因的 candidate 卡；同区域已有卡则累加统计。"""
         try:
             from .memory import KnowledgeStore
@@ -630,7 +664,7 @@ class GameSession:
                     "template": attribution["template"],
                     "relation": attribution["relation"],
                 },
-                "event": {"type": "damage", "cause": attribution["cause"], "hp_before": hp_before, "hp_after": hp_after},
+                "event": {"type": event_type, "cause": attribution["cause"], "hp_before": hp_before, "hp_after": hp_after},
                 "response": {
                     "skill": "jump_over" if attribution["cause"] == "contact" else ("evade" if attribution["cause"] == "projectile" else "unknown")
                 },
@@ -657,8 +691,9 @@ class GameSession:
                 "profile": self._record_game,
             }
         )
+        # 不在这里清 _last_recorded_scene：保存后立即重启录制时清掉它，会让同一个
+        # death 画面在每个 OCR 周期都重新落盘一次。开局时由 policy_start 清零。
         self._record_next_at = 0.0
-        self._last_recorded_scene = None
 
     def _stop_policy(self) -> None:
         """停掉本地反射策略并确保所有按键已释放。"""
@@ -903,6 +938,9 @@ class GameSession:
         self._record_game = str(params.get("game") or profile.get("id") or "unknown")[:48]
         self._record_level = str(params.get("level") or "level")[:48]
         self._last_hp = None
+        self._pending_hp = None
+        self._death_carded = False
+        self._last_recorded_scene = None
         if params.get("knowledge", True):
             try:
                 from .memory import KnowledgeStore
