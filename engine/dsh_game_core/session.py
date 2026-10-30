@@ -10,6 +10,7 @@ M3 的闭环是一个**本地线程**，不是让模型每拍调一次工具：�
 from __future__ import annotations
 
 import os
+import re
 import threading
 import time
 
@@ -789,10 +790,41 @@ class GameSession:
         if thread is not None and thread.is_alive():
             thread.join(timeout=1.5)
 
+    def _read_hud_hp(self, ocr, frame, profile: dict | None) -> int | None:
+        """OCR only the HP HUD crop at full resolution (fast, keeps digits readable)."""
+        if not isinstance(profile, dict):
+            return None
+        hud = profile.get("hud") if isinstance(profile.get("hud"), dict) else {}
+        hp_cfg = hud.get("hp") if isinstance(hud.get("hp"), dict) else {}
+        box = hp_cfg.get("box")
+        if not isinstance(box, (list, tuple)) or len(box) < 4:
+            return None
+        try:
+            height, width = frame.shape[:2]
+            left, top, bw, bh = (float(value) for value in box[:4])
+            x0 = int(max(0.0, min(1.0, left)) * width)
+            y0 = int(max(0.0, min(1.0, top)) * height)
+            x1 = int(max(0.0, min(1.0, left + bw)) * width)
+            y1 = int(max(0.0, min(1.0, top + bh)) * height)
+            if x1 <= x0 or y1 <= y0:
+                return None
+            crop = frame[y0:y1, x0:x1]
+            prefix = str(hp_cfg.get("prefix") or "HP").upper()
+            for line in ocr.read(crop):
+                text = str(line.text or "").upper()
+                if prefix and prefix not in text:
+                    continue
+                match = re.search(r"(\d+)", text)
+                if match:
+                    return max(0, min(9, int(match.group(1))))
+        except Exception:  # noqa: BLE001 - HP 读取失败由 OCR 场景兜底
+            return None
+        return None
+
     def _scene_loop(self, profile: dict, stop: threading.Event) -> None:
         try:
             from .ocr import Ocr
-            from .state import detect_scene, extract_hp
+            from .state import detect_scene
 
             ocr = Ocr()
             ocr.warmup()
@@ -805,20 +837,21 @@ class GameSession:
             if frame is None:
                 continue
             try:
-                scene_profile = profile.get("scene") if isinstance(profile, dict) else None
-                max_width = int((scene_profile or {}).get("ocr_max_width") or 480)
-                if frame.shape[1] > max_width:
-                    import cv2
+                import cv2
 
-                    frame = cv2.resize(
-                        frame,
-                        (max_width, max(1, int(round(frame.shape[0] * max_width / frame.shape[1])))),
+                full_frame = frame
+                scene_profile = profile.get("scene") if isinstance(profile, dict) else None
+                max_width = int((scene_profile or {}).get("ocr_max_width") or 640)
+                if full_frame.shape[1] > max_width:
+                    scene_frame = cv2.resize(
+                        full_frame,
+                        (max_width, max(1, int(round(full_frame.shape[0] * max_width / full_frame.shape[1])))),
                         interpolation=cv2.INTER_AREA,
                     )
-                lines = [line.to_dict() for line in ocr.read(frame)]
-                hp, _hp_text = extract_hp(
-                    lines, profile=profile, frame_size=(int(frame.shape[1]), int(frame.shape[0]))
-                )
+                else:
+                    scene_frame = full_frame
+                lines = [line.to_dict() for line in ocr.read(scene_frame)]
+                hp = self._read_hud_hp(ocr, full_frame, profile)
                 scene, confidence = detect_scene(lines, profile=profile, hp=hp)
                 self._scene_cache = {
                     "scene": scene,
