@@ -506,3 +506,18 @@ def test_walk_to_affordance_stops_and_confirms():
     assert status["stop_reason"] == "affordance_confirm"
     assert any(call["action"] == "hold" and call["button"] == "RIGHT" for call in controller.calls)
     assert any(call["action"] == "hold" and call["button"] == "Z" for call in controller.calls)
+
+def test_route_macro_executes_steps():
+    profile = make_profile()
+    profile["macros"] = [
+        {
+            "scroll_s": 0.0,
+            "window": 1.0,
+            "steps": [{"hold": ["RIGHT"], "tap": ["Z"], "duration_ms": 120}],
+        }
+    ]
+    runner, _, controller = build_runner(budget_ticks=20, profile=profile)
+    run_to_completion(runner)
+    log = [(call["action"], call["button"]) for call in controller.calls]
+    assert ("hold", "RIGHT") in log
+    assert ("hold", "Z") in log
