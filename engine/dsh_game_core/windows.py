@@ -117,6 +117,20 @@ def _process_name(hwnd: int) -> str | None:
         return None
 
 
+def _window_title(hwnd: int) -> str:
+    """窗口标题（去首尾空白）；取不到时返回空串。"""
+    try:
+        user32 = _user32()
+        length = user32.GetWindowTextLengthW(hwnd)
+        if length <= 0:
+            return ""
+        buffer = ctypes.create_unicode_buffer(length + 1)
+        user32.GetWindowTextW(hwnd, buffer, length + 1)
+        return buffer.value.strip()
+    except Exception:  # noqa: BLE001 - 标题只是附加信息
+        return ""
+
+
 def window_rect(hwnd: int) -> tuple[int, int, int, int] | None:
     """返回 (left, top, right, bottom)；优先用 DWM 的可见边框。"""
     if not IS_WINDOWS:
@@ -136,6 +150,38 @@ def window_rect(hwnd: int) -> tuple[int, int, int, int] | None:
         return None
 
 
+def foreground_window() -> dict | None:
+    """当前前台窗口（只读，不抢焦点）。
+
+    返回 ``{"hwnd", "title", "process", "left", "top", "width", "height"}``；
+    没有前台窗口 / 非 Windows / API 失败时返回 None，调用方降级为「不知道」。
+    """
+    if not IS_WINDOWS:
+        return None
+    try:
+        user32 = _user32()
+        # ctypes 默认 restype 是 c_int，64 位下会截断 HWND，这里显式声明。
+        user32.GetForegroundWindow.restype = wintypes.HWND
+        raw = user32.GetForegroundWindow()
+        if not raw:
+            return None
+        hwnd = int(raw)
+        rect = window_rect(hwnd)
+        if rect is None:
+            return None
+        return {
+            "hwnd": hwnd,
+            "title": _window_title(hwnd),
+            "process": _process_name(hwnd),
+            "left": rect[0],
+            "top": rect[1],
+            "width": rect[2] - rect[0],
+            "height": rect[3] - rect[1],
+        }
+    except Exception:  # noqa: BLE001 - 只读探针，失败即降级
+        return None
+
+
 def list_windows(min_width: int = 80, min_height: int = 60) -> list[dict]:
     """列出可见、带标题、尺寸合理的顶层窗口。"""
     if not IS_WINDOWS:
@@ -148,12 +194,7 @@ def list_windows(min_width: int = 80, min_height: int = 60) -> list[dict]:
         try:
             if not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd):
                 return True
-            length = user32.GetWindowTextLengthW(hwnd)
-            if length == 0:
-                return True
-            buffer = ctypes.create_unicode_buffer(length + 1)
-            user32.GetWindowTextW(hwnd, buffer, length + 1)
-            title = buffer.value.strip()
+            title = _window_title(hwnd)
             if not title:
                 return True
             rect = window_rect(hwnd)
@@ -212,3 +253,173 @@ def find_window(windows: list[dict], match: str) -> dict | None:
 
 def resolve_window(match: str) -> dict | None:
     return find_window(list_windows(), match)
+
+
+# ── 遮挡判定（纯函数 + 只读枚举）─────────────────────────────────────────
+# attach 之后模型看到的是「窗口截图」，但目标窗口可能被聊天窗/浏览器盖住。
+# 这里用 z-order 判断目标之上压了哪些可见顶层窗口，只读枚举、不改变窗口状态。
+
+OCCLUSION_TOP_N = 3  # covered_by 只保留比例最高的前几个
+OCCLUSION_THRESHOLD = 0.5  # 遮挡超过一半视为「被盖住」
+
+
+def _unavailable_occlusion() -> dict:
+    """降级结果：无法判断遮挡（非 Windows / API 失败 / 目标无效）。"""
+    return {"available": False, "occluded_ratio": 0.0, "occluded": False, "covered_by": []}
+
+
+def _normalize_rect(value) -> tuple[int, int, int, int] | None:
+    """纯函数：把矩形归一成 (left, top, right, bottom)；无效或零面积返回 None。
+
+    支持两种形状：``(left, top, right, bottom)`` 元组，以及
+    ``{"left", "top", "width", "height"}`` 字典（与 list_windows 输出一致）。
+    """
+    try:
+        if isinstance(value, dict):
+            left = int(value["left"])
+            top = int(value["top"])
+            right = left + int(value["width"])
+            bottom = top + int(value["height"])
+        else:
+            left, top, right, bottom = (int(part) for part in value)
+    except (KeyError, TypeError, ValueError):
+        return None
+    if right <= left or bottom <= top:
+        return None
+    return (left, top, right, bottom)
+
+
+def rect_intersection_area(rect_a, rect_b) -> int:
+    """纯函数：两个矩形的交集面积；无交集或解析失败返回 0，不抛异常。"""
+    first = _normalize_rect(rect_a)
+    second = _normalize_rect(rect_b)
+    if first is None or second is None:
+        return 0
+    width = min(first[2], second[2]) - max(first[0], second[0])
+    height = min(first[3], second[3]) - max(first[1], second[1])
+    if width <= 0 or height <= 0:
+        return 0
+    return width * height
+
+
+def covered_ratio(target_rect, window_rect) -> float:
+    """纯函数：单个窗口对目标的遮挡比例 = min(1, 交集 / 目标面积)。
+
+    窗口比目标大时比例封顶 1.0；目标无效或与窗口无交集返回 0.0。
+    """
+    target = _normalize_rect(target_rect)
+    if target is None:
+        return 0.0
+    target_area = (target[2] - target[0]) * (target[3] - target[1])
+    return min(1.0, rect_intersection_area(target, window_rect) / target_area)
+
+
+def occlusion_from_windows(target_rect, windows) -> dict:
+    """纯函数：根据目标矩形与「压在上面的窗口」列表算遮挡，测试无需真实桌面。
+
+    ``target_rect`` 为目标矩形（LTRB 元组或 list_windows 形状的字典）；
+    ``windows`` 为 z-order 在目标之上的可见顶层窗口（上 -> 下），每项是
+    ``{"hwnd", "title", "left", "top", "width", "height"}`` 字典。
+
+    单窗口比例 = min(1, 交集 / 目标面积)，全部求和后截到 1.0；``covered_by``
+    按比例降序取前 3 个（比例相同按 hwnd 升序，保证结果稳定）。
+    任何输入异常都降级为 ``available=False``，不抛异常。
+    """
+    target = _normalize_rect(target_rect)
+    if target is None:
+        return _unavailable_occlusion()
+    try:
+        candidates = list(windows)
+    except TypeError:
+        return _unavailable_occlusion()
+    target_area = (target[2] - target[0]) * (target[3] - target[1])
+    total = 0.0
+    covering: list[dict] = []
+    for window in candidates:
+        if not isinstance(window, dict):
+            continue
+        rect = _normalize_rect(window)
+        if rect is None:
+            continue
+        ratio = round(min(1.0, rect_intersection_area(target, rect) / target_area), 4)
+        if ratio <= 0.0:
+            continue
+        total += ratio
+        try:
+            hwnd = int(window.get("hwnd") or 0)
+        except (TypeError, ValueError):
+            hwnd = 0
+        covering.append({"hwnd": hwnd, "title": str(window.get("title") or ""), "ratio": ratio})
+    ratio = round(min(1.0, total), 4)
+    covering.sort(key=lambda item: (-item["ratio"], item["hwnd"]))
+    return {
+        "available": True,
+        "occluded_ratio": ratio,
+        "occluded": ratio >= OCCLUSION_THRESHOLD,
+        "covered_by": covering[:OCCLUSION_TOP_N],
+    }
+
+
+def _windows_above(hwnd: int) -> list[dict] | None:
+    """按 z-order（上 -> 下）列出目标窗口之上的可见顶层窗口。
+
+    EnumWindows 从最上层开始枚举，遇到目标 hwnd 即停止，所以返回的窗口都压在
+    目标之上。目标不在枚举结果里（无效 hwnd / 子窗口）返回 None。
+    最小化的窗口不算遮挡（它不占屏幕像素），因此跳过。
+    """
+    user32 = _user32()
+    results: list[dict] = []
+    found = False
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def callback(current, _lparam):
+        nonlocal found
+        try:
+            if int(current) == int(hwnd):
+                found = True
+                return False  # 目标之下的窗口不参与遮挡
+            if not user32.IsWindowVisible(current) or user32.IsIconic(current):
+                return True
+            rect = window_rect(current)
+            if rect is None:
+                return True
+            results.append(
+                {
+                    "hwnd": int(current),
+                    "title": _window_title(current),
+                    "left": rect[0],
+                    "top": rect[1],
+                    "width": rect[2] - rect[0],
+                    "height": rect[3] - rect[1],
+                }
+            )
+        except Exception:  # noqa: BLE001 - 单个窗口失败不影响整体
+            pass
+        return True
+
+    try:
+        user32.EnumWindows(callback, 0)
+    except Exception:  # noqa: BLE001
+        return None
+    return results if found else None
+
+
+def window_occlusion(hwnd: int) -> dict:
+    """目标窗口相对其它顶层窗口的遮挡情况（只读，不改变窗口状态）。
+
+    返回 ``{"available", "occluded_ratio", "occluded", "covered_by"}``；
+    非 Windows / hwnd 无效 / 枚举失败时返回 ``available=False`` 的空结果，
+    从不抛异常。``occluded_ratio`` 封顶 1.0，``occluded`` 阈值为 0.5。
+    """
+    if not IS_WINDOWS:
+        return _unavailable_occlusion()
+    try:
+        target_rect = window_rect(hwnd)
+        if target_rect is None:
+            return _unavailable_occlusion()
+        above = _windows_above(hwnd)
+        if above is None:
+            return _unavailable_occlusion()
+        return occlusion_from_windows(target_rect, above)
+    except Exception:  # noqa: BLE001 - 遮挡只是附加信息，失败即降级
+        return _unavailable_occlusion()

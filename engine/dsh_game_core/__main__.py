@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import sys
 import time
@@ -42,7 +43,88 @@ def _config() -> dict:
     return {"platform": f"{platform.system()}-{platform.machine()}", "python": platform.python_version()}
 
 
-def selftest(capture: bool = False) -> dict:
+# 环境变量后排名的别名：插件侧历史上用过 gamepad。
+_BACKEND_ALIASES = {"gamepad": "vgamepad"}
+
+
+def _normalized_backend_name(value: str | None) -> str:
+    name = (value or "dry-run").strip().lower() or "dry-run"
+    return _BACKEND_ALIASES.get(name, name)
+
+
+def _foreground_report() -> dict | None:
+    """前台窗口（只读）。windows 模块没有该助手或调用失败时返回 None。"""
+    try:
+        from .windows import foreground_window
+    except Exception:  # noqa: BLE001 - 旧版 windows 模块可能还没有这个助手
+        return None
+    try:
+        return foreground_window()
+    except Exception:  # noqa: BLE001 - 自检要报告而不是抛
+        return None
+
+
+def _connected_xinput_slots() -> list[int]:
+    """当前连接的 XInput 槽位；探测失败一律当作空列表（自检不能因此失败）。"""
+    try:
+        from .control import xinput_connected_slots
+
+        return [int(slot) for slot in xinput_connected_slots()]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _backend_report(probe_devices: bool = False) -> dict:
+    """当前控制后端的就绪度报告（绝不发送任何输入）。"""
+    name = _normalized_backend_name(os.environ.get("DSH_GAME_BRIDGE_CONTROL"))
+    report: dict = {"name": name, "ready": True, "detail": "", "xinput_slot": None, "warnings": []}
+    if name == "dry-run":
+        report["detail"] = "records actions only"
+        return report
+    if name == "keyboard":
+        report["detail"] = "SendInput"
+        return report
+    if name != "vgamepad":
+        report["ready"] = False
+        report["detail"] = f"unknown backend: {name}"
+        report["warnings"] = [f"DSH_GAME_BRIDGE_CONTROL={name} 不是受支持的后端"]
+        return report
+
+    try:
+        import vgamepad  # noqa: F401 - 只验证可导入性，不创建手柄
+    except Exception as error:  # noqa: BLE001
+        report["ready"] = False
+        report["detail"] = f"vgamepad unavailable: {type(error).__name__}: {error}"
+        return report
+
+    if not probe_devices:
+        report["detail"] = "vgamepad importable; device not probed"
+        return report
+
+    from .control import VGamepadController
+
+    controller = None
+    try:
+        controller = VGamepadController()
+        info = controller.backend_info()
+    except Exception as error:  # noqa: BLE001
+        report["ready"] = False
+        report["detail"] = f"pad probe failed: {type(error).__name__}: {error}"
+        return report
+    finally:
+        if controller is not None:
+            try:
+                controller.close()
+            except Exception:  # noqa: BLE001 - 收尾失败不掩盖自检结果
+                pass
+    report["ready"] = bool(info.get("ready", True))
+    report["detail"] = str(info.get("detail") or report["detail"])
+    report["xinput_slot"] = info.get("xinput_slot")
+    report["warnings"] = list(info.get("warnings") or [])
+    return report
+
+
+def selftest(capture: bool = False, probe_devices: bool = False) -> dict:
     report: dict = {
         "engine": "dsh-game-core",
         "version": __version__,
@@ -52,8 +134,11 @@ def selftest(capture: bool = False) -> dict:
         "capture_ok": None,
         "ocr_ready": None,
         "ocr_warmup_ms": None,
+        "foreground": None,
+        "backend": {},
+        "xinput_slots_connected": [],
     }
-    for module in ("numpy", "cv2", "dxcam", "rapidocr_onnxruntime"):
+    for module in ("numpy", "cv2", "dxcam", "rapidocr_onnxruntime", "vgamepad"):
         try:
             imported = __import__(module)
             report["deps"][module] = getattr(imported, "__version__", "ok")
@@ -75,6 +160,11 @@ def selftest(capture: bool = False) -> dict:
     except Exception as error:  # noqa: BLE001
         report["ocr_ready"] = False
         report["ocr_error"] = f"{type(error).__name__}: {error}"
+
+    report["foreground"] = _foreground_report()
+    # 先记录既有槽位，再探测后端：probe 时临时创建的虚拟手柄不该混进这个列表。
+    report["xinput_slots_connected"] = _connected_xinput_slots()
+    report["backend"] = _backend_report(probe_devices=probe_devices)
 
     if capture:
         try:
@@ -114,7 +204,10 @@ def serve(stdin=None, stdout=None) -> int:
             if method == "ping":
                 result = {"ok": True, "version": __version__}
             elif method == "selftest":
-                result = selftest(capture=bool(params.get("capture")))
+                result = selftest(
+                    capture=bool(params.get("capture")),
+                    probe_devices=bool(params.get("probe_devices")),
+                )
             elif method == "snapshot":
                 result = session.snapshot(
                     ocr=bool(params.get("ocr", True)),
@@ -160,13 +253,24 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command")
     selftest_parser = sub.add_parser("selftest", help="报告依赖、显示器、OCR 与抓屏状态（JSON）")
     selftest_parser.add_argument("--capture", action="store_true", help="真的抓一帧（只读，不注入输入）")
+    selftest_parser.add_argument(
+        "--probe-devices",
+        action="store_true",
+        help="试建一次控制后端（vgamepad 会临时创建并关闭虚拟手柄，不按任何键）",
+    )
     windows_parser = sub.add_parser("windows", help="列出当前可见窗口（只读）")
     windows_parser.add_argument("--limit", type=int, default=40)
     sub.add_parser("serve", help="stdio JSON 服务（插件用）")
     args = parser.parse_args(argv)
 
     if args.command == "selftest":
-        print(json.dumps(selftest(capture=args.capture), ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                selftest(capture=args.capture, probe_devices=args.probe_devices),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0
     if args.command == "windows":
         from .session import GameSession

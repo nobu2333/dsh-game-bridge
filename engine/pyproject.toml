@@ -12,6 +12,10 @@ dependencies = [
   "rapidocr-onnxruntime>=1.2.3",
 ]
 
+[project.optional-dependencies]
+# 真实手柄后端。默认 dry-run 不需要它；bootstrap 会按所选后端决定是否带 extra。
+gamepad = ["vgamepad>=0.1.0"]
+
 [project.scripts]
 dsh-game-core = "dsh_game_core.__main__:main"
 

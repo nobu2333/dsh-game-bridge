@@ -46,6 +46,8 @@ class GameSession:
         window_resolver=None,
         window_rect_source=None,
         window_monitor_source=None,
+        foreground_source=None,
+        occlusion_source=None,
     ):
         self.engine = engine or GameEngine()
         self.gate = gate or SafetyGate()
@@ -54,6 +56,8 @@ class GameSession:
         self._window_resolver = window_resolver
         self._window_rect_source = window_rect_source
         self._window_monitor_source = window_monitor_source
+        self._foreground_source = foreground_source
+        self._occlusion_source = occlusion_source
         self._controller = None
         self.attached: dict | None = None
         self.history: list[dict] = []
@@ -87,6 +91,108 @@ class GameSession:
         from .windows import list_windows
 
         return [window["title"] for window in list_windows()[:8]]
+
+    # ── 前台 / 遮挡 ───────────────────────────────────────────────────
+    def _foreground(self) -> dict | None:
+        if self._foreground_source is not None:
+            return self._foreground_source()
+        from .windows import foreground_window
+
+        return foreground_window()
+
+    def _occlusion(self, hwnd: int) -> dict | None:
+        if self._occlusion_source is not None:
+            return self._occlusion_source(hwnd)
+        from .windows import window_occlusion
+
+        return window_occlusion(hwnd)
+
+    def _foreground_is_attached(self, foreground: dict | None) -> bool | None:
+        """attached.hwnd 是否就是当前前台窗口；无法判断时返回 None。"""
+        hwnd = (self.attached or {}).get("hwnd")
+        if not hwnd or not isinstance(foreground, dict):
+            return None
+        return int(foreground.get("hwnd") or 0) == int(hwnd)
+
+    def _delivery(self, foreground: dict | None) -> dict:
+        same = self._foreground_is_attached(foreground)
+        return {
+            "checked": same is not None,
+            "foreground": same,
+            "hwnd": (self.attached or {}).get("hwnd"),
+            "title": foreground.get("title") if isinstance(foreground, dict) else None,
+        }
+
+    def _foreground_required(self) -> bool:
+        """真实后端才强制前台；dry-run 只记录，不因此拒绝。"""
+        return (self.backend or "dry-run").lower() not in ("dry-run",)
+
+    def _foreground_message(self, foreground: dict | None) -> str:
+        title = foreground.get("title") if isinstance(foreground, dict) else None
+        target = (self.attached or {}).get("window") or "目标窗口"
+        return (
+            f"{target} 不是前台窗口（当前前台：{title or '未知'}）；"
+            "XInput/键盘输入只会送到前台窗口。把游戏切回前台（或让 DSH 窗口让出焦点）后再试；"
+            "dry-run 下不会因此拒绝。"
+        )
+
+    def _backend_hint(self, control: dict) -> str:
+        backend = (self.backend or "dry-run").lower()
+        detail = str(control.get("detail") or "unknown error")
+        if backend in ("vgamepad", "gamepad"):
+            return (
+                f"真实手柄后端不可用：{detail}；vgamepad 没装进引擎环境时，"
+                "请在同一 venv 里安装（uv pip install --python <engine-python> vgamepad），"
+                "或把 DSH_GAME_BRIDGE_CONTROL 切回 dry-run。"
+            )
+        if backend in ("keyboard", "sendinput"):
+            return f"键盘后端不可用：{detail}；检查 DSH_GAME_BRIDGE_CONTROL 与 Win32 环境。"
+        return f"输出后端 {backend} 不可用：{detail}"
+
+    def backend_status(self, *, probe: bool = False) -> dict:
+        """当前输出后端的就绪状态（供 attach/status 与 selftest 共用）。"""
+        backend = (self.backend or "dry-run").lower()
+        if backend == "dry-run":
+            return {
+                "backend": "dry-run",
+                "ready": True,
+                "detail": "records actions only",
+                "xinput_slot": None,
+                "warnings": [],
+            }
+        if self._controller is None and not probe:
+            return {
+                "backend": backend,
+                "ready": None,
+                "detail": "not initialized (attach probes the backend)",
+                "xinput_slot": None,
+                "warnings": [],
+            }
+        try:
+            controller = self._controller_instance()
+        except Exception as error:  # noqa: BLE001 - 就绪报告不应该炸
+            return {
+                "backend": backend,
+                "ready": False,
+                "detail": f"{type(error).__name__}: {error}",
+                "xinput_slot": None,
+                "warnings": [],
+            }
+        info = {
+            "backend": backend,
+            "ready": True,
+            "detail": "",
+            "xinput_slot": None,
+            "warnings": [],
+        }
+        reported = getattr(controller, "backend_info", None)
+        if callable(reported):
+            try:
+                info.update(reported())
+            except Exception as error:  # noqa: BLE001
+                info["ready"] = False
+                info["detail"] = f"backend_info failed: {type(error).__name__}: {error}"
+        return info
 
     # ── 手 ────────────────────────────────────────────────────────────
     def _controller_instance(self):
@@ -130,6 +236,12 @@ class GameSession:
         else:
             # 不指定窗口时退回整屏（仍是有用的兜底，但模型应优先 attach 具体窗口）。
             self.attached = {"window": "unspecified", "attached_at_ms": int(time.time() * 1000)}
+        # 真实后端：attach 时做一次就绪预检（会创建虚拟手柄），失败 fail-fast，
+        # 不把「attach 成功、第一次 act 才炸」的问题留给模型。
+        control = self.backend_status(probe=True)
+        if self._foreground_required() and not control.get("ready"):
+            self.attached = None
+            raise EngineError("BACKEND_UNAVAILABLE", self._backend_hint(control))
         # 重新 attach 视为用户重新授权：清掉夺权闩锁，并丢掉旧的帧差基线。
         self.gate.reset_takeover()
         reset_diff = getattr(self.engine, "reset_diff", None)
@@ -139,6 +251,7 @@ class GameSession:
         if callable(warmup):
             warmup((self.attached or {}).get("monitor"))
         safety = self.gate.evaluate().to_dict()
+        foreground = self._foreground()
         self.audit.write(
             {
                 "event": "attach",
@@ -146,9 +259,16 @@ class GameSession:
                 "hwnd": self.attached.get("hwnd"),
                 "backend": self.backend,
                 "safety": safety,
+                "foreground": foreground,
             }
         )
-        return {"attached": self.attached, "backend": self.backend, "safety": safety}
+        return {
+            "attached": self.attached,
+            "backend": self.backend,
+            "safety": safety,
+            "control": control,
+            "foreground": foreground,
+        }
 
     def act(self, params: dict | None = None) -> dict:
         params = params or {}
@@ -164,11 +284,31 @@ class GameSession:
         except (TypeError, ValueError) as error:
             raise EngineError("BAD_DURATION", f"duration_ms 不是整数：{params.get('duration_ms')!r}") from error
         duration = max(1, min(duration, MAX_BUTTON_DURATION_MS))
+        foreground = self._foreground()
+        delivery = self._delivery(foreground)
+        if self._foreground_required() and delivery["checked"] and not delivery["foreground"]:
+            self.audit.write({"event": "act_blocked", "reasons": ["foreground mismatch"], "foreground": foreground})
+            raise EngineError("FOREGROUND_MISMATCH", self._foreground_message(foreground))
         action = self._controller_instance().press(button, duration)
         entry = {**action, "at_ms": int(time.time() * 1000)}
         self.history.append(entry)
-        self.audit.write({"event": "act", "button": action.get("button"), "duration_ms": duration, "backend": action.get("backend"), "dry_run": action.get("dry_run")})
-        return {"action": action, "safety": report.to_dict(), "attached": self.attached, "actions_total": len(self.history)}
+        self.audit.write(
+            {
+                "event": "act",
+                "button": action.get("button"),
+                "duration_ms": duration,
+                "backend": action.get("backend"),
+                "dry_run": action.get("dry_run"),
+                "delivery": delivery,
+            }
+        )
+        return {
+            "action": action,
+            "safety": report.to_dict(),
+            "attached": self.attached,
+            "actions_total": len(self.history),
+            "delivery": delivery,
+        }
 
     # ── 小脑：20 Hz 闭环 ──────────────────────────────────────────────
     def plan(self, params: dict | None = None) -> dict:
@@ -196,6 +336,13 @@ class GameSession:
             self.audit.write({"event": "plan_blocked", "reasons": report.reasons})
             raise EngineError("SAFETY_BLOCKED", "；".join(report.reasons))
 
+        # 真实后端：闭环开始前先确认目标窗口在前台；运行中每拍再复检（下面 _run_plan）。
+        foreground = self._foreground()
+        delivery = self._delivery(foreground)
+        if self._foreground_required() and delivery["checked"] and not delivery["foreground"]:
+            self.audit.write({"event": "plan_blocked", "reasons": ["foreground mismatch"], "foreground": foreground})
+            raise EngineError("FOREGROUND_MISMATCH", self._foreground_message(foreground))
+
         self._stop_plan(join=True)
         state = {
             "id": f"plan-{int(time.time() * 1000)}",
@@ -213,13 +360,19 @@ class GameSession:
             "last_event": None,
             "status": "running",
             "stop_reason": None,
+            "foreground_lost": False,
         }
         self._plan = state
         self._plan_stop.clear()
         self.audit.write({"event": "plan_start", "plan": state["id"], "mode": mode, "button": button, "duration_ms": duration})
         self._plan_thread = threading.Thread(target=self._run_plan, args=(state,), daemon=True)
         self._plan_thread.start()
-        return {"plan": self._plan_snapshot(), "safety": report.to_dict()}
+        return {
+            "plan": self._plan_snapshot(),
+            "safety": report.to_dict(),
+            "control": self.backend_status(),
+            "foreground": foreground,
+        }
 
     def _diff_event(self) -> dict | None:
         """在闭环里取一次帧差分事件；引擎异常时返回 None（闭环继续走）。"""
@@ -233,6 +386,8 @@ class GameSession:
         controller = self._controller_instance()
         mode = state["mode"]
         button = state["button"]
+        hwnd = (self.attached or {}).get("hwnd")
+        require_foreground = self._foreground_required() and bool(hwnd)
         deadline = time.monotonic() + state["duration_ms"] / 1000.0
         holds_direction = mode in ("hold", "advance")
         if holds_direction:
@@ -255,6 +410,14 @@ class GameSession:
                     state["status"] = "aborted"
                     state["stop_reason"] = "；".join(report.reasons)
                     break
+                if require_foreground:
+                    foreground = self._foreground()
+                    if self._foreground_is_attached(foreground) is False:
+                        title = foreground.get("title") if isinstance(foreground, dict) else None
+                        state["status"] = "aborted"
+                        state["foreground_lost"] = True
+                        state["stop_reason"] = f"foreground lost (now: {title or 'unknown'})"
+                        break
                 if mode == "tap":
                     controller.press(button, 30)
                     state["actions"] += 1
@@ -314,7 +477,17 @@ class GameSession:
     def stop(self) -> dict:
         self._stop_plan(join=True)
         if self._controller is not None:
-            self._controller.release_all()
+            try:
+                self._controller.release_all()
+            except Exception:  # noqa: BLE001 - 松手失败不掩盖解绑
+                pass
+            close = getattr(self._controller, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:  # noqa: BLE001
+                    pass
+                self._controller = None
         self.attached = None
         self.gate.reset_takeover()
         self.audit.write({"event": "stop", "actions_total": len(self.history)})
@@ -329,6 +502,8 @@ class GameSession:
             "last_action": self.history[-1] if self.history else None,
             "plan": self._plan_snapshot(),
             "audit": {"path": self.audit.path, "tail": self.audit.tail(5)},
+            "control": self.backend_status(),
+            "foreground": self._foreground(),
         }
 
     # ── 眼 ────────────────────────────────────────────────────────────
@@ -392,7 +567,14 @@ class GameSession:
                     }
                 else:
                     region = {"left": left, "top": top, "width": right - left, "height": bottom - top}
-        return self.engine.snapshot(ocr=ocr, max_width=max_width, region=region, monitor=monitor)
+        frame = self.engine.snapshot(ocr=ocr, max_width=max_width, region=region, monitor=monitor)
+        if isinstance(frame, dict):
+            # 「我拍到的画面是不是目标窗口」：前台 + 遮挡元数据，让模型/用户能看出
+            # 截到的是被别的窗口盖住的画面（整屏抓 + 裁剪的已知限制）。
+            frame["foreground"] = self._foreground()
+            if hwnd:
+                frame["occluded"] = self._occlusion(hwnd)
+        return frame
 
     def close(self) -> None:
         self._stop_plan(join=True)
@@ -401,4 +583,11 @@ class GameSession:
                 self._controller.release_all()
             except Exception:  # noqa: BLE001 - 收尾失败不掩盖主流程
                 pass
+            close = getattr(self._controller, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:  # noqa: BLE001
+                    pass
+            self._controller = None
         self.engine.close()
