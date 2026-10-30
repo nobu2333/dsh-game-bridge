@@ -465,3 +465,22 @@ def test_detect_scene_equip_precedes_death_keywords():
     ]
     scene, _confidence = state_module.detect_scene(lines)
     assert scene == "equip"
+
+def test_detect_static_hazards_color_blob():
+    frame = np.zeros((120, 200, 3), dtype=np.uint8)
+    frame[80:100, 120:150] = (20, 20, 220)  # red in BGR
+    profile = {
+        "hazards": [
+            {
+                "kind": "red_mushroom",
+                "colors": [{"r_min": 170, "g_max": 100, "b_max": 100}],
+                "region": [0.0, 0.5, 1.0, 0.5],
+                "min_pixels": 20,
+            }
+        ]
+    }
+    found = state_module.detect_static_hazards(frame, profile)
+    assert len(found) == 1
+    assert found[0]["kind"] == "red_mushroom"
+    assert abs(found[0]["x"] - 135 / 200.0) < 0.05
+    assert state_module.detect_static_hazards(None, profile) == []

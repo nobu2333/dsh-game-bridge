@@ -337,6 +337,7 @@ class PolicyRunner:
         self._hurt_jump_pending = False
         self._entity_roles = []
         self._turn_until = 0.0
+        self._last_hazard_jump = 0.0
         # 实体跟踪 / 交战细节（通用，可按游戏关闭）。
         self._ignore_own_bullets = bool(combat.get("ignore_own_bullets", True))
         self._face_back = bool(combat.get("face_back", True))
@@ -352,6 +353,12 @@ class PolicyRunner:
         self._entity_memory = None
         self._entity_roles: list[dict] = []
         self._turn_until = 0.0
+        # 静态危险物（地面毒蘑菇/地刺）：颜色区域检测 + 临近跳跃。
+        self._static_hazards = bool(combat.get("static_hazards", False))
+        self._hazard_every = max(1, int(_as_float(combat.get("hazard_every_n_ticks"), 6) or 6))
+        self._hazard_cooldown_ms = max(200.0, _as_float(combat.get("hazard_cooldown_ms"), 700.0) or 700.0)
+        self._hazard_distance = max(0.05, _as_float(combat.get("hazard_distance"), 0.32) or 0.32)
+        self._last_hazard_jump = 0.0
         self._tracker = None
         self._tracks: list[Any] = []
         # 场景门控/恢复：profile.scenes = {scene: {"recover": [{"press": "confirm"}], ...}}
@@ -405,6 +412,7 @@ class PolicyRunner:
         self._hurt_jump_pending = False
         self._entity_roles = []
         self._turn_until = 0.0
+        self._last_hazard_jump = 0.0
         self._tracks = []
         # 非阻塞点按：press() 会 sleep 按住时长，60 Hz 环里不能调用它；
         # 这里改用 hold + 到期 release，避免跳跃/闪避把整拍拖慢。
@@ -507,6 +515,7 @@ class PolicyRunner:
         self._hurt_jump_pending = False
         self._entity_roles = []
         self._turn_until = 0.0
+        self._last_hazard_jump = 0.0
         self._pending_releases = []
         self._held = set()
         self._tracks = []
@@ -682,6 +691,7 @@ class PolicyRunner:
                 self._mark_timing("hit", hit_started)
                 self._update_tracks(entities)
                 self._update_entity_memory(frame)
+                self._maybe_static_hazard(frame)
                 player_started = self._clock()
                 self._update_player(frame)
                 self._mark_timing("player", player_started)
@@ -761,6 +771,32 @@ class PolicyRunner:
             )
         except Exception:  # noqa: BLE001 - 对象记忆失败只损失语义
             self._entity_roles = []
+
+    def _maybe_static_hazard(self, frame: np.ndarray) -> None:
+        """地面静态危险物：靠近且在前方时跳一次（颜色区域检测，profile 驱动）。"""
+        if not self._static_hazards or not self._jump_keys:
+            return
+        if self._ticks % self._hazard_every != 0:
+            return
+        now = self._clock()
+        if (now - self._last_hazard_jump) * 1000.0 < self._hazard_cooldown_ms:
+            return
+        try:
+            from .state import detect_static_hazards
+
+            hazards = detect_static_hazards(frame, self._profile)
+        except Exception:  # noqa: BLE001
+            return
+        anchor_x, anchor_y = self._anchor
+        for hazard in hazards:
+            dx = float(hazard.get("x") or 0.0) - anchor_x
+            if dx <= 0.02 or dx > self._hazard_distance:
+                continue
+            if abs(float(hazard.get("y") or 0.0) - anchor_y) > 0.45:
+                continue
+            self._tap(self._jump_keys[0], 140.0)
+            self._last_hazard_jump = now
+            return
 
     def _maybe_turn_shoot(self) -> None:
         """背后有 approaching/chaser 时：停步、短点转向持续射击，再恢复推进。

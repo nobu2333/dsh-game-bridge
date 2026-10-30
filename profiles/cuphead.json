@@ -130,7 +130,10 @@
     "engage_max_ms": 2500,
     "entity_memory": true,
     "turn_and_shoot": true,
-    "turn_shoot_ms": 600
+    "turn_shoot_ms": 600,
+    "static_hazards": true,
+    "hazard_every_n_ticks": 6,
+    "hazard_distance": 0.32
   },
   "colors": {
     "parry": {
@@ -140,5 +143,24 @@
       "min_pixels": 6
     }
   },
-  "notes": "Cuphead keyboard defaults: arrows/WASD move, Z jump/confirm, X shoot, SHIFT dash. HUD HP sits bottom-left (HP.3). Profile contains only UI/input data, no memory offsets."
+  "notes": "Cuphead keyboard defaults: arrows/WASD move, Z jump/confirm, X shoot, SHIFT dash. HUD HP sits bottom-left (HP.3). Profile contains only UI/input data, no memory offsets.",
+  "hazards": [
+    {
+      "kind": "red_mushroom",
+      "colors": [
+        {
+          "r_min": 170,
+          "g_max": 100,
+          "b_max": 100
+        }
+      ],
+      "region": [
+        0.0,
+        0.55,
+        1.0,
+        0.45
+      ],
+      "min_pixels": 30
+    }
+  ]
 }

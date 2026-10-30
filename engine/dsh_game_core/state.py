@@ -862,6 +862,66 @@ def find_player(frame_bgr: Any, profile: Any = None, previous: Any = None) -> di
         return None
 
 
+def detect_static_hazards(frame_bgr: Any, profile: Any = None) -> list[dict]:
+    """Profile-driven static hazard blobs (ground mushrooms/spikes) via colour ranges.
+
+    Frame-difference threat detection is blind to stationary hazards; this is the
+    cheap visual floor for them. Profile:
+      hazards: [{kind, colors:[{r_min,...}], region:[l,t,w,h], min_pixels}]
+    Returns normalized {kind,x,y,area,score}.
+    """
+    try:
+        frame = _coerce_frame(frame_bgr)
+        if frame is None:
+            return []
+        specs = _mapping(profile).get("hazards")
+        if not isinstance(specs, (list, tuple)):
+            return []
+        import cv2
+
+        height, width = frame.shape[:2]
+        found: list[dict] = []
+        for spec in specs:
+            if not isinstance(spec, Mapping):
+                continue
+            region = spec.get("region")
+            if isinstance(region, (list, tuple)) and len(region) >= 4:
+                left = int(max(0.0, min(1.0, _number(region[0], 0.0))) * width)
+                top = int(max(0.0, min(1.0, _number(region[1], 0.0))) * height)
+                rw = int(max(0.0, min(1.0, _number(region[2], 1.0))) * width)
+                rh = int(max(0.0, min(1.0, _number(region[3], 1.0))) * height)
+                crop = frame[top : top + rh, left : left + rw]
+            else:
+                left = top = 0
+                crop = frame
+            mask = _player_color_mask(crop, spec.get("colors"))
+            if mask is None:
+                continue
+            gray = (mask.astype(np.uint8) * 255)
+            min_pixels = int(_number(spec.get("min_pixels"), 24))
+            if cv2.countNonZero(gray) < min_pixels:
+                continue
+            count, labels, stats, centroids = cv2.connectedComponentsWithStats(gray, connectivity=8)
+            for label in range(1, count):
+                area = int(stats[label, cv2.CC_STAT_AREA])
+                if area < min_pixels:
+                    continue
+                cx, cy = centroids[label]
+                found.append(
+                    {
+                        "kind": str(spec.get("kind") or "hazard")[:32],
+                        "x": round(_clamp((left + float(cx)) / width, 0.0, 1.0), 4),
+                        "y": round(_clamp((top + float(cy)) / height, 0.0, 1.0), 4),
+                        "area": area,
+                        "score": round(min(1.0, area / 500.0), 4),
+                    }
+                )
+        found.sort(key=lambda item: (-item["area"], item["x"]))
+        return found[:8]
+    except Exception:  # noqa: BLE001 - 静态危险检测失败只损失本拍信息
+        return []
+
+
 # ── WorldState assembly ──────────────────────────────────────────────────────
 _PROMPT_ICON_CACHE: dict[int, np.ndarray] = {}
 
