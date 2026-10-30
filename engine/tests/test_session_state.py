@@ -433,3 +433,24 @@ def test_danger_outcome_writes_back_stats(tmp_path, monkeypatch):
     assert stored["stats"]["response_tries"] == 2
     assert stored["response_efficacy"] <= 0.5
     session.close()
+
+def test_read_hud_hp_from_crop():
+    class Line:
+        def __init__(self, text):
+            self.text = text
+
+    class Ocr:
+        def read(self, crop):
+            return [Line("HP.3")]
+
+    import numpy as np
+
+    session = GameSession(
+        engine=FakeEngine(),
+        gate=SafetyGate(process_source=lambda: [], takeover_source=lambda: False, process_ttl_s=0),
+    )
+    frame = np.zeros((100, 200, 3), dtype=np.uint8)
+    profile = {"hud": {"hp": {"box": [0.0, 0.8, 0.25, 0.2], "prefix": "HP"}}}
+    assert session._read_hud_hp(Ocr(), frame, profile) == 3
+    assert session._read_hud_hp(Ocr(), frame, {}) is None
+    session.close()
