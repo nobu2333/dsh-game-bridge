@@ -335,6 +335,8 @@ class PolicyRunner:
         self._engage_suppressed_until = 0.0
         self._hurt_until = 0.0
         self._hurt_jump_pending = False
+        self._entity_roles = []
+        self._turn_until = 0.0
         # 实体跟踪 / 交战细节（通用，可按游戏关闭）。
         self._ignore_own_bullets = bool(combat.get("ignore_own_bullets", True))
         self._face_back = bool(combat.get("face_back", True))
@@ -342,6 +344,14 @@ class PolicyRunner:
         self._track_radius = max(0.01, _as_float(combat.get("track_match_radius"), 0.08) or 0.08)
         # 单机「一次学习」反射：candidate 危险卡也允许在对应坐标执行一次规避动作。
         self._danger_reflex = bool(combat.get("danger_reflex", False))
+        # 对象级理解 + 背后追击者处理（默认关闭，profile 开启）。
+        self._entity_memory_enabled = bool(combat.get("entity_memory", False))
+        self._entity_every = max(1, int(_as_float(combat.get("entity_every_n_ticks"), 6) or 6))
+        self._turn_and_shoot = bool(combat.get("turn_and_shoot", False))
+        self._turn_shoot_ms = max(200.0, _as_float(combat.get("turn_shoot_ms"), 600.0) or 600.0)
+        self._entity_memory = None
+        self._entity_roles: list[dict] = []
+        self._turn_until = 0.0
         self._tracker = None
         self._tracks: list[Any] = []
         # 场景门控/恢复：profile.scenes = {scene: {"recover": [{"press": "confirm"}], ...}}
@@ -393,6 +403,8 @@ class PolicyRunner:
         self._engage_suppressed_until = 0.0
         self._hurt_until = 0.0
         self._hurt_jump_pending = False
+        self._entity_roles = []
+        self._turn_until = 0.0
         self._tracks = []
         # 非阻塞点按：press() 会 sleep 按住时长，60 Hz 环里不能调用它；
         # 这里改用 hold + 到期 release，避免跳跃/闪避把整拍拖慢。
@@ -493,6 +505,8 @@ class PolicyRunner:
         self._engage_suppressed_until = 0.0
         self._hurt_until = 0.0
         self._hurt_jump_pending = False
+        self._entity_roles = []
+        self._turn_until = 0.0
         self._pending_releases = []
         self._held = set()
         self._tracks = []
@@ -513,6 +527,11 @@ class PolicyRunner:
             elapsed = (ended if ended is not None else self._clock()) - self._started_at
             if elapsed > 0:
                 hz = round(self._ticks / elapsed, 1)
+        role_map = {
+            int(observation.get("id")): observation
+            for observation in self._entity_roles
+            if isinstance(observation, dict) and observation.get("id") is not None
+        }
         return {
             "running": bool(self._running),
             "ticks": int(self._ticks),
@@ -535,6 +554,8 @@ class PolicyRunner:
                     "vx": round(float(track.vx), 4),
                     "vy": round(float(track.vy), 4),
                     "speed": round(float(track.speed), 4),
+                    "role": (role_map.get(int(track.id)) or {}).get("role"),
+                    "cluster": (role_map.get(int(track.id)) or {}).get("cluster"),
                 }
                 for track in getattr(self, "_tracks", [])[:8]
             ],
@@ -660,6 +681,7 @@ class PolicyRunner:
                 self._update_hit_signal(frame)
                 self._mark_timing("hit", hit_started)
                 self._update_tracks(entities)
+                self._update_entity_memory(frame)
                 player_started = self._clock()
                 self._update_player(frame)
                 self._mark_timing("player", player_started)
@@ -668,6 +690,7 @@ class PolicyRunner:
                 self._mark_timing("memory", memory_started)
                 self._check_danger_outcome()
                 self._maybe_engage(entities)
+                self._maybe_turn_shoot()
 
             # 3) 持续键（射击 / 前进）：缺什么补什么，已经按住的不重复按。
             self._ensure_holds()
@@ -703,10 +726,11 @@ class PolicyRunner:
         engage = self._clock() < self._engage_until
         if self._clock() < self._engage_suppressed_until:
             engage = False
+        turning = self._clock() < self._turn_until
         for key in self._hold_keys:
             if key in self._held:
                 continue
-            if engage and key == self._advance_key:
+            if (engage or turning) and key == self._advance_key:
                 continue
             self._controller.hold(key)
             self._held.add(key)
@@ -714,6 +738,65 @@ class PolicyRunner:
         if self._advance_key is not None and self._advance_key in self._held:
             self._engage_stop_ms = 0.0
             self._last_engage_at = None
+
+    def _update_entity_memory(self, frame: np.ndarray) -> None:
+        if not self._entity_memory_enabled:
+            return
+        if self._entity_memory is None:
+            try:
+                from .entity_memory import EntityMemory
+
+                self._entity_memory = EntityMemory()
+            except Exception:  # noqa: BLE001
+                return
+        if self._ticks % self._entity_every != 0:
+            return
+        try:
+            self._entity_roles = self._entity_memory.update(
+                self._tracks,
+                frame,
+                self._anchor,
+                hp=self._current_hp(),
+                now=self._clock(),
+            )
+        except Exception:  # noqa: BLE001 - 对象记忆失败只损失语义
+            self._entity_roles = []
+
+    def _maybe_turn_shoot(self) -> None:
+        """背后有 approaching/chaser 时：停步、面向后持续射击，再恢复推进。"""
+        if not self._turn_and_shoot:
+            return
+        now = self._clock()
+        left = self._resolve_key("left") or "LEFT"
+        if now < self._turn_until:
+            if left not in self._held:
+                self._controller.hold(left)
+                self._held.add(left)
+                self._actions += 1
+            advance = self._advance_key
+            if advance is not None and advance in self._held:
+                self._release_key(advance)
+            return
+        if self._turn_until:
+            self._turn_until = 0.0
+            if left in self._held:
+                self._release_key(left)
+        for observation in self._entity_roles:
+            if observation.get("role") not in ("chaser", "approaching"):
+                continue
+            if not observation.get("behind"):
+                continue
+            if float(observation.get("distance") or 1.0) > 0.6:
+                continue
+            self._turn_until = now + self._turn_shoot_ms / 1000.0
+            advance = self._advance_key
+            if advance is not None and advance in self._held:
+                self._release_key(advance)
+            if left not in self._held:
+                self._controller.hold(left)
+                self._held.add(left)
+                self._actions += 1
+            return
 
     def _maybe_engage(self, entities: list[dict]) -> None:
         """威胁进入交战半径：松开前进、保持射击；背后威胁则先转身。
