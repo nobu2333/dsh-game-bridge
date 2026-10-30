@@ -255,6 +255,31 @@ def resolve_window(match: str) -> dict | None:
     return find_window(list_windows(), match)
 
 
+def focus_window(hwnd: int) -> bool:
+    """尽力把目标窗口调到前台（只改变窗口激活状态，不注入输入）。
+
+    本地策略环需要它：SendInput 只送前台窗口，而 DSH 窗口可能在工具调用期间
+    抢回前台；逐拍校验 + 重新聚焦能让长闭环在后台继续。
+    """
+    if not IS_WINDOWS or not hwnd:
+        return False
+    try:
+        user32 = _user32()
+        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        if user32.SetForegroundWindow(hwnd):
+            return True
+        foreground = user32.GetForegroundWindow()
+        foreground_thread = user32.GetWindowThreadProcessId(foreground, None)
+        target_thread = user32.GetWindowThreadProcessId(hwnd, None)
+        user32.AttachThreadInput(foreground_thread, target_thread, True)
+        try:
+            return bool(user32.SetForegroundWindow(hwnd))
+        finally:
+            user32.AttachThreadInput(foreground_thread, target_thread, False)
+    except Exception:  # noqa: BLE001 - 聚焦失败由调用方降级处理
+        return False
+
+
 # ── 遮挡判定（纯函数 + 只读枚举）─────────────────────────────────────────
 # attach 之后模型看到的是「窗口截图」，但目标窗口可能被聊天窗/浏览器盖住。
 # 这里用 z-order 判断目标之上压了哪些可见顶层窗口，只读枚举、不改变窗口状态。

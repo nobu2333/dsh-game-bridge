@@ -627,6 +627,14 @@ class GameSession:
         state["backend"] = self.backend
         return state
 
+    def _focus_attached(self) -> bool:
+        hwnd = (self.attached or {}).get("hwnd")
+        if not hwnd:
+            return False
+        from .windows import focus_window
+
+        return focus_window(int(hwnd))
+
     def policy_start(self, params: dict | None = None) -> dict:
         """启动本地 60 Hz 反射策略（profile 驱动：射击/前进/闪避/卡住脱困）。"""
         params = params or {}
@@ -649,6 +657,8 @@ class GameSession:
             gate=self.gate,
             profile=profile,
             tick_hz=int(params.get("tick_hz") or 60),
+            foreground_ok=lambda: self._foreground_is_attached(self._foreground()),
+            focus_window=self._focus_attached,
         )
         started = self._policy.start()
         self.audit.write({"event": "policy_start", "profile": (profile or {}).get("id")})

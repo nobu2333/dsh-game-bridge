@@ -192,6 +192,8 @@ class PolicyRunner:
         sleep: Callable[[float], Any] = time.sleep,
         entities: Callable[..., list] | None = None,
         scene_source: Callable[[], str | None] | None = None,
+        foreground_ok: Callable[[], bool | None] | None = None,
+        focus_window: Callable[[], Any] | None = None,
     ):
         self._capture = capture
         self._controller = controller
@@ -203,6 +205,9 @@ class PolicyRunner:
         self._entities_source = entities if callable(entities) else None
         # 可选：给 status.scene 提供场景（60 Hz 路径不做 OCR，由调用方缓存喂进来）。
         self._scene_source = scene_source if callable(scene_source) else None
+        # 可选：逐拍前台校验 + 重新聚焦（SendInput 只送前台窗口）。
+        self._foreground_ok = foreground_ok if callable(foreground_ok) else None
+        self._focus_window = focus_window if callable(focus_window) else None
         self._entities_missing = False
         self._last_error: str | None = None
 
@@ -471,6 +476,31 @@ class PolicyRunner:
                 break
             self._release_due()
 
+            # 1.5) 前台校验：SendInput 只送前台窗口；DSH 可能在工具调用期间抢回前台。
+            if self._foreground_ok is not None:
+                try:
+                    foreground_ok = self._foreground_ok() is not False
+                except Exception:  # noqa: BLE001 - 前台查询失败不阻塞闭环
+                    foreground_ok = True
+                if not foreground_ok:
+                    if self._focus_window is not None:
+                        try:
+                            self._focus_window()
+                        except Exception:  # noqa: BLE001
+                            pass
+                    try:
+                        foreground_ok = self._foreground_ok() is not False
+                    except Exception:  # noqa: BLE001
+                        foreground_ok = False
+                    if not foreground_ok:
+                        self._release_all_keys()
+                        self._last_error = "foreground lost; paused"
+                        self._ticks += 1
+                        delay = self._period
+                        if delay > 0:
+                            self._sleep(delay)
+                        continue
+
             # 2) 一帧原始 BGR（不 OCR、不编码）。
             frame = self._grab()
             entities: list[dict] = []
@@ -549,6 +579,16 @@ class PolicyRunner:
     def _release_holds(self) -> None:
         for key in [held for held in self._hold_keys if held in self._held]:
             self._release_key(key)
+
+    def _release_all_keys(self) -> None:
+        """前台丢失/暂停时一次性释放全部按键与待释放点按。"""
+        try:
+            self._controller.release_all()
+        except Exception:  # noqa: BLE001
+            pass
+        self._held.clear()
+        self._pending_releases = []
+        self._actions += 1
 
     def _release_key(self, key: str) -> None:
         try:
