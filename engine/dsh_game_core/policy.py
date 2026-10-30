@@ -358,6 +358,14 @@ class PolicyRunner:
         self._prev_scene: str | None = None
         self._danger_armed = None
         self._danger_armed_at = 0.0
+        # 快环受击信号：HP 区域白色像素数变化（OCR 只做数值确认）。
+        hud = self._profile.get("hud")
+        hp = hud.get("hp") if isinstance(hud, dict) else None
+        box = hp.get("box") if isinstance(hp, dict) else None
+        self._hp_box = tuple(box) if isinstance(box, (list, tuple)) and len(box) >= 4 else None
+        self._hp_signature: int | None = None
+        self._last_hit: dict | None = None
+        self._last_hit_at = 0.0
 
         # ── 线程内状态 ──
         self._held: set[str] = set()
@@ -491,6 +499,7 @@ class PolicyRunner:
             "scroll_s": round(float(self._scroll_s), 3),
             "danger": self._nearby_danger,
             "player": {"x": round(float(self._anchor[0]), 4), "y": round(float(self._anchor[1]), 4)},
+            "hit": self._last_hit,
             "tracks": [
                 {
                     "id": int(track.id),
@@ -597,6 +606,7 @@ class PolicyRunner:
                     ):
                         self._scroll_s = 0.0
                         self._last_danger_id = None
+                        self._hp_signature = None
                         if self._locator is not None:
                             self._locator.reset()
                     self._prev_scene = self._scene
@@ -612,6 +622,7 @@ class PolicyRunner:
                     continue
                 entities = self._entities(frame, previous_frame)
                 self._last_entities = len(entities)
+                self._update_hit_signal(frame)
                 self._update_tracks(entities)
                 self._update_player(frame)
                 self._update_memory(previous_frame, frame)
@@ -928,6 +939,39 @@ class PolicyRunner:
             self._nearby_danger["acted"] = True
             self._danger_armed = {"id": card_id, "hp": self._current_hp()}
             self._danger_armed_at = self._clock()
+
+    def _update_hit_signal(self, frame: np.ndarray) -> None:
+        """快环 HP 区域白色像素签名；变化时记录 t_hit 和当时的关卡坐标。"""
+        if self._hp_box is None or self._scene != "gameplay":
+            return
+        try:
+            h, w = frame.shape[:2]
+            left, top, bw, bh = self._hp_box
+            x0 = int(max(0.0, min(1.0, float(left))) * w)
+            y0 = int(max(0.0, min(1.0, float(top))) * h)
+            x1 = int(max(0.0, min(1.0, float(left) + float(bw))) * w)
+            y1 = int(max(0.0, min(1.0, float(top) + float(bh))) * h)
+            if x1 <= x0 or y1 <= y0:
+                return
+            crop = frame[y0:y1, x0:x1]
+            gray = crop.astype(np.uint8).mean(axis=2) if crop.ndim == 3 else crop
+            signature = int(np.count_nonzero(gray > 200))
+        except Exception:  # noqa: BLE001 - 签名失败只损失快环 t_hit
+            return
+        now = self._clock()
+        if (
+            self._hp_signature is not None
+            and abs(signature - self._hp_signature) >= 8
+            and now - self._last_hit_at >= 0.4
+        ):
+            self._last_hit = {
+                "t": round(now, 3),
+                "scroll_s": round(float(self._scroll_s), 3),
+                "before": self._hp_signature,
+                "after": signature,
+            }
+            self._last_hit_at = now
+        self._hp_signature = signature
 
     def _current_hp(self) -> int | None:
         if self._hp_source is None:

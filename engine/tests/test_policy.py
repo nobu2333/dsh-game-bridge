@@ -54,6 +54,7 @@ STATUS_KEYS = {
     "danger",
     "player",
     "tracks",
+    "hit",
 }
 
 
