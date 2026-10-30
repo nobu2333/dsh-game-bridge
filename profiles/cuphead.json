@@ -18,12 +18,24 @@
       "prefix": "HP"
     }
   },
+  "player": {
+    "track": true,
+    "every_n_ticks": 3,
+    "colors": [{"r_min": 170, "g_max": 110, "b_max": 110}],
+    "validate_colors": [{"r_min": 170, "g_max": 110, "b_max": 110}],
+    "validate_min_fraction": 0.005,
+    "min_pixels": 20,
+    "color_score": 0.55,
+    "match_threshold": 0.65,
+    "search_radius": 0.25
+  },
   "scene": {
     "menu_keywords": ["START", "OPTIONS", "EXIT", "DLC", "CONTINUE", "RESUME"],
     "death_keywords": ["DEAD", "GAME OVER", "RETRY"],
     "loading_max_texts": 1,
-    "refresh_ms": 700,
-    "recover_interval_ms": 700
+    "refresh_ms": 2500,
+    "recover_interval_ms": 700,
+    "ocr_max_width": 962
   },
   "scenes": {
     "death": {"recover": [{"press": "confirm"}]},

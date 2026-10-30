@@ -658,31 +658,70 @@ def _player_template(profile: Any) -> np.ndarray | None:
     return None
 
 
+def _player_color_mask(frame: np.ndarray, specs: Any) -> np.ndarray | None:
+    """Union of profile r/g/b ranges as a boolean mask (None if unusable)."""
+    if not isinstance(specs, (list, tuple)) or not specs:
+        return None
+    try:
+        h, w = frame.shape[:2]
+        bgr = frame.astype(np.int16)
+        b, g, r = bgr[:, :, 0], bgr[:, :, 1], bgr[:, :, 2]
+        mask = np.zeros((h, w), dtype=bool)
+        for spec in specs:
+            if not isinstance(spec, Mapping):
+                continue
+            current = np.ones((h, w), dtype=bool)
+            for channel, values in (("r", r), ("g", g), ("b", b)):
+                low = spec.get(f"{channel}_min")
+                high = spec.get(f"{channel}_max")
+                if low is not None:
+                    current &= values >= _number(low, 0)
+                if high is not None:
+                    current &= values <= _number(high, 255)
+            mask |= current
+        return mask
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _player_color_valid(frame: np.ndarray, section: Mapping, found: dict) -> bool:
+    """Check that a template hit has the player's colors inside its bbox."""
+    specs = section.get("validate_colors")
+    mask = _player_color_mask(frame, specs)
+    if mask is None:
+        return True
+    try:
+        h, w = frame.shape[:2]
+        size = section.get("template_size")
+        if isinstance(size, (list, tuple)) and len(size) >= 2:
+            bw = int(w * _number(size[0], 0.15))
+            bh = int(h * _number(size[1], 0.3))
+        else:
+            bw = max(12, int(w * 0.15))
+            bh = max(12, int(h * 0.3))
+        cx = int(float(found["x"]) * w)
+        cy = int(float(found["y"]) * h)
+        x0, x1 = max(0, cx - bw // 2), min(w, cx + bw // 2 + 1)
+        y0, y1 = max(0, cy - bh // 2), min(h, cy + bh // 2 + 1)
+        if x1 <= x0 or y1 <= y0:
+            return False
+        fraction = float(mask[y0:y1, x0:x1].mean())
+        return fraction >= _number(section.get("validate_min_fraction"), 0.02)
+    except Exception:  # noqa: BLE001
+        return True
+
+
 def _find_player_color(frame: np.ndarray, profile: Any) -> dict | None:
     """Color-blob fallback: profile.player.colors = [{r_min,g_min,b_min,...}], largest blob."""
     section = _player_section(profile)
-    specs = section.get("colors")
-    if not isinstance(specs, (list, tuple)) or not specs:
+    mask = _player_color_mask(frame, section.get("colors"))
+    if mask is None:
         return None
     try:
         import cv2
 
         h, w = frame.shape[:2]
-        gray = np.zeros((h, w), dtype=np.uint8)
-        bgr = frame.astype(np.int16)
-        b, g, r = bgr[:, :, 0], bgr[:, :, 1], bgr[:, :, 2]
-        for spec in specs:
-            if not isinstance(spec, Mapping):
-                continue
-            mask = np.ones((h, w), dtype=bool)
-            for channel, values in (("r", r), ("g", g), ("b", b)):
-                low = spec.get(f"{channel}_min")
-                high = spec.get(f"{channel}_max")
-                if low is not None:
-                    mask &= values >= _number(low, 0)
-                if high is not None:
-                    mask &= values <= _number(high, 255)
-            gray |= (mask.astype(np.uint8) * 255)
+        gray = (mask.astype(np.uint8) * 255)
         min_pixels = int(_number(section.get("min_pixels"), 40))
         if cv2.countNonZero(gray) < min_pixels:
             return None
@@ -700,7 +739,7 @@ def _find_player_color(frame: np.ndarray, profile: Any) -> dict | None:
         return {
             "x": round(_clamp(cx, 0.0, 1.0), 4),
             "y": round(_clamp(cy, 0.0, 1.0), 4),
-            "score": round(min(1.0, area / float(h * w) * 20.0), 4),
+            "score": round(min(1.0, _number(section.get("color_score"), 0.55)), 4),
             "method": "color",
         }
     except Exception:  # noqa: BLE001
@@ -816,7 +855,7 @@ def find_player(frame_bgr: Any, profile: Any = None, previous: Any = None) -> di
         template = _player_template(profile)
         if template is not None:
             found = _match_player_template(frame, section, template, previous=_previous_point(previous))
-            if found is not None:
+            if found is not None and _player_color_valid(frame, section, found):
                 return found
         return _find_player_color(frame, profile)
     except Exception:  # noqa: BLE001 - perception must never raise

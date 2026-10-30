@@ -520,7 +520,7 @@ class GameSession:
     def _scene_loop(self, profile: dict, stop: threading.Event) -> None:
         try:
             from .ocr import Ocr
-            from .state import detect_scene
+            from .state import detect_scene, extract_hp
 
             ocr = Ocr()
             ocr.warmup()
@@ -533,8 +533,21 @@ class GameSession:
             if frame is None:
                 continue
             try:
+                scene_profile = profile.get("scene") if isinstance(profile, dict) else None
+                max_width = int((scene_profile or {}).get("ocr_max_width") or 480)
+                if frame.shape[1] > max_width:
+                    import cv2
+
+                    frame = cv2.resize(
+                        frame,
+                        (max_width, max(1, int(round(frame.shape[0] * max_width / frame.shape[1])))),
+                        interpolation=cv2.INTER_AREA,
+                    )
                 lines = [line.to_dict() for line in ocr.read(frame)]
-                scene, confidence = detect_scene(lines, profile=profile)
+                hp, _hp_text = extract_hp(
+                    lines, profile=profile, frame_size=(int(frame.shape[1]), int(frame.shape[0]))
+                )
+                scene, confidence = detect_scene(lines, profile=profile, hp=hp)
                 self._scene_cache = {
                     "scene": scene,
                     "confidence": float(confidence),

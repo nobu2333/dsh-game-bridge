@@ -338,6 +338,7 @@ class PolicyRunner:
         self._track_player = bool(player_cfg.get("track", False))
         self._player_every = max(1, int(_as_float(player_cfg.get("every_n_ticks"), 3) or 3))
         self._player_source: Callable[..., Any] | None = None
+        self._player_candidate = None
 
         # ── 线程内状态 ──
         self._held: set[str] = set()
@@ -445,6 +446,7 @@ class PolicyRunner:
         self._recover_scene = None
         self._recover_attempts = 0
         self._last_recover_at = 0.0
+        self._player_candidate = None
         self._last_error = None
 
     def _status_locked(self) -> dict:
@@ -845,9 +847,15 @@ class PolicyRunner:
             return
         previous_x, previous_y = self._anchor
         distance = math.hypot(x - previous_x, y - previous_y)
-        # 单帧模板可能误匹配到别的精灵：大幅度跳变只接受很高分的结果。
-        if distance > 0.35 and score < 0.85:
-            return
+        # 单帧模板可能误匹配到别的精灵：大幅度跳变需要连续两帧一致才接受。
+        if distance > 0.25:
+            if score < 0.9:
+                return
+            candidate = getattr(self, "_player_candidate", None)
+            if candidate is None or math.hypot(x - candidate[0], y - candidate[1]) > 0.08:
+                self._player_candidate = (x, y)
+                return
+        self._player_candidate = None
         # 轻量平滑，避免锚点抖动导致闪避/交战判定抖。
         x = previous_x * 0.35 + x * 0.65
         y = previous_y * 0.35 + y * 0.65
