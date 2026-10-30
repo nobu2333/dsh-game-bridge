@@ -89,3 +89,31 @@ def test_coordinate_drift_from_damage_scrolls():
     assert summary["ok"] is False
     stable = [{"id": "card-b", "stats": {"damage_scrolls": [-1.0, -1.05]}}]
     assert summarize_coordinate_drift(stable)["ok"] is True
+
+def test_summarize_ab_groups_by_knowledge(tmp_path):
+    from dsh_game_core.evaluate import summarize_ab
+
+    for name, knowledge, damage, scroll in (
+        ("on1", True, 1, -3.0),
+        ("on2", True, 2, -4.0),
+        ("off1", False, 4, -2.0),
+        ("old", None, 9, -1.0),
+    ):
+        directory = tmp_path / name
+        directory.mkdir()
+        (directory / "meta.json").write_text(
+            json.dumps({"game": "cuphead", "level": "forest-follies", "frame_count": 1, "event_count": 1, "knowledge": knowledge}),
+            encoding="utf-8",
+        )
+        (directory / "events.jsonl").write_text(json.dumps({"type": "damage"}) + "\n", encoding="utf-8")
+        (directory / "frames.jsonl").write_text(
+            json.dumps({"index": 0, "t": 0, "state": {"scroll_s": scroll}}) + "\n", encoding="utf-8"
+        )
+        for _ in range(damage - 1):
+            with (directory / "events.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps({"type": "damage"}) + "\n")
+    summary = summarize_ab(tmp_path, game="cuphead", level="forest-follies")
+    assert summary["on"]["episodes"] == 2
+    assert summary["on"]["damage_events"] == 3  # on1:1 + on2:2
+    assert summary["off"]["episodes"] == 1
+    assert summary["unknown"]["episodes"] == 1

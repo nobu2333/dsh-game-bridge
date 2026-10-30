@@ -74,6 +74,7 @@ class GameSession:
         self._record_next_at = 0.0
         self._record_game = "unknown"
         self._record_level = "level"
+        self._record_knowledge = True
         self._last_recorded_scene = None
         self._last_hp: int | None = None
         self._record_queue: queue.Queue | None = None
@@ -811,6 +812,7 @@ class GameSession:
                 "game": self._record_game,
                 "level": self._record_level,
                 "profile": self._record_game,
+                "knowledge": bool(self._record_knowledge),
             }
         )
         # 不在这里清 _last_recorded_scene：保存后立即重启录制时清掉它，会让同一个
@@ -1107,6 +1109,7 @@ class GameSession:
         profile = dict(profile) if isinstance(profile, dict) else {}
         self._record_game = str(params.get("game") or profile.get("id") or "unknown")[:48]
         self._record_level = str(params.get("level") or "level")[:48]
+        self._record_knowledge = bool(params.get("knowledge", True))
         self._last_hp = None
         self._pending_hp = None
         self._death_carded = False

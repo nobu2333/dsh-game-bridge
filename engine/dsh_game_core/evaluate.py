@@ -165,6 +165,39 @@ def summarize_coordinate_drift(cards: list[dict], *, budget: float = 0.2) -> dic
     }
 
 
+def summarize_ab(root: str | os.PathLike[str], *, game: str | None = None, level: str | None = None) -> dict:
+    """Group episodes by recorder meta.knowledge (on/off) for A/B comparisons."""
+    directory = Path(root)
+    groups: dict[str, list[dict]] = {"on": [], "off": [], "unknown": []}
+    if directory.is_dir():
+        for child in sorted(directory.iterdir()):
+            if not child.is_dir():
+                continue
+            episode = load_episode(child)
+            if episode is None:
+                continue
+            meta = episode.get("meta") or {}
+            if game and meta.get("game") != game:
+                continue
+            if level and meta.get("level") != level:
+                continue
+            knowledge = meta.get("knowledge")
+            group = "on" if knowledge is True else ("off" if knowledge is False else "unknown")
+            groups[group].append(summarize_episode(episode))
+
+    def summarize(group: list[dict]) -> dict:
+        total = len(group)
+        return {
+            "episodes": total,
+            "damage_events": sum(item["damage_events"] for item in group),
+            "deaths": sum(item["deaths"] for item in group),
+            "damage_per_episode": round(sum(item["damage_events"] for item in group) / total, 2) if total else 0.0,
+            "best_progress": round(max((item["progress"] for item in group), default=0.0), 3),
+        }
+
+    return {name: summarize(group) for name, group in groups.items()}
+
+
 def load_cards(path: str | os.PathLike[str], game: str, level: str) -> list[dict]:
     from .memory import KnowledgeStore
 
