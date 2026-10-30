@@ -426,3 +426,22 @@ def test_candidate_danger_reflex_jumps_once():
     assert status["danger"].get("acted") is True
     jump_holds = [call for call in controller.calls if call["action"] == "hold" and call["button"] == "Z"]
     assert len(jump_holds) == 1
+
+def test_danger_reflex_uses_dodge_key_for_evade():
+    profile = make_profile(danger_reflex=True)
+    profile["combat"]["dodge"]["keys"] = ["SHIFT"]
+    profile["danger_cards"] = [
+        {
+            "id": "cuphead/forest-follies/danger-evade",
+            "game": "cuphead",
+            "level": "forest-follies",
+            "place": {"scroll_s": 0.0},
+            "trigger": {"kind": "threat"},
+            "response": {"skill": "evade"},
+            "status": "candidate",
+        }
+    ]
+    runner, _, controller = build_runner(budget_ticks=20, profile=profile)
+    run_to_completion(runner)
+    assert any(call["action"] == "hold" and call["button"] == "SHIFT" for call in controller.calls)
+    assert not any(call["action"] == "hold" and call["button"] == "Z" for call in controller.calls)

@@ -907,9 +907,13 @@ class PolicyRunner:
         card_id = self._nearby_danger["id"]
         allowed = status in ("validated", "trusted") or (self._danger_reflex and status == "candidate")
         if allowed and skill in ("jump_over", "evade", "unknown") and distance <= 0.35 and card_id != self._last_danger_id:
-            jump = self._jump_keys[0] if self._jump_keys else None
-            if jump:
-                self._tap(jump, 140.0)
+            if skill == "evade":
+                keys = self._dodge_keys
+            else:
+                keys = self._jump_keys
+            key = keys[0] if keys else None
+            if key:
+                self._tap(key, 140.0)
             self._last_danger_id = card_id
             self._nearby_danger["acted"] = True
 
