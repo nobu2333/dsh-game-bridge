@@ -376,6 +376,12 @@ class PolicyRunner:
         self._macros = macros if isinstance(macros, list) else []
         self._macro_used = set()
         self._macro_state = None
+        terrain = self._profile.get("terrain")
+        terrain = terrain if isinstance(terrain, dict) else {}
+        self._gap_enabled = bool(terrain.get("gap_enabled", False))
+        self._gap_every = max(1, int(_as_float(terrain.get("gap_every_n_ticks"), 6) or 6))
+        self._gap_cooldown_ms = max(200.0, _as_float(terrain.get("gap_cooldown_ms"), 600.0) or 600.0)
+        self._last_gap_jump = 0.0
         self._tracker = None
         self._tracks: list[Any] = []
         # 场景门控/恢复：profile.scenes = {scene: {"recover": [{"press": "confirm"}], ...}}
@@ -720,6 +726,7 @@ class PolicyRunner:
                 self._update_tracks(entities)
                 self._update_entity_memory(frame)
                 self._maybe_static_hazard(frame)
+                self._maybe_gap_jump(frame)
                 player_started = self._clock()
                 self._update_player(frame)
                 self._mark_timing("player", player_started)
@@ -838,6 +845,24 @@ class PolicyRunner:
             self._tap(key, 140.0)
         self._stop_reason = "affordance_confirm"
         self._stop_event.set()
+
+    def _maybe_gap_jump(self, frame: np.ndarray) -> None:
+        """前方地面变暗（断崖/坑）时跳一次。"""
+        if not self._gap_enabled or not self._jump_keys:
+            return
+        if self._ticks % self._gap_every != 0:
+            return
+        now = self._clock()
+        if (now - self._last_gap_jump) * 1000.0 < self._gap_cooldown_ms:
+            return
+        try:
+            from .state import detect_gap_ahead
+
+            if detect_gap_ahead(frame, self._profile, self._anchor):
+                self._tap(self._jump_keys[0], 140.0)
+                self._last_gap_jump = now
+        except Exception:  # noqa: BLE001
+            return
 
     def _maybe_static_hazard(self, frame: np.ndarray) -> None:
         """地面静态危险物：靠近且在前方时跳一次（颜色区域检测，profile 驱动）。"""

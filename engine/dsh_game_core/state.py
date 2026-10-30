@@ -922,6 +922,41 @@ def detect_static_hazards(frame_bgr: Any, profile: Any = None) -> list[dict]:
         return []
 
 
+def detect_gap_ahead(frame_bgr: Any, profile: Any = None, anchor: Any = None) -> bool:
+    """Cheap platform gap probe: ground ahead much darker than ground under player."""
+    try:
+        frame = _coerce_frame(frame_bgr)
+        terrain = _section(profile, "terrain")
+        if frame is None or not terrain.get("gap_enabled"):
+            return False
+        if not isinstance(anchor, (list, tuple)) or len(anchor) < 2:
+            return False
+        height, width = frame.shape[:2]
+        ax = int(_clamp(_number(anchor[0], 0.4), 0.0, 1.0) * width)
+        ay = int(_clamp(_number(anchor[1], 0.8), 0.0, 1.0) * height)
+        lookahead = int(_clamp(_number(terrain.get("gap_lookahead"), 0.18), 0.05, 0.4) * width)
+        strip = max(6, int(width * 0.015))
+        y0 = max(0, ay)
+        y1 = height
+        if y1 - y0 < 6:
+            return False
+
+        def brightness(center_x: int) -> float:
+            x0 = max(0, center_x - strip // 2)
+            x1 = min(width, center_x + strip // 2 + 1)
+            if x1 <= x0:
+                return 255.0
+            return float(frame[y0:y1, x0:x1].mean())
+
+        current = brightness(ax)
+        ahead = brightness(min(width - 1, ax + lookahead))
+        min_brightness = _number(terrain.get("gap_min_brightness"), 45.0)
+        ratio = _number(terrain.get("gap_ratio"), 0.55)
+        return current >= min_brightness and ahead < current * ratio
+    except Exception:  # noqa: BLE001
+        return False
+
+
 # ── WorldState assembly ──────────────────────────────────────────────────────
 _PROMPT_ICON_CACHE: dict[int, np.ndarray] = {}
 

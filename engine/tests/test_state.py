@@ -484,3 +484,18 @@ def test_detect_static_hazards_color_blob():
     assert found[0]["kind"] == "red_mushroom"
     assert abs(found[0]["x"] - 135 / 200.0) < 0.05
     assert state_module.detect_static_hazards(None, profile) == []
+
+def test_detect_gap_ahead():
+    frame = np.zeros((100, 200, 3), dtype=np.uint8)
+    frame[50:100, 40:80] = (220, 220, 220)  # bright ground under player
+    profile = {
+        "terrain": {
+            "gap_enabled": True,
+            "gap_lookahead": 0.2,
+            "gap_min_brightness": 20,
+            "gap_ratio": 0.6,
+        }
+    }
+    assert state_module.detect_gap_ahead(frame, profile, (0.3, 0.5)) is True
+    uniform = np.full((100, 200, 3), 120, dtype=np.uint8)
+    assert state_module.detect_gap_ahead(uniform, profile, (0.3, 0.5)) is False

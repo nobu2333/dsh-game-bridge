@@ -162,5 +162,13 @@
       ],
       "min_pixels": 30
     }
-  ]
+  ],
+  "terrain": {
+    "gap_enabled": true,
+    "gap_lookahead": 0.18,
+    "gap_min_brightness": 45,
+    "gap_ratio": 0.55,
+    "gap_every_n_ticks": 6,
+    "gap_cooldown_ms": 600
+  }
 }
