@@ -304,3 +304,16 @@ game_attach(window="…", profile="cuphead")
   合成移动威胁、垃圾输入不崩）、`test_policy.py`（安全中止、闪避冷却、脱困、松手、status 形状）。
 - 插件：`test/general-state.test.mjs` 与 `test/m0.test.mjs`（工具列表、渲染路径、档案库）。
 - 全量回归与真实对局验证由 Lead 执行；`docs/STATUS.md` 只记录已验证的事实。
+
+## Player tracking (optional)
+
+`profile.player` enables a cheap per-tick player anchor (used by `game_policy` dodge/engage radius):
+
+- `track`: boolean, default false;
+- `every_n_ticks`: run the detector every N policy ticks (default 3);
+- template mode: `template_png_base64` (PNG base64), `template_size` (normalized w/h ratios at capture size), `search_width`, `match_threshold`;
+- color fallback: `colors` (`[{r_min,g_min,b_min,r_max,g_max,b_max}]`, `min_pixels`).
+
+Public profiles must not embed commercial game art; keep templates in the user-local
+profile store (`game_memory save` / `DSH_GAME_BRIDGE_PROFILE_DIR`). Detection never
+raises; a low-confidence result keeps the previous anchor.

@@ -379,3 +379,47 @@ def test_cheap_path_performance_budget():
         cheap_entities(frame, previous)
     elapsed_ms = (time.perf_counter() - started) / 5.0 * 1000.0
     assert elapsed_ms < 25.0, f"cheap path too slow: {elapsed_ms:.2f} ms"
+
+import base64
+
+import cv2
+
+
+def _png_b64(image: np.ndarray) -> str:
+    ok, buffer = cv2.imencode(".png", image)
+    assert ok
+    return base64.b64encode(buffer.tobytes()).decode("ascii")
+
+
+def test_find_player_finds_template():
+    rng = np.random.default_rng(3)
+    frame = rng.integers(0, 80, (200, 320, 3), dtype=np.uint8)
+    template = np.zeros((40, 30, 3), dtype=np.uint8)
+    template[:, :] = (240, 240, 240)
+    template[10:30, 8:22] = (30, 30, 200)
+    frame[100:140, 150:180] = template
+    profile = {
+        "player": {
+            "template_png_base64": _png_b64(template),
+            "template_size": [30 / 320.0, 40 / 200.0],
+            "search_width": 320,
+            "match_threshold": 0.5,
+        }
+    }
+    found = state_module.find_player(frame, profile)
+    assert found is not None
+    assert found["method"] == "template"
+    assert abs(found["x"] - 165 / 320.0) < 0.05
+    assert abs(found["y"] - 120 / 200.0) < 0.05
+
+
+def test_find_player_color_fallback_and_garbage():
+    frame = np.zeros((120, 240, 3), dtype=np.uint8)
+    frame[50:90, 100:160] = (20, 20, 220)
+    profile = {"player": {"colors": [{"r_min": 180, "g_max": 80, "b_max": 80}], "min_pixels": 30}}
+    found = state_module.find_player(frame, profile)
+    assert found is not None
+    assert found["method"] == "color"
+    assert abs(found["x"] - 130 / 240.0) < 0.08
+    assert state_module.find_player(None, profile) is None
+    assert state_module.find_player(frame, {"player": {"template_png_base64": "not-base64!!"}}) is None

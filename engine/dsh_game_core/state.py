@@ -621,6 +621,141 @@ def cheap_entities(frame_bgr: Any, prev_frame: Any, profile: Any = None) -> list
         return []
 
 
+def _player_section(profile: Any) -> Mapping:
+    return _section(profile, "player")
+
+
+_PLAYER_TEMPLATE_CACHE: dict[int, np.ndarray] = {}
+
+
+def _player_template(profile: Any) -> np.ndarray | None:
+    """Decode/cached player template PNG from profile (base64), if provided."""
+    section = _player_section(profile)
+    encoded = section.get("template_png_base64")
+    if not isinstance(encoded, str) or not encoded.strip():
+        return None
+    key = hash(encoded)
+    cached = _PLAYER_TEMPLATE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    try:
+        import base64
+
+        import cv2
+
+        raw = base64.b64decode(encoded, validate=True)
+        array = np.frombuffer(raw, dtype=np.uint8)
+        image = cv2.imdecode(array, cv2.IMREAD_COLOR)
+        if image is not None and image.ndim == 3 and image.size:
+            _PLAYER_TEMPLATE_CACHE[key] = image
+            return image
+    except Exception:  # noqa: BLE001 - bad template just disables tracking
+        return None
+    return None
+
+
+def _find_player_color(frame: np.ndarray, profile: Any) -> dict | None:
+    """Color-blob fallback: profile.player.colors = [{r_min,g_min,b_min,...}], largest blob."""
+    section = _player_section(profile)
+    specs = section.get("colors")
+    if not isinstance(specs, (list, tuple)) or not specs:
+        return None
+    try:
+        import cv2
+
+        h, w = frame.shape[:2]
+        gray = np.zeros((h, w), dtype=np.uint8)
+        bgr = frame.astype(np.int16)
+        b, g, r = bgr[:, :, 0], bgr[:, :, 1], bgr[:, :, 2]
+        for spec in specs:
+            if not isinstance(spec, Mapping):
+                continue
+            mask = np.ones((h, w), dtype=bool)
+            for channel, values in (("r", r), ("g", g), ("b", b)):
+                low = spec.get(f"{channel}_min")
+                high = spec.get(f"{channel}_max")
+                if low is not None:
+                    mask &= values >= _number(low, 0)
+                if high is not None:
+                    mask &= values <= _number(high, 255)
+            gray |= (mask.astype(np.uint8) * 255)
+        min_pixels = int(_number(section.get("min_pixels"), 40))
+        if cv2.countNonZero(gray) < min_pixels:
+            return None
+        count, labels, stats, centroids = cv2.connectedComponentsWithStats(gray, connectivity=8)
+        best = None
+        for label in range(1, count):
+            area = int(stats[label, cv2.CC_STAT_AREA])
+            if area < min_pixels or (best is not None and area <= best[0]):
+                continue
+            cx, cy = centroids[label]
+            best = (area, float(cx) / w, float(cy) / h)
+        if best is None:
+            return None
+        area, cx, cy = best
+        return {
+            "x": round(_clamp(cx, 0.0, 1.0), 4),
+            "y": round(_clamp(cy, 0.0, 1.0), 4),
+            "score": round(min(1.0, area / float(h * w) * 20.0), 4),
+            "method": "color",
+        }
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def find_player(frame_bgr: Any, profile: Any = None, previous: Any = None) -> dict | None:
+    """Locate the controllable character in one BGR frame (profile-driven, never raises).
+
+    Two generic modes:
+    - template: ``profile.player.template_png_base64`` + optional ``template_size``
+      (normalized width/height ratios), ``search_width``, ``match_threshold``;
+    - color: ``profile.player.colors`` (list of r/g/b min/max ranges), largest blob.
+    Returns ``{"x","y","score","method"}`` normalized to the frame, or None.
+    """
+    try:
+        frame = _coerce_frame(frame_bgr)
+        if frame is None:
+            return None
+        section = _player_section(profile)
+        if section.get("track") is False:
+            return None
+        template = _player_template(profile)
+        if template is not None:
+            import cv2
+
+            h, w = frame.shape[:2]
+            search_width = int(_number(section.get("search_width"), 480))
+            search_width = max(120, min(search_width, w))
+            scale = search_width / float(w)
+            search = cv2.resize(frame, (search_width, max(1, int(round(h * scale)))), interpolation=cv2.INTER_AREA)
+            size = section.get("template_size")
+            if isinstance(size, (list, tuple)) and len(size) >= 2:
+                tw = max(8, int(round(w * _number(size[0], 0.15) * scale)))
+                th = max(8, int(round(h * _number(size[1], 0.3) * scale)))
+            else:
+                tw = max(8, int(round(template.shape[1] * scale)))
+                th = max(8, int(round(template.shape[0] * scale)))
+            if tw >= search.shape[1] or th >= search.shape[0]:
+                return None
+            scaled = cv2.resize(template, (tw, th), interpolation=cv2.INTER_AREA)
+            result = cv2.matchTemplate(search, scaled, cv2.TM_CCOEFF_NORMED)
+            _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(result)
+            threshold = _number(section.get("match_threshold"), 0.55)
+            if not math.isfinite(max_val) or max_val < threshold:
+                return _find_player_color(frame, profile)
+            center_x = (max_loc[0] + tw / 2.0) / search_width
+            center_y = (max_loc[1] + th / 2.0) / search.shape[0]
+            return {
+                "x": round(_clamp(center_x, 0.0, 1.0), 4),
+                "y": round(_clamp(center_y, 0.0, 1.0), 4),
+                "score": round(float(max_val), 4),
+                "method": "template",
+            }
+        return _find_player_color(frame, profile)
+    except Exception:  # noqa: BLE001 - perception must never raise
+        return None
+
+
 # ── WorldState assembly ──────────────────────────────────────────────────────
 def _profile_id(profile: Any) -> str | None:
     value = _mapping(profile).get("id")

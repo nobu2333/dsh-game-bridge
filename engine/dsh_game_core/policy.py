@@ -300,6 +300,14 @@ class PolicyRunner:
         self._engage_radius = max(0.0, _as_float(combat.get("engage_radius"), 0.0) or 0.0)
         self._engage_hold_ms = max(0.0, _as_float(combat.get("engage_hold_ms"), 220.0) or 0.0)
 
+        # 玩家追踪：profile.player.track=true 时定期用 state.find_player 更新锚点，
+        # 让闪避/交战半径跟着角色走，而不是固定 self_pos。
+        player_cfg = self._profile.get("player")
+        player_cfg = player_cfg if isinstance(player_cfg, dict) else {}
+        self._track_player = bool(player_cfg.get("track", False))
+        self._player_every = max(1, int(_as_float(player_cfg.get("every_n_ticks"), 3) or 3))
+        self._player_source: Callable[..., Any] | None = None
+
         # ── 线程内状态 ──
         self._held: set[str] = set()
         self._last_dodge_at: float | None = None
@@ -442,6 +450,8 @@ class PolicyRunner:
     def _loop(self) -> None:
         if self._entities_source is None:
             self._entities_source = self._load_entities()
+        if self._track_player and self._player_source is None:
+            self._player_source = self._load_player()
         previous_frame: np.ndarray | None = None
         previous_tick_at: float | None = None
         static_ms = 0.0
@@ -473,6 +483,7 @@ class PolicyRunner:
             else:
                 entities = self._entities(frame, previous_frame)
                 self._last_entities = len(entities)
+                self._update_player(frame)
                 self._maybe_engage(entities)
 
             # 3) 持续键（射击 / 前进）：缺什么补什么，已经按住的不重复按。
@@ -675,6 +686,32 @@ class PolicyRunner:
             self._entities_missing = True
             return lambda frame, previous, profile=None: []
         return cheap_entities
+
+    def _load_player(self) -> Callable[..., Any] | None:
+        try:
+            from .state import find_player
+        except Exception:  # noqa: BLE001
+            return None
+        return find_player
+
+    def _update_player(self, frame: np.ndarray) -> None:
+        """定期更新角色屏幕坐标；找不到时保留上一个可信锚点。"""
+        if not self._track_player or self._player_source is None:
+            return
+        if self._ticks % self._player_every != 0:
+            return
+        try:
+            found = self._player_source(frame, self._profile)
+        except Exception:  # noqa: BLE001 - 追踪失败只损失本拍精度
+            return
+        if not isinstance(found, dict):
+            return
+        x = _as_float(found.get("x"), None)
+        y = _as_float(found.get("y"), None)
+        score = _as_float(found.get("score"), 0.0) or 0.0
+        if x is None or y is None or score < 0.25:
+            return
+        self._anchor = (min(max(x, 0.0), 1.0), min(max(y, 0.0), 1.0))
 
     def _read_scene(self) -> None:
         if self._scene_source is None:
