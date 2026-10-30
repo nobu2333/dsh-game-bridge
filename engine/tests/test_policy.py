@@ -250,10 +250,12 @@ def test_dodge_respects_cooldown():
 
     status = run_to_completion(runner)
 
-    presses = [call for call in controller.calls if call["action"] == "press"]
-    assert [call["button"] for call in presses] == ["Z", "Z", "Z"]
-    assert all(call["duration_ms"] == 10 for call in presses)
-    times_ms = [call["at"] * 1000.0 for call in presses]
+    # 非阻塞点按：hold 立刻发生，release 在后续拍到期；冷却按 hold 时间计算。
+    holds = [call for call in controller.calls if call["action"] == "hold" and call["button"] == "Z"]
+    releases = [call for call in controller.calls if call["action"] == "release" and call["button"] == "Z"]
+    assert [call["button"] for call in holds] == ["Z", "Z", "Z"]
+    assert len(releases) == 3
+    times_ms = [call["at"] * 1000.0 for call in holds]
     gaps = [later - earlier for earlier, later in zip(times_ms, times_ms[1:])]
     assert gaps and all(gap >= 200.0 - 1e-6 for gap in gaps)
     assert status["last_entities"] == 1
@@ -276,13 +278,11 @@ def test_stuck_escape_releases_advance_probes_and_resumes():
 
     assert status["ticks"] == 50
     assert status["escapes"] == 1
-    assert status["actions"] == 5  # 2 次初始 hold + release/press/hold 脱困
+    assert status["actions"] == 5  # 2 次初始 hold + release RIGHT / hold Z / hold RIGHT
 
     log = [(call["action"], call["button"]) for call in controller.calls]
     escape_at = log.index(("release", "RIGHT"))
-    assert log[escape_at : escape_at + 3] == [("release", "RIGHT"), ("press", "Z"), ("hold", "RIGHT")]
-    probe = [call for call in controller.calls if call["action"] == "press"][0]
-    assert probe["duration_ms"] == 350
+    assert log[escape_at : escape_at + 3] == [("release", "RIGHT"), ("hold", "Z"), ("hold", "RIGHT")]
     # 只按 profile 声明过的键
     assert {button for _, button in log} <= {"X", "RIGHT", "Z"}
 

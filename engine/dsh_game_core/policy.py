@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import math
 import threading
 import time
@@ -45,6 +46,33 @@ DEFAULT_PROBE_MS = 350
 DEFAULT_PLAYER_ANCHOR = (0.5, 0.72)
 
 _STATIC_WIDTH = 160  # 静止判定的下采样宽度，和 grab_diff 保持同一量级
+
+# Windows 默认 sleep 粒度约 15.6ms，60 Hz 环会被拖到 ~22ms/拍。开 1ms 定时器
+# 让 sleep(10ms) 真的只睡 ~10ms（只影响本进程，退出时恢复）。
+_HIGH_RES_ACTIVE = False
+
+
+def _enable_high_res_timer() -> None:
+    global _HIGH_RES_ACTIVE
+    if _HIGH_RES_ACTIVE or not hasattr(ctypes, "windll"):
+        return
+    try:
+        if ctypes.windll.winmm.timeBeginPeriod(1) == 0:
+            _HIGH_RES_ACTIVE = True
+    except Exception:  # noqa: BLE001 - 非 Windows/受限环境保持默认粒度
+        pass
+
+
+def _disable_high_res_timer() -> None:
+    global _HIGH_RES_ACTIVE
+    if not _HIGH_RES_ACTIVE:
+        return
+    try:
+        ctypes.windll.winmm.timeEndPeriod(1)
+    except Exception:  # noqa: BLE001
+        pass
+    finally:
+        _HIGH_RES_ACTIVE = False
 
 
 def _as_float(value: Any, default: float | None) -> float | None:
@@ -100,14 +128,15 @@ def _gate_verdict(report: Any) -> tuple[bool, list[str]]:
 
 
 def _frame_small(frame: np.ndarray) -> np.ndarray:
-    """转灰度并下采样到 <= _STATIC_WIDTH 宽；纯 numpy，不依赖 cv2。"""
-    if frame.ndim == 3:
-        gray = frame.astype(np.float32).mean(axis=2)
-    else:
-        gray = frame.astype(np.float32)
-    height, width = gray.shape[:2]
+    """先切片下采样再转 float；对 962x567 帧只需处理 ~160x94，避免每拍全帧转换。"""
+    if frame is None or frame.size == 0:
+        return np.zeros((0, 0), dtype=np.float32)
+    height, width = frame.shape[:2]
     step = max(1, int(width) // _STATIC_WIDTH)
-    return gray[::step, ::step]
+    small = frame[::step, ::step]
+    if small.ndim == 3:
+        return small.astype(np.float32).mean(axis=2)
+    return small.astype(np.float32)
 
 
 def _static_metric(previous: np.ndarray, current: np.ndarray) -> float:
@@ -249,6 +278,9 @@ class PolicyRunner:
         self._last_jump_at: float | None = None
         self._last_dash_at: float | None = None
         self._engage_until = 0.0
+        # 非阻塞点按：press() 会 sleep 按住时长，60 Hz 环里不能调用它；
+        # 这里改用 hold + 到期 release，避免跳跃/闪避把整拍拖慢。
+        self._pending_releases: list[tuple[float, str]] = []
 
     # ── profile 键位解析 ──────────────────────────────────────────────
     def _resolve_key(self, value: Any) -> str | None:
@@ -285,6 +317,7 @@ class PolicyRunner:
             self._stop_event.clear()
             self._running = True
             self._started_at = self._clock()
+            _enable_high_res_timer()
             self._thread = threading.Thread(target=self._run, name="dsh-game-policy", daemon=True)
             self._thread.start()
             return self._status_locked()
@@ -338,6 +371,7 @@ class PolicyRunner:
         self._last_jump_at = None
         self._last_dash_at = None
         self._engage_until = 0.0
+        self._pending_releases = []
         self._held = set()
         self._last_error = None
 
@@ -366,6 +400,7 @@ class PolicyRunner:
         except BaseException as error:  # noqa: BLE001 - 线程里绝不能让异常漏出去
             self._stop_reason = f"error: {type(error).__name__}: {error}"
         finally:
+            _disable_high_res_timer()
             self._running = False
             with self._lock:
                 self._ended_at = self._clock()
@@ -396,6 +431,7 @@ class PolicyRunner:
                 self._stop_reason = "safety: " + ("; ".join(reasons) if reasons else "blocked")
                 self._stop_event.set()
                 break
+            self._release_due()
 
             # 2) 一帧原始 BGR（不 OCR、不编码）。
             frame = self._grab()
@@ -478,6 +514,31 @@ class PolicyRunner:
             self._held.discard(key)
         self._actions += 1
 
+    def _tap(self, key: str, duration_ms: float) -> None:
+        """非阻塞点按：先 hold，到期后由下一拍 release（press() 会 sleep，不能用）。"""
+        if key in self._held:
+            return
+        self._controller.hold(key)
+        self._held.add(key)
+        self._actions += 1
+        self._pending_releases.append(
+            (self._clock() + max(1.0, duration_ms) / 1000.0, key)
+        )
+
+    def _release_due(self) -> None:
+        now = self._clock()
+        remaining: list[tuple[float, str]] = []
+        for release_at, key in self._pending_releases:
+            if now >= release_at:
+                try:
+                    self._controller.release(key)
+                    self._actions += 1
+                finally:
+                    self._held.discard(key)
+            else:
+                remaining.append((release_at, key))
+        self._pending_releases = remaining
+
     def _is_advancing(self) -> bool:
         return self._advance_key is not None and self._advance_key in self._held
 
@@ -501,8 +562,7 @@ class PolicyRunner:
                 continue
             if math.hypot(x - anchor_x, y - anchor_y) <= self._threat_radius:
                 for key in self._dodge_keys:
-                    self._controller.press(key, self._dodge_press_ms)
-                    self._actions += 1
+                    self._tap(key, self._dodge_press_ms)
                 self._last_dodge_at = now
                 return
 
@@ -517,8 +577,7 @@ class PolicyRunner:
         ):
             return
         for key in self._jump_keys:
-            self._controller.press(key, self._dodge_press_ms)
-            self._actions += 1
+            self._tap(key, self._dodge_press_ms)
         self._last_jump_at = now
 
     def _maybe_dash(self) -> None:
@@ -532,8 +591,7 @@ class PolicyRunner:
         ):
             return
         for key in self._dash_keys:
-            self._controller.press(key, self._dodge_press_ms)
-            self._actions += 1
+            self._tap(key, self._dodge_press_ms)
         self._last_dash_at = now
 
     def _escape(self) -> None:
@@ -544,8 +602,7 @@ class PolicyRunner:
         if advance in self._held:
             self._release_key(advance)
         for key in self._probe_keys:
-            self._controller.press(key, self._probe_ms)
-            self._actions += 1
+            self._tap(key, self._probe_ms)
         self._controller.hold(advance)
         self._held.add(advance)
         self._actions += 1
