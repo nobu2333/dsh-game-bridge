@@ -645,8 +645,29 @@ class GameSession:
                     card["hazard_confidence"] = round(
                         min(1.0, float(card.get("hazard_confidence", card.get("confidence", 0.3))) + 0.03), 3
                     )
+                    if (
+                        int(stats.get("response_tries", 0)) >= 2
+                        and float(card.get("response_efficacy", 0.5)) >= 0.6
+                        and float(card.get("hazard_confidence", 0.3)) >= 0.5
+                    ):
+                        card["status"] = "validated"
                 else:
                     stats["response_failures"] = int(stats.get("response_failures", 0)) + 1
+                    if int(stats.get("response_failures", 0)) >= 2 and float(card.get("response_efficacy", 0.5)) < 0.4:
+                        ladder = ("jump_over", "evade", "retreat", "hold")
+                        current = str(card.get("response", {}).get("skill") or "unknown")
+                        try:
+                            next_skill = ladder[(ladder.index(current) + 1) % len(ladder)]
+                        except ValueError:
+                            next_skill = ladder[0]
+                        history = card.get("response_history") or []
+                        history.append(current)
+                        card["response_history"] = history[-8:]
+                        card["response"] = {"skill": next_skill, "params": {}, "timing": ""}
+                        card["response_efficacy"] = 0.5
+                        stats["response_tries"] = 0
+                        stats["response_failures"] = 0
+                        card["status"] = "candidate"
                 break
             else:
                 return
@@ -696,9 +717,10 @@ class GameSession:
                         "projectile",
                     ):
                         card["response"]["skill"] = "jump_over" if card["event"]["cause"] == "contact" else "evade"
-                    # 同一坐标重复挨打，说明这里是稳定危险点：升级为 validated 供策略执行。
-                    if int(card["stats"]["damage_events"]) >= 2 and card.get("status") == "candidate":
-                        card["status"] = "validated"
+                    # 危险与应对分开：重复受伤只提高 hazard_confidence，不再直接 validated。
+                    card["hazard_confidence"] = round(
+                        min(1.0, float(card.get("hazard_confidence", card.get("confidence", 0.3))) + 0.08), 3
+                    )
                     if episode:
                         card["evidence"] = (card.get("evidence") or [])[-7:] + [episode]
                     store.save(self._record_game, self._record_level, book["cards"])

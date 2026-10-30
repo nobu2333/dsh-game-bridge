@@ -133,6 +133,9 @@ def normalize_danger_card(raw: Any, *, now: Any = None) -> dict | None:
             "params": response.get("params") if isinstance(response.get("params"), dict) else {},
             "timing": str(response.get("timing") or "")[:80],
         },
+        "response_history": [str(item)[:32] for item in raw.get("response_history", [])[:8]]
+        if isinstance(raw.get("response_history"), list)
+        else [],
         "evidence": evidence,
         "stats": {
             "encounters": max(0, int(_num(stats.get("encounters"), 0))),

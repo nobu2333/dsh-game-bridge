@@ -925,9 +925,12 @@ class PolicyRunner:
         # 已人工/评测确认的危险点才执行预设技能；开 danger_reflex 时 candidate 也执行一次。
         status = str(card.get("status") or "candidate")
         skill = str(response.get("skill") or "")
+        params = response.get("params") if isinstance(response.get("params"), dict) else {}
+        default_distance = 0.18 if skill in ("jump_over", "unknown", "") else 0.24
+        trigger_distance = max(0.05, _as_float(params.get("trigger_distance"), default_distance) or default_distance)
         card_id = self._nearby_danger["id"]
         allowed = status in ("validated", "trusted") or (self._danger_reflex and status == "candidate")
-        if allowed and skill in ("jump_over", "evade", "unknown") and distance <= 0.35 and card_id != self._last_danger_id:
+        if allowed and skill in ("jump_over", "evade", "unknown") and distance <= trigger_distance and card_id != self._last_danger_id:
             if skill == "evade":
                 keys = self._dodge_keys
             else:
