@@ -68,6 +68,11 @@ class GameSession:
         self._scene_cache = {"scene": None, "confidence": 0.0, "ts": 0.0}
         self._scene_stop = None
         self._scene_thread = None
+        self._recorder = None
+        self._record_next_at = 0.0
+        self._record_game = "unknown"
+        self._record_level = "level"
+        self._last_recorded_scene = None
 
     # ── 窗口 ──────────────────────────────────────────────────────────
     def _resolve_window(self, match: str) -> dict | None:
@@ -478,6 +483,54 @@ class GameSession:
             self._plan_thread.join(timeout=1.5)
         self._plan_thread = None
 
+    def _data_root(self) -> str:
+        return os.environ.get("DSH_GAME_BRIDGE_DATA_DIR") or os.path.join(
+            os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "dsh-game-bridge"
+        )
+
+    def _record_frame(self, frame) -> None:
+        recorder = self._recorder
+        if recorder is None or frame is None:
+            return
+        now = time.monotonic()
+        if now < self._record_next_at:
+            return
+        self._record_next_at = now + 0.12  # ~8 fps 缩略图足够复盘
+        recorder.add_frame(frame, None)
+
+    def _save_episode(self, tag: str) -> str | None:
+        recorder, self._recorder = self._recorder, None
+        if recorder is None:
+            return None
+        recorder.add_event({"type": "episode_end", "tag": tag})
+        return recorder.save(f"{self._record_level}-{tag}")
+
+    def _maybe_record_scene(self, scene: str) -> None:
+        if self._recorder is None or scene == self._last_recorded_scene:
+            return
+        self._last_recorded_scene = scene
+        if scene in ("death", "equip", "cutscene"):
+            self._recorder.add_event({"type": "scene", "scene": scene})
+            self._save_episode(scene)
+            self._start_recorder()  # 继续录下一段
+
+    def _start_recorder(self) -> None:
+        if self._recorder is not None:
+            return
+        from .recorder import EpisodeRecorder
+
+        root = os.path.join(self._data_root(), "episodes")
+        self._recorder = EpisodeRecorder(root, version="0.0.2")
+        self._recorder.start(
+            {
+                "game": self._record_game,
+                "level": self._record_level,
+                "profile": self._record_game,
+            }
+        )
+        self._record_next_at = 0.0
+        self._last_recorded_scene = None
+
     def _stop_policy(self) -> None:
         """停掉本地反射策略并确保所有按键已释放。"""
         self._stop_scene_watcher()
@@ -487,6 +540,7 @@ class GameSession:
                 policy.stop()
             except Exception:  # noqa: BLE001 - 收尾失败不掩盖主流程
                 pass
+        self._save_episode("stop")
 
     # ── 异步场景识别（慢环写缓存，60Hz 快环只读） ──────────────────────
     def _scene_interval_s(self, profile: dict | None) -> float:
@@ -553,6 +607,7 @@ class GameSession:
                     "confidence": float(confidence),
                     "ts": time.time(),
                 }
+                self._maybe_record_scene(scene)
             except Exception:  # noqa: BLE001 - 单次 OCR 失败不终止慢环
                 continue
 
@@ -713,8 +768,19 @@ class GameSession:
         if self.attached is None:
             raise EngineError("NOT_ATTACHED", "还没有 attach 任何窗口：先调 game_attach，再调 game_policy")
         profile = params.get("profile")
-        if not isinstance(profile, dict):
-            profile = {}
+        profile = dict(profile) if isinstance(profile, dict) else {}
+        self._record_game = str(params.get("game") or profile.get("id") or "unknown")[:48]
+        self._record_level = str(params.get("level") or "level")[:48]
+        if params.get("knowledge", True):
+            try:
+                from .memory import KnowledgeStore
+
+                store = KnowledgeStore(os.path.join(self._data_root(), "knowledge"))
+                cards = store.load(self._record_game, self._record_level)["cards"]
+                if cards:
+                    profile["danger_cards"] = cards
+            except Exception:  # noqa: BLE001 - 记忆读取失败不影响开局
+                pass
         foreground = self._foreground()
         delivery = self._delivery(foreground)
         if self._foreground_required() and delivery["checked"] and not delivery["foreground"]:
@@ -723,8 +789,16 @@ class GameSession:
         region, monitor = self._capture_geometry()
         from .policy import PolicyRunner
 
+        if params.get("record"):
+            self._start_recorder()
+
+        def capture():
+            frame = self.engine.grab_raw(monitor=monitor, region=region)
+            self._record_frame(frame)
+            return frame
+
         self._policy = PolicyRunner(
-            capture=lambda: self.engine.grab_raw(monitor=monitor, region=region),
+            capture=capture,
             controller=self._controller_instance(),
             gate=self.gate,
             profile=profile,
@@ -742,8 +816,11 @@ class GameSession:
     def policy_stop(self, params: dict | None = None) -> dict:
         policy, self._policy = self._policy, None
         if policy is None:
+            self._save_episode("stop")
             return {"stopped": False, "policy": None}
         status = policy.stop()
+        self._stop_scene_watcher()
+        self._save_episode("stop")
         self.audit.write({"event": "policy_stop", **status})
         return {"stopped": True, "policy": status}
 

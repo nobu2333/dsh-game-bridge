@@ -339,6 +339,12 @@ class PolicyRunner:
         self._player_every = max(1, int(_as_float(player_cfg.get("every_n_ticks"), 3) or 3))
         self._player_source: Callable[..., Any] | None = None
         self._player_candidate = None
+        # 关卡记忆：滚动坐标 + 可选的 DangerCard 列表（由会话按 game/level 注入）。
+        self._locator = None
+        self._dangers = self._profile.get("danger_cards")
+        self._danger_window = max(0.1, _as_float(self._profile.get("danger_window"), 1.2) or 1.2)
+        self._nearby_danger: dict | None = None
+        self._scroll_s = 0.0
 
         # ── 线程内状态 ──
         self._held: set[str] = set()
@@ -447,6 +453,8 @@ class PolicyRunner:
         self._recover_attempts = 0
         self._last_recover_at = 0.0
         self._player_candidate = None
+        self._nearby_danger = None
+        self._scroll_s = 0.0
         self._last_error = None
 
     def _status_locked(self) -> dict:
@@ -465,6 +473,8 @@ class PolicyRunner:
             "stop_reason": self._stop_reason,
             "scene": self._scene,
             "last_entities": int(self._last_entities),
+            "scroll_s": round(float(self._scroll_s), 3),
+            "danger": self._nearby_danger,
         }
 
     # ── 线程主体 ──────────────────────────────────────────────────────
@@ -562,6 +572,7 @@ class PolicyRunner:
                 self._last_entities = len(entities)
                 self._update_tracks(entities)
                 self._update_player(frame)
+                self._update_memory(previous_frame, frame)
                 self._maybe_engage(entities)
 
             # 3) 持续键（射击 / 前进）：缺什么补什么，已经按住的不重复按。
@@ -813,6 +824,49 @@ class PolicyRunner:
         except Exception:  # noqa: BLE001 - 阶段性开发允许 tracking.py 缺席
             return None
         return EntityTracker(match_radius=self._track_radius)
+
+    def _load_locator(self):
+        try:
+            from .memory import LevelLocator
+        except Exception:  # noqa: BLE001
+            return None
+        return LevelLocator()
+
+    def _update_memory(self, previous_frame: np.ndarray | None, frame: np.ndarray) -> None:
+        """把镜头滚动累积成关卡坐标，并检索附近的 DangerCard。"""
+        if self._locator is None:
+            self._locator = self._load_locator()
+        if self._locator is not None and previous_frame is not None:
+            try:
+                dx = _estimate_scroll_dx(previous_frame, frame)
+                if dx is not None:
+                    self._locator.update(dx / float(_STATIC_WIDTH))
+                    self._scroll_s = float(self._locator.position()["scroll_s"])
+            except Exception:  # noqa: BLE001 - 定位失败只损失记忆检索
+                pass
+        self._nearby_danger = None
+        if not isinstance(self._dangers, (list, tuple)):
+            return
+        best = None
+        for card in self._dangers:
+            if not isinstance(card, dict):
+                continue
+            place = card.get("place") if isinstance(card.get("place"), dict) else {}
+            distance = abs(_as_float(place.get("scroll_s"), 0.0) - self._scroll_s)
+            if distance <= self._danger_window and (best is None or distance < best[0]):
+                best = (distance, card)
+        if best is None:
+            return
+        distance, card = best
+        trigger = card.get("trigger") if isinstance(card.get("trigger"), dict) else {}
+        response = card.get("response") if isinstance(card.get("response"), dict) else {}
+        self._nearby_danger = {
+            "id": str(card.get("id") or "")[:80],
+            "distance": round(distance, 3),
+            "trigger": str(trigger.get("template") or trigger.get("kind") or "")[:64],
+            "skill": str(response.get("skill") or "")[:32],
+            "status": str(card.get("status") or "candidate")[:16],
+        }
 
     def _update_tracks(self, entities: list[dict]) -> None:
         if self._tracker is None:

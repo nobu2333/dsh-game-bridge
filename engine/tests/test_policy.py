@@ -50,6 +50,8 @@ STATUS_KEYS = {
     "stop_reason",
     "scene",
     "last_entities",
+    "scroll_s",
+    "danger",
 }
 
 
@@ -383,3 +385,22 @@ def test_scene_source_is_reported():
     status = run_to_completion(runner)
 
     assert status["scene"] == "gameplay"
+
+def test_status_reports_nearby_danger_card():
+    profile = make_profile()
+    profile["danger_cards"] = [
+        {
+            "id": "cuphead/forest-follies/danger-test",
+            "game": "cuphead",
+            "level": "forest-follies",
+            "place": {"scroll_s": 0.0, "player_x": 0.4},
+            "trigger": {"kind": "enemy", "template": "mushroom"},
+            "response": {"skill": "jump_over"},
+            "status": "candidate",
+        }
+    ]
+    runner, _, _ = build_runner(budget_ticks=6, profile=profile)
+    status = run_to_completion(runner)
+    assert status["danger"] is not None
+    assert status["danger"]["trigger"] == "mushroom"
+    assert status["danger"]["skill"] == "jump_over"
