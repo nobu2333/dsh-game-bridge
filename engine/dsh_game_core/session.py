@@ -516,7 +516,7 @@ class GameSession:
             self._start_recorder()  # 继续录下一段
 
     def _maybe_record_hp(self, hp: int | None) -> None:
-        """HP 下降时立刻落盘，不依赖慢环识别到 death（死亡前往往还有受击）。"""
+        """HP 下降时立刻落盘，并生成/更新一张 candidate DangerCard。"""
         if hp is None:
             return
         previous, self._last_hp = self._last_hp, int(hp)
@@ -525,8 +525,51 @@ class GameSession:
         self._recorder.add_event(
             {"type": "damage", "hp_before": previous, "hp_after": int(hp)}
         )
-        self._save_episode("damage")
+        episode = self._save_episode("damage")
+        self._record_damage_card(previous, int(hp), episode)
         self._start_recorder()
+
+    def _record_damage_card(self, hp_before: int, hp_after: int, episode: str | None) -> None:
+        """把一次受击写成带关卡坐标的 candidate 卡；同区域已有卡则累加统计。"""
+        try:
+            from .memory import KnowledgeStore
+
+            policy_status = self._policy.status() if self._policy is not None else {}
+            scroll_s = float(policy_status.get("scroll_s") or 0.0)
+            nearby = policy_status.get("danger") if isinstance(policy_status.get("danger"), dict) else None
+            store = KnowledgeStore(os.path.join(self._data_root(), "knowledge"))
+            if nearby and nearby.get("id"):
+                book = store.load(self._record_game, self._record_level)
+                for card in book["cards"]:
+                    if card["id"] != nearby["id"]:
+                        continue
+                    card["stats"]["damage_events"] = int(card["stats"].get("damage_events", 0)) + 1
+                    card["stats"]["encounters"] = int(card["stats"].get("encounters", 0)) + 1
+                    card["confidence"] = round(min(1.0, float(card.get("confidence", 0.3)) + 0.1), 3)
+                    if episode:
+                        card["evidence"] = (card.get("evidence") or [])[-7:] + [episode]
+                    store.save(self._record_game, self._record_level, book["cards"])
+                    return
+            card = {
+                "game": self._record_game,
+                "level": self._record_level,
+                "place": {
+                    "scroll_s": scroll_s,
+                    "segment": int(scroll_s // 1.0),
+                    "player_x": 0.4,
+                    "player_y": 0.8,
+                },
+                "trigger": {"kind": "unknown", "template": "", "relation": "unknown"},
+                "event": {"type": "damage", "cause": "unknown", "hp_before": hp_before, "hp_after": hp_after},
+                "response": {"skill": "unknown"},
+                "evidence": [episode] if episode else [],
+                "stats": {"encounters": 1, "damage_events": 1, "avoided": 0},
+                "confidence": 0.35,
+                "status": "candidate",
+            }
+            store.upsert(card)
+        except Exception:  # noqa: BLE001 - 记忆写入失败不影响游戏
+            pass
 
     def _start_recorder(self) -> None:
         if self._recorder is not None:

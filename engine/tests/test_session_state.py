@@ -223,3 +223,40 @@ def test_hp_drop_saves_damage_episode():
     session._maybe_record_hp(2)
     assert saved == ["forest-follies-damage"]
     session.close()
+
+def test_hp_drop_creates_candidate_danger_card(tmp_path, monkeypatch):
+    monkeypatch.setenv("DSH_GAME_BRIDGE_DATA_DIR", str(tmp_path))
+    session = GameSession(
+        engine=FakeEngine(),
+        gate=SafetyGate(process_source=lambda: [], takeover_source=lambda: False, process_ttl_s=0),
+    )
+    saved = []
+
+    class Recorder:
+        def add_event(self, event):
+            pass
+
+        def save(self, tag):
+            saved.append(tag)
+            return str(tmp_path / "episode")
+
+    class PolicyStatus:
+        def status(self):
+            return {"scroll_s": 2.75, "danger": None}
+
+    session._recorder = Recorder()
+    session._policy = PolicyStatus()
+    session._record_game = "cuphead"
+    session._record_level = "forest-follies"
+    session._start_recorder = lambda: None
+    session._maybe_record_hp(3)
+    session._maybe_record_hp(2)
+    assert saved == ["forest-follies-damage"]
+    from dsh_game_core.memory import KnowledgeStore
+
+    cards = KnowledgeStore(tmp_path / "knowledge").load("cuphead", "forest-follies")["cards"]
+    assert len(cards) == 1
+    assert cards[0]["place"]["scroll_s"] == 2.75
+    assert cards[0]["stats"]["damage_events"] == 1
+    assert cards[0]["status"] == "candidate"
+    session.close()
