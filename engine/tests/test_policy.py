@@ -55,6 +55,7 @@ STATUS_KEYS = {
     "player",
     "tracks",
     "hit",
+    "timing",
 }
 
 

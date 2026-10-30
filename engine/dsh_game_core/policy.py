@@ -25,6 +25,7 @@ import ctypes
 import math
 import threading
 import time
+from collections import deque
 from collections.abc import Mapping
 from typing import Any, Callable
 
@@ -225,6 +226,10 @@ class PolicyRunner:
         self._on_danger_outcome = on_danger_outcome if callable(on_danger_outcome) else None
         self._danger_armed: dict | None = None
         self._danger_armed_at = 0.0
+        self._timings = {
+            name: deque(maxlen=120)
+            for name in ("grab", "entities", "player", "memory", "hit", "loop")
+        }
         self._entities_missing = False
         self._last_error: str | None = None
 
@@ -323,6 +328,13 @@ class PolicyRunner:
         self._engage_hold_ms = max(0.0, _as_float(combat.get("engage_hold_ms"), 220.0) or 0.0)
         # 基本操作先验：交战停步不能无限持续，否则会在原地「磨蹭」不推进。
         self._engage_max_ms = max(0.0, _as_float(combat.get("engage_max_ms"), 0.0) or 0.0)
+        # 受击后短暂强制推进/跳跃，避免掉血后原地发呆。
+        self._post_hit_ms = max(0.0, _as_float(combat.get("post_hit_ms"), 450.0) or 0.0)
+        self._engage_stop_ms = 0.0
+        self._last_engage_at: float | None = None
+        self._engage_suppressed_until = 0.0
+        self._hurt_until = 0.0
+        self._hurt_jump_pending = False
         # 实体跟踪 / 交战细节（通用，可按游戏关闭）。
         self._ignore_own_bullets = bool(combat.get("ignore_own_bullets", True))
         self._face_back = bool(combat.get("face_back", True))
@@ -376,6 +388,11 @@ class PolicyRunner:
         self._last_dash_at: float | None = None
         self._engage_until = 0.0
         self._engage_started: float | None = None
+        self._engage_stop_ms = 0.0
+        self._last_engage_at = None
+        self._engage_suppressed_until = 0.0
+        self._hurt_until = 0.0
+        self._hurt_jump_pending = False
         self._tracks = []
         # 非阻塞点按：press() 会 sleep 按住时长，60 Hz 环里不能调用它；
         # 这里改用 hold + 到期 release，避免跳跃/闪避把整拍拖慢。
@@ -471,6 +488,11 @@ class PolicyRunner:
         self._last_dash_at = None
         self._engage_until = 0.0
         self._engage_started: float | None = None
+        self._engage_stop_ms = 0.0
+        self._last_engage_at = None
+        self._engage_suppressed_until = 0.0
+        self._hurt_until = 0.0
+        self._hurt_jump_pending = False
         self._pending_releases = []
         self._held = set()
         self._tracks = []
@@ -516,6 +538,10 @@ class PolicyRunner:
                 }
                 for track in getattr(self, "_tracks", [])[:8]
             ],
+            "timing": {
+                name: round(sum(values) / len(values) * 1000.0, 2) if values else 0.0
+                for name, values in self._timings.items()
+            },
         }
 
     # ── 线程主体 ──────────────────────────────────────────────────────
@@ -588,7 +614,9 @@ class PolicyRunner:
                         continue
 
             # 2) 一帧原始 BGR（不 OCR、不编码）。
+            grab_started = self._clock()
             frame = self._grab()
+            self._mark_timing("grab", grab_started)
             self._latest_frame = frame
             entities: list[dict] = []
             if frame is None:
@@ -624,12 +652,20 @@ class PolicyRunner:
                     if delay > 0:
                         self._sleep(delay)
                     continue
+                entities_started = self._clock()
                 entities = self._entities(frame, previous_frame)
+                self._mark_timing("entities", entities_started)
                 self._last_entities = len(entities)
+                hit_started = self._clock()
                 self._update_hit_signal(frame)
+                self._mark_timing("hit", hit_started)
                 self._update_tracks(entities)
+                player_started = self._clock()
                 self._update_player(frame)
+                self._mark_timing("player", player_started)
+                memory_started = self._clock()
                 self._update_memory(previous_frame, frame)
+                self._mark_timing("memory", memory_started)
                 self._check_danger_outcome()
                 self._maybe_engage(entities)
 
@@ -665,6 +701,8 @@ class PolicyRunner:
     # ── 单拍动作 ──────────────────────────────────────────────────────
     def _ensure_holds(self) -> None:
         engage = self._clock() < self._engage_until
+        if self._clock() < self._engage_suppressed_until:
+            engage = False
         for key in self._hold_keys:
             if key in self._held:
                 continue
@@ -673,6 +711,9 @@ class PolicyRunner:
             self._controller.hold(key)
             self._held.add(key)
             self._actions += 1
+        if self._advance_key is not None and self._advance_key in self._held:
+            self._engage_stop_ms = 0.0
+            self._last_engage_at = None
 
     def _maybe_engage(self, entities: list[dict]) -> None:
         """威胁进入交战半径：松开前进、保持射击；背后威胁则先转身。
@@ -681,6 +722,8 @@ class PolicyRunner:
         己方子弹速度快、朝远离玩家方向飞，不应触发交战/闪避。
         """
         if self._engage_radius <= 0:
+            return
+        if self._clock() < self._engage_suppressed_until:
             return
         anchor_x, anchor_y = self._anchor
         target = None
@@ -708,14 +751,17 @@ class PolicyRunner:
                 if distance <= self._engage_radius and (target is None or distance < target[0]):
                     target = (distance, x, entity)
         if target is None:
-            self._engage_started = None
+            self._engage_stop_ms = 0.0
+            self._last_engage_at = None
             return
         now = self._clock()
-        if self._engage_started is None:
-            self._engage_started = now
-        if self._engage_max_ms > 0 and (now - self._engage_started) * 1000.0 >= self._engage_max_ms:
-            # 已经停步太久：即使还有威胁也恢复推进，避免原地磨蹭。
-            self._engage_started = now
+        if self._last_engage_at is not None:
+            self._engage_stop_ms += max(0.0, (now - self._last_engage_at) * 1000.0)
+        self._last_engage_at = now
+        if self._engage_max_ms > 0 and self._engage_stop_ms >= self._engage_max_ms:
+            # 累计停步太久：即使还有威胁也恢复推进一段时间，避免原地发呆。
+            self._engage_suppressed_until = now + 0.8
+            self._engage_stop_ms = 0.0
             return
         target_distance, target_x, _target = target
         self._engage_until = self._clock() + self._engage_hold_ms / 1000.0
@@ -987,6 +1033,12 @@ class PolicyRunner:
             }
             self._last_hit_at = now
         self._hp_signature = signature
+
+    def _mark_timing(self, name: str, started: float) -> None:
+        try:
+            self._timings[name].append(max(0.0, self._clock() - started))
+        except Exception:  # noqa: BLE001 - 计时失败不影响主流程
+            pass
 
     def _current_hp(self) -> int | None:
         if self._hp_source is None:
