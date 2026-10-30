@@ -129,9 +129,9 @@
     "face_back": false,
     "engage_max_ms": 2500,
     "entity_memory": true,
-    "turn_and_shoot": true,
+    "turn_and_shoot": false,
     "turn_shoot_ms": 600,
-    "static_hazards": true,
+    "static_hazards": false,
     "hazard_every_n_ticks": 6,
     "hazard_distance": 0.32
   },
