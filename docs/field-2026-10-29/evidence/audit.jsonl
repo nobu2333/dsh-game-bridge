@@ -1,0 +1,5 @@
+{"ts_ms": 1793279676778, "event": "attach", "window": "Cuphead", "hwnd": 17957408, "backend": "vgamepad", "safety": {"allowed": true, "reasons": [], "anticheat": [], "idle_seconds": 0.7, "takeover": false}}
+{"ts_ms": 1793279695855, "event": "act", "button": "A", "duration_ms": 120, "backend": "vgamepad", "dry_run": false}
+{"ts_ms": 1793279721731, "event": "attach", "window": "Cuphead", "hwnd": 17957408, "backend": "vgamepad", "safety": {"allowed": true, "reasons": [], "anticheat": [], "idle_seconds": 0.0, "takeover": false}}
+{"ts_ms": 1793279735750, "event": "act", "button": "A", "duration_ms": 120, "backend": "vgamepad", "dry_run": false}
+{"ts_ms": 1793279807172, "event": "stop", "actions_total": 1}
