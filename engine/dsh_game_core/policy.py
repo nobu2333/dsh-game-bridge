@@ -127,6 +127,16 @@ def _gate_verdict(report: Any) -> tuple[bool, list[str]]:
     return bool(allowed), [str(reason) for reason in reasons]
 
 
+def _approaching(track: Any, anchor: tuple[float, float]) -> float:
+    """轨迹速度朝玩家方向的分量（归一化/秒）；负值表示远离。"""
+    dx = anchor[0] - track.x
+    dy = anchor[1] - track.y
+    length = math.hypot(dx, dy)
+    if length <= 1e-6:
+        return 0.0
+    return (track.vx * dx + track.vy * dy) / length
+
+
 def _frame_small(frame: np.ndarray) -> np.ndarray:
     """先切片下采样再转 float；对 962x567 帧只需处理 ~160x94，避免每拍全帧转换。"""
     if frame is None or frame.size == 0:
@@ -304,6 +314,13 @@ class PolicyRunner:
         # 交战距离：威胁进入该半径时先停前进、继续射击，避免「一路走进敌人身上」。
         self._engage_radius = max(0.0, _as_float(combat.get("engage_radius"), 0.0) or 0.0)
         self._engage_hold_ms = max(0.0, _as_float(combat.get("engage_hold_ms"), 220.0) or 0.0)
+        # 实体跟踪 / 交战细节（通用，可按游戏关闭）。
+        self._ignore_own_bullets = bool(combat.get("ignore_own_bullets", True))
+        self._face_back = bool(combat.get("face_back", True))
+        self._turn_press_ms = max(20.0, _as_float(combat.get("turn_press_ms"), 90.0) or 90.0)
+        self._track_radius = max(0.01, _as_float(combat.get("track_match_radius"), 0.08) or 0.08)
+        self._tracker = None
+        self._tracks: list[Any] = []
 
         # 玩家追踪：profile.player.track=true 时定期用 state.find_player 更新锚点，
         # 让闪避/交战半径跟着角色走，而不是固定 self_pos。
@@ -319,6 +336,7 @@ class PolicyRunner:
         self._last_jump_at: float | None = None
         self._last_dash_at: float | None = None
         self._engage_until = 0.0
+        self._tracks = []
         # 非阻塞点按：press() 会 sleep 按住时长，60 Hz 环里不能调用它；
         # 这里改用 hold + 到期 release，避免跳跃/闪避把整拍拖慢。
         self._pending_releases: list[tuple[float, str]] = []
@@ -414,6 +432,7 @@ class PolicyRunner:
         self._engage_until = 0.0
         self._pending_releases = []
         self._held = set()
+        self._tracks = []
         self._last_error = None
 
     def _status_locked(self) -> dict:
@@ -457,6 +476,8 @@ class PolicyRunner:
             self._entities_source = self._load_entities()
         if self._track_player and self._player_source is None:
             self._player_source = self._load_player()
+        if self._tracker is None:
+            self._tracker = self._load_tracker()
         previous_frame: np.ndarray | None = None
         previous_tick_at: float | None = None
         static_ms = 0.0
@@ -513,6 +534,7 @@ class PolicyRunner:
             else:
                 entities = self._entities(frame, previous_frame)
                 self._last_entities = len(entities)
+                self._update_tracks(entities)
                 self._update_player(frame)
                 self._maybe_engage(entities)
 
@@ -558,23 +580,48 @@ class PolicyRunner:
             self._actions += 1
 
     def _maybe_engage(self, entities: list[dict]) -> None:
-        """威胁进入交战半径：松开前进、保持射击，先清场再走。"""
-        if self._engage_radius <= 0 or not entities:
+        """威胁进入交战半径：松开前进、保持射击；背后威胁则先转身。
+
+        有轨迹时用轨迹（速度/方位）过滤「持续射击产生的己方子弹」：
+        己方子弹速度快、朝远离玩家方向飞，不应触发交战/闪避。
+        """
+        if self._engage_radius <= 0:
             return
         anchor_x, anchor_y = self._anchor
-        for entity in entities:
-            if entity.get("kind") != "threat":
-                continue
-            x = _as_float(entity.get("x"), None)
-            y = _as_float(entity.get("y"), None)
-            if x is None or y is None:
-                continue
-            if math.hypot(x - anchor_x, y - anchor_y) <= self._engage_radius:
-                self._engage_until = self._clock() + self._engage_hold_ms / 1000.0
-                advance = self._advance_key
-                if advance is not None and advance in self._held:
-                    self._release_key(advance)
-                return
+        target = None
+        if self._tracks:
+            for track in self._tracks:
+                if getattr(track, "kind", None) != "threat":
+                    continue
+                distance = math.hypot(track.x - anchor_x, track.y - anchor_y)
+                if distance > self._engage_radius:
+                    continue
+                approach = _approaching(track, (anchor_x, anchor_y))
+                if self._ignore_own_bullets and track.speed > 0.35 and approach < -0.05:
+                    continue
+                if target is None or distance < target[0]:
+                    target = (distance, track.x, track)
+        else:
+            for entity in entities:
+                if entity.get("kind") != "threat":
+                    continue
+                x = _as_float(entity.get("x"), None)
+                y = _as_float(entity.get("y"), None)
+                if x is None or y is None:
+                    continue
+                distance = math.hypot(x - anchor_x, y - anchor_y)
+                if distance <= self._engage_radius and (target is None or distance < target[0]):
+                    target = (distance, x, entity)
+        if target is None:
+            return
+        target_distance, target_x, _target = target
+        self._engage_until = self._clock() + self._engage_hold_ms / 1000.0
+        advance = self._advance_key
+        if advance is not None and advance in self._held:
+            self._release_key(advance)
+        if self._face_back and target_x is not None and target_x < anchor_x - 0.04:
+            turn = self._resolve_key("left") or "LEFT"
+            self._tap(turn, self._turn_press_ms)
 
     def _release_holds(self) -> None:
         for key in [held for held in self._hold_keys if held in self._held]:
@@ -733,6 +780,22 @@ class PolicyRunner:
         except Exception:  # noqa: BLE001
             return None
         return find_player
+
+    def _load_tracker(self):
+        try:
+            from .tracking import EntityTracker
+        except Exception:  # noqa: BLE001 - 阶段性开发允许 tracking.py 缺席
+            return None
+        return EntityTracker(match_radius=self._track_radius)
+
+    def _update_tracks(self, entities: list[dict]) -> None:
+        if self._tracker is None:
+            self._tracks = []
+            return
+        try:
+            self._tracks = self._tracker.update(entities, now=self._clock())
+        except Exception:  # noqa: BLE001 - 跟踪失败只损失本拍方位信息
+            self._tracks = []
 
     def _update_player(self, frame: np.ndarray) -> None:
         """定期更新角色屏幕坐标；低置信度/跳变过大时保留上一个可信锚点。"""
