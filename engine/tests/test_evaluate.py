@@ -78,3 +78,22 @@ def test_load_cards_uses_knowledge_store(tmp_path):
     parsed = load_episode(episode)
     assert parsed is not None
     assert summarize_episode(parsed)["damage_events"] == 1
+
+def test_coordinate_drift_from_episode_frames(tmp_path):
+    from dsh_game_core.evaluate import summarize_coordinate_drift
+
+    for name, scroll in (("a", -1.00), ("b", -1.05), ("c", -1.40)):
+        directory = tmp_path / name
+        directory.mkdir()
+        (directory / "meta.json").write_text(
+            json.dumps({"game": "cuphead", "level": "forest-follies", "frame_count": 1, "event_count": 0}),
+            encoding="utf-8",
+        )
+        (directory / "frames.jsonl").write_text(
+            json.dumps({"index": 0, "t": 0, "state": {"danger": "card-a", "scroll_s": scroll}}) + "\n",
+            encoding="utf-8",
+        )
+    summary = summarize_coordinate_drift(tmp_path, game="cuphead", level="forest-follies")
+    assert summary["cards_with_multiple_visits"] == 1
+    assert summary["max_spread"] == 0.4
+    assert summary["ok"] is False
