@@ -10,6 +10,7 @@ M3 的闭环是一个**本地线程**，不是让模型每拍调一次工具：�
 from __future__ import annotations
 
 import os
+import queue
 import re
 import threading
 import time
@@ -75,6 +76,9 @@ class GameSession:
         self._record_level = "level"
         self._last_recorded_scene = None
         self._last_hp: int | None = None
+        self._record_queue: queue.Queue | None = None
+        self._record_worker: threading.Thread | None = None
+        self._record_stop: threading.Event | None = None
         # HP 下降要连续两次 OCR 读数一致才确认，避免单次误读（3→2→3）生成假卡。
         self._pending_hp: int | None = None
         # 本条命的死亡是否已建卡；回到 gameplay 才清零，防止死亡画面闪烁重复建卡。
@@ -495,31 +499,53 @@ class GameSession:
         )
 
     def _record_frame(self, frame) -> None:
+        """入队一帧（8fps 节流）；缩略图缩放/JPEG 编码在录制线程里做。"""
         recorder = self._recorder
-        if recorder is None or frame is None:
+        if recorder is None or self._record_queue is None or frame is None:
             return
         now = time.monotonic()
         if now < self._record_next_at:
             return
         self._record_next_at = now + 0.12  # ~8 fps 缩略图足够复盘
-        state = None
-        policy = self._policy
-        if policy is not None:
+        try:
+            self._record_queue.put_nowait(frame)
+        except queue.Full:
+            pass  # 录制丢帧不能阻塞控制环
+
+    def _record_loop(self, recorder, frames: queue.Queue, stop: threading.Event) -> None:
+        while not stop.is_set():
             try:
-                snapshot = policy.status()
-                danger = snapshot.get("danger") if isinstance(snapshot.get("danger"), dict) else None
-                state = {
-                    "scroll_s": snapshot.get("scroll_s"),
-                    "scene": snapshot.get("scene"),
-                    "player": snapshot.get("player"),
-                    "danger": (danger or {}).get("id"),
-                    "ticks": snapshot.get("ticks"),
-                }
-            except Exception:  # noqa: BLE001 - 录制状态只是附加信息
-                state = None
-        recorder.add_frame(frame, state)
+                frame = frames.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            state = None
+            policy = self._policy
+            if policy is not None:
+                try:
+                    snapshot = policy.status()
+                    danger = snapshot.get("danger") if isinstance(snapshot.get("danger"), dict) else None
+                    state = {
+                        "scroll_s": snapshot.get("scroll_s"),
+                        "scene": snapshot.get("scene"),
+                        "player": snapshot.get("player"),
+                        "danger": (danger or {}).get("id"),
+                        "ticks": snapshot.get("ticks"),
+                    }
+                except Exception:  # noqa: BLE001 - 录制状态只是附加信息
+                    state = None
+            recorder.add_frame(frame, state)
+
+    def _stop_record_worker(self) -> None:
+        stop, self._record_stop = self._record_stop, None
+        if stop is not None:
+            stop.set()
+        worker, self._record_worker = self._record_worker, None
+        if worker is not None and worker.is_alive():
+            worker.join(timeout=1.0)
+        self._record_queue = None
 
     def _save_episode(self, tag: str) -> str | None:
+        self._stop_record_worker()
         recorder, self._recorder = self._recorder, None
         if recorder is None:
             return None
@@ -790,6 +816,15 @@ class GameSession:
         # 不在这里清 _last_recorded_scene：保存后立即重启录制时清掉它，会让同一个
         # death 画面在每个 OCR 周期都重新落盘一次。开局时由 policy_start 清零。
         self._record_next_at = 0.0
+        self._record_queue = queue.Queue(maxsize=2)
+        self._record_stop = threading.Event()
+        self._record_worker = threading.Thread(
+            target=self._record_loop,
+            args=(self._recorder, self._record_queue, self._record_stop),
+            name="dsh-game-record",
+            daemon=True,
+        )
+        self._record_worker.start()
 
     def _stop_policy(self) -> None:
         """停掉本地反射策略并确保所有按键已释放。"""
