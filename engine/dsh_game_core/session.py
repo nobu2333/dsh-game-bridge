@@ -501,7 +501,22 @@ class GameSession:
         if now < self._record_next_at:
             return
         self._record_next_at = now + 0.12  # ~8 fps 缩略图足够复盘
-        recorder.add_frame(frame, None)
+        state = None
+        policy = self._policy
+        if policy is not None:
+            try:
+                snapshot = policy.status()
+                danger = snapshot.get("danger") if isinstance(snapshot.get("danger"), dict) else None
+                state = {
+                    "scroll_s": snapshot.get("scroll_s"),
+                    "scene": snapshot.get("scene"),
+                    "player": snapshot.get("player"),
+                    "danger": (danger or {}).get("id"),
+                    "ticks": snapshot.get("ticks"),
+                }
+            except Exception:  # noqa: BLE001 - 录制状态只是附加信息
+                state = None
+        recorder.add_frame(frame, state)
 
     def _save_episode(self, tag: str) -> str | None:
         recorder, self._recorder = self._recorder, None
