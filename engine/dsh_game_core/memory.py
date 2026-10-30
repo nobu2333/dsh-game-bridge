@@ -221,7 +221,17 @@ class KnowledgeStore:
         # 同一位置 + 同一触发条件视为同一张卡，只累加统计/提高置信度。
         replaced = False
         for index, existing in enumerate(cards):
-            same_place = abs(existing["place"]["scroll_s"] - normalized["place"]["scroll_s"]) < 0.35
+            existing_scrolls = (existing.get("stats") or {}).get("damage_scrolls") or [
+                existing["place"]["scroll_s"]
+            ]
+            new_scrolls = (normalized.get("stats") or {}).get("damage_scrolls") or [
+                normalized["place"]["scroll_s"]
+            ]
+            # 只在「新伤害离已有伤害坐标足够近」时合并，避免 A-B-C 链式并成一张卡。
+            nearest_gap = min(
+                abs(float(new) - float(old)) for new in new_scrolls for old in existing_scrolls
+            )
+            same_place = nearest_gap < 0.2
             same_trigger = (
                 existing["trigger"]["kind"] == normalized["trigger"]["kind"]
                 and existing["trigger"]["template"] == normalized["trigger"]["template"]
@@ -252,6 +262,55 @@ class KnowledgeStore:
         cards.sort(key=lambda item: item["place"]["scroll_s"])
         self.save(game, level, cards)
         return normalized
+
+    def split_inconsistent_cards(self, game: str, level: str, *, gap: float = 0.15) -> int:
+        """Split cards whose recorded hit coordinates form separate clusters.
+
+        Merging is based on nearest hit, but legacy/loose cards may still contain
+        two hazards; this repair keeps each cluster as its own candidate.
+        """
+        book = self.load(game, level)
+        cards = book["cards"]
+        rebuilt: list[dict] = []
+        split_count = 0
+        for card in cards:
+            scrolls = sorted(
+                set(float(value) for value in ((card.get("stats") or {}).get("damage_scrolls") or []))
+            )
+            clusters: list[list[float]] = []
+            for scroll in scrolls:
+                if clusters and scroll - clusters[-1][-1] <= gap:
+                    clusters[-1].append(scroll)
+                else:
+                    clusters.append([scroll])
+            if len(clusters) <= 1:
+                # 单链聚类会被连续小间隔“串起来”；总跨度超预算时按最大间隙强制一分为二。
+                if scrolls and scrolls[-1] - scrolls[0] > 0.2 and len(scrolls) >= 2:
+                    split_at = max(range(1, len(scrolls)), key=lambda index: scrolls[index] - scrolls[index - 1])
+                    clusters = [scrolls[:split_at], scrolls[split_at:]]
+                else:
+                    rebuilt.append(card)
+                    continue
+            split_count += 1
+            for cluster_index, cluster in enumerate(clusters):
+                clone = json.loads(json.dumps(card))
+                median = cluster[len(cluster) // 2]
+                clone["stats"]["damage_scrolls"] = [round(value, 3) for value in cluster]
+                clone["stats"]["damage_events"] = max(1, len(cluster))
+                clone["place"]["scroll_s"] = round(median, 3)
+                clone["place"]["segment"] = int(median // 1.0)
+                if cluster_index > 0:
+                    clone["id"] = f"{game}/{level}/danger-{uuid.uuid4().hex[:8]}"
+                    clone["status"] = "candidate"
+                    clone["response"] = {"skill": "unknown", "params": {}, "timing": ""}
+                    clone["response_efficacy"] = 0.5
+                    clone["stats"]["response_tries"] = 0
+                    clone["stats"]["response_failures"] = 0
+                    clone["stats"]["avoided"] = 0
+                rebuilt.append(clone)
+        if split_count:
+            self.save(game, level, rebuilt)
+        return split_count
 
     def nearby(self, game: str, level: str, scroll_s: float, *, window: float = 1.2, limit: int = 5) -> list[dict]:
         cards = self.load(game, level)["cards"]
@@ -378,4 +437,7 @@ class GuideStore:
             return normalized
         except Exception:  # noqa: BLE001 - optional knowledge must never break play
             return None
+
+
+
 

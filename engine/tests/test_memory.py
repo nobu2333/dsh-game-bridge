@@ -107,3 +107,40 @@ def test_guide_normalization_and_store(tmp_path):
     assert len(cards) == 1
     assert cards[0]["facts"][0]["text"] == "mushrooms pop up"
     assert cards[0]["status"] == "unverified"
+
+def test_upsert_does_not_chain_merge_distant_hits(tmp_path):
+    store = KnowledgeStore(tmp_path)
+    first = make_card(place={"scroll_s": -1.34}, trigger={"kind": "threat", "template": ""})
+    second = make_card(place={"scroll_s": -1.79}, trigger={"kind": "threat", "template": ""})
+    store.upsert(first)
+    store.upsert(second)
+    cards = store.load("cuphead", "forest-follies")["cards"]
+    assert len(cards) == 2
+
+
+def test_split_inconsistent_cards(tmp_path):
+    store = KnowledgeStore(tmp_path)
+    card = make_card(
+        place={"scroll_s": -1.71},
+        trigger={"kind": "threat", "template": ""},
+    )
+    card["stats"] = {"damage_scrolls": [-1.79, -1.71, -1.34], "damage_events": 3}
+    store.upsert(card)
+    assert store.split_inconsistent_cards("cuphead", "forest-follies") == 1
+    cards = store.load("cuphead", "forest-follies")["cards"]
+    assert len(cards) == 2
+    for item in cards:
+        scrolls = item["stats"]["damage_scrolls"]
+        assert max(scrolls) - min(scrolls) <= 0.35
+
+def test_split_chained_scrolls_over_budget(tmp_path):
+    store = KnowledgeStore(tmp_path)
+    card = make_card(place={"scroll_s": -1.15}, trigger={"kind": "threat", "template": ""})
+    card["stats"] = {"damage_scrolls": [-1.0, -1.1, -1.2, -1.3], "damage_events": 4}
+    store.upsert(card)
+    assert store.split_inconsistent_cards("cuphead", "forest-follies") == 1
+    cards = store.load("cuphead", "forest-follies")["cards"]
+    assert len(cards) == 2
+    for item in cards:
+        scrolls = item["stats"]["damage_scrolls"]
+        assert max(scrolls) - min(scrolls) <= 0.2
