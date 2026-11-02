@@ -406,4 +406,11 @@
 - 修复后 base 180s：17 episodes、10 damage、6 deaths、best **6.797**；仍未通关，7.0 未过。
 - 其它尝试：handoff 没跑到 7.0（best 4.751）；knowledge-on best 6.293；周期跳/route-macro 变体均更差。run-to-run 方差仍大。
 - 下一步：用修复后的 base 多跑几局，观察 player_age/stale 是否下降；再在 7.0 做 handoff/宏。
+
+## 2026-11-03 00:20 Round 3：玩家修复后的 300s baseline
+
+- base + player continuity，300s：29 episodes、15 damage、**13 deaths**、best **6.812**；13 次死亡尝试，仍未通关。
+- 6.4 已过，7.0 仍没过；player_age 仍会出现 1–2s 的 stale，confidence 固定 0.55，颜色追踪的连续性还不够稳。
+- handoff 尝试：目标 -6.6 的 run 最好只到 5.587，没触发；目标 -6.9 的 run 最好 4.751，也没触发。固定序列仍无法评估。
+- 结论：玩家误判已修，但**到达 6.5 的可靠性不足**是当前前提问题；下一轮先做“稳定到 6.5”（而不是继续在 7.0 调宏），再 handoff。
 - Cuphead 仍在下载；暂无实机新数据。
