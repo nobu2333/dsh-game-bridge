@@ -375,4 +375,11 @@
 - 新增 `game_intent`（引擎 stdio `submit_intent` + 插件工具）：低频战术 Intent，默认 advisory；本地 60 Hz 策略继续跑，执行当前只覆盖 jump/dodge/retreat；需 `game_policy start intent_enabled=true` 或 `profile.instant_play.intent_enabled=true`。
 - `game_policy start` 新增 `intent_enabled` 开关，可显式开启 intent 执行（默认关）。
 - 测试：插件 45、引擎 243、集成 11/11。
+
+## 2026-11-02 23:10 首轮实机启动（Cuphead 下载完成）
+
+- 游戏：`E:\Cuphead-SteamRIP.com\Cuphead\Cuphead.exe`；必须用 `-screen-fullscreen 0 -screen-width 960 -screen-height 540 -popupwindow` 启动，否则全屏窗口抓不到（DXcam 只看到桌面）。
+- 修复 DPI bug：Windows 125% 缩放下，`GetMonitorInfoW` 给 1536x864、DXcam 给 1920x1080，attach 报“没有显示器与窗口匹配”。`windows.py` 现在在导入时设 per-monitor v2 DPI awareness，attach/snapshot 正常拿到 960x540。
+- 实机：policy 45s、约 38.5Hz；但角色还在老茶壶家/大地图，`scroll_s≈-0.03`，没有进入 Forest Follies；地图入口仍未找到。
+- 现状：游戏窗口已 topmost、engine 可 attach/capture；需要人工把角色走到 Forest Follies 入口（或下一步做地图航点），才能开始关卡内 baseline。
 - Cuphead 仍在下载；暂无实机新数据。

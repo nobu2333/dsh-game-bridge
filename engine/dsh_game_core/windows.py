@@ -20,6 +20,32 @@ MONITOR_DEFAULTTONEAREST = 2
 MONITORINFOF_PRIMARY = 1
 
 
+def _enable_dpi_awareness() -> None:
+    """把 Win32 坐标统一到物理像素，和 DXcam 的显示器尺寸对齐。
+
+    实测：Windows 125% 缩放下，未声明 DPI awareness 的进程里
+    GetMonitorInfoW 返回 1536x864（逻辑像素），而 DXcam 报 1920x1080
+    （物理像素）；attach 时窗口矩形是 1920x1080 坐标系，monitor 却是
+    1536x864，直接导致“没有显示器与窗口匹配”的抓屏失败。
+    """
+    if not IS_WINDOWS:
+        return
+    try:
+        # PER_MONITOR_AWARE_V2；Windows 10 1703+。
+        if ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)):
+            return
+    except Exception:  # noqa: BLE001 - 旧系统/已设置过时走下面的回退
+        pass
+    try:
+        # PROCESS_PER_MONITOR_DPI_AWARE
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:  # noqa: BLE001 - 非 Windows/受限环境保持默认
+        pass
+
+
+_enable_dpi_awareness()
+
+
 class _MONITORINFO(ctypes.Structure):
     _fields_ = [
         ("cbSize", wintypes.DWORD),
