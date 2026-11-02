@@ -189,7 +189,7 @@ npm run test:session
 **harness 实际发出的请求体**里断言：工具确实出现在 `tools` 数组里、工具结果确实
 回来了、图片确实以 `data:image/png` 送到了模型。产物落在 `test/integration/.out/`。
 
-**全量回归**（一次跑完 M0/M1/M2/M3/events/windows/controls/审批/崩溃自愈/bootstrap 十条）：
+**全量回归**（一次跑完 M0/M1/M2/M3/events/windows/controls/审批/崩溃自愈/bootstrap 十一条）：
 
 ```powershell
 $env:DSH_HOME='<repo>/.dsh-test'
@@ -197,7 +197,7 @@ $env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'   # 不设则跳过需要真实
 npm run test:all
 ```
 
-最近一次实测：10/10 PASS，约 110 秒（含真实抓屏、OCR、闭环、窗口列表、控制表、审批 fail-closed、引擎崩溃自愈、自举安装）。
+最近一次实测：11/11 PASS，约 110 秒（含真实抓屏、OCR、闭环、窗口列表、控制表、审批 fail-closed、引擎崩溃自愈、自举安装）。
 
 验证自举安装（不需要系统 Python：uv 建 venv，装仓库内的假引擎包，秒级）：
 
@@ -262,7 +262,7 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR / 前台
 | M1 ✅ | 真实抓屏/OCR + 引擎自举 | 隔离 harness 里拿到真实屏幕帧 + OCR 文本；uv 自举可跑 |
 | M2 ✅ | 安全闸 + 输出通道 + 单步 act | 两道安全闸单测钉死；attach → act 端到端通过；真实后端需审批 |
 | M3 ✅（dry-run 已验证） | 20 Hz 本地闭环 | 闭环 ~20 Hz、逐拍安全复检、stop 立即松手 |
-| M4 ✅（单测通过） | 通用玩法基线：WorldState + 60 Hz 策略 + 档案层 | 引擎 state/policy 单测、插件工具与档案库测试通过（`npm test` 44/44、`pytest` 154/154）；Cuphead 样例 profile 可跑 dry-run；集成/真实对局待复验；memory/API provider 未实现 |
+| M4 ✅（单测通过） | 通用玩法基线：WorldState + 60 Hz 策略 + 档案层 | 引擎 state/policy 单测、插件工具与档案库测试通过（`npm test` 45/45、`pytest` 243/243）；集成 11/11；Cuphead 样例 profile 可跑 dry-run；真实对局/6.4 屏通关待复验；memory/API provider 未实现 |
 | 发布 ✅ | npm + PyPI + 插件市场 | 0.0.1 已发布，发布产物安装/M1/M3 实测通过；市场收录待提交 |
 
 ## 已知限制（v1）

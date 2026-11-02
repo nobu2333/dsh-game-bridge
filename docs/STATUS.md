@@ -20,7 +20,7 @@
 | M3 20 Hz 闭环 | ✅（dry-run 已验证） | 实测 21.3 Hz；逐拍安全复检；stop 一拍内松手；真实后端已接线 |
 | 发布 | ✅ 2026-10-29 | npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`；发布版安装+自举+M1/M3 实测通过 |
 | 0.0.2 本地打包 | ✅ 2026-10-30 | wheel/sdist/tarball 构建校验；桌面 profile 安装 0.0.2（引擎缓存 0.0.2）；`game_selftest` 报 0.0.2；**未发布** |
-| 通用玩法基线 | ✅ 单测通过（真实对局待复验） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 44/44、`pytest engine/tests` 154/154；memory/API provider **未实现**；集成/真实对局未复验 |
+| 通用玩法基线 | ✅ 单测通过（真实对局待复验） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_intent`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 45/45、`pytest engine/tests` 243/243；集成 11/11；memory/API provider **未实现**；真实对局/6.4 屏通关未复验 |
 | 市场收录 | ⏳ 待提交 | 仓库已 public，按 MARKETPLACE 提交 |
 
 工具面（14 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
@@ -42,8 +42,8 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 另外几条已实测：
 - **打包产物真实安装**：`npm pack` → `dsh plugin add <tarball>` → M1/M3 集成 PASS；
 - **真实引擎自举**：本地 wheel + 阿里云镜像，19.9 秒装完，缓存内 Python 直接起引擎。
-- **通用基线单测**（2026-10-30）：`npm test` 44/44、`pytest engine/tests` 154/154；
-  全量集成（`test:all`）与真实对局由发布前/Leader 验收时跑。
+- **当前单测**（2026-11-02）：`npm test` 45/45、`pytest engine/tests` 243/243；
+  全量集成 11/11 已跑；真实对局仍待跑。
 
 ## 安全边界（已实现，不是口号）
 
