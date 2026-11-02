@@ -306,3 +306,24 @@
 - 验证：模型下发 advance(TTL 4s)，2 秒后 active_intent 仍 source=model/arbiter=model；scroll -0.428。
 - 说明：模型现在可以按 0.5–1Hz 在关内做高层决策，不再只是写死 Python；执行仍由 L1 完成。
 - 未通关；README 未写；HEAD 372df3c。
+
+## 2026-11-02 19:40 L1/L2 准确率与模型延迟实测
+
+### 10 点同步采样
+- 新命前/陈旧阶段：player_age 1.3s→8s、missing 22，L2 仍曾用旧锚点报 threat_charging；已修：新命重置 anchor/player/temporal，age>400ms 或 missing>5 时 temporal 输入清空，L2 标 player_stale。
+- 修复后 10 点：3 个 death/dialogue/开局样本正确标 stale、无幽灵威胁；7 个 gameplay 样本玩家位置与截图一致（如 x=0.245/0.462/0.513），HP3 与截图一致。
+- 剩余：HP 偶发滞后、玩家 confidence 0.55 偏低、threat 里仍可能混入特效；需要继续观察。
+
+### 模型决策延迟
+- decision-log 实测两次间隔：**9.12s / 8.93s**；p95 ≈ 9s。
+- 目标要求 TTL 覆盖 p95（2500–3000ms），实际远超。
+- 结论：当前主模型不能做 1–2Hz 战术决策，更不可能做逐弹幕反射；只能做 10s 级姿态/策略，或需要更快的 L3（小模型/子 agent/事件驱动）。
+- 模型 intent 通道本身可用：TTL 3s 内 active_intent=model；最后一次 scroll -6.158, HP1。
+
+### 当前阻塞/需要的决定
+- 继续用主模型在关内做战术决策，延迟不可接受；
+- 可选：A) 事件驱动，只在卡住/低置信时由模型介入；B) 用更快的 L3 小模型；C) 模型只做姿态/参数，Python 做战术。
+- goal 仍为 paused（模型无法自行 resume，需要用户在界面恢复）。
+
+### 未完成
+- 未通关；README 未写；L2 准确率还没到“10 点全部人工核对”的严格标准；无模型 A/B。
