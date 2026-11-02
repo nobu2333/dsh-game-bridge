@@ -142,3 +142,23 @@ def build_profile(
         "sources": merged["sources"],
         "verified_in_game": any(item.get("source") == "probe" for item in merged["controls"].values()),
     }
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    import json
+
+    from .game_probe import scan_game
+
+    parser = argparse.ArgumentParser(description="Read-only cold-start profile scan (no game launch).")
+    parser.add_argument("root")
+    args = parser.parse_args(argv)
+    scan = scan_game(args.root)
+    from .coldstart import build_profile, scan_to_candidates
+
+    profile = build_profile(engine=scan.get("engine", "unknown"), scan_candidates=scan_to_candidates(scan))
+    print(json.dumps({"scan": scan, "profile": profile}, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
