@@ -1158,6 +1158,16 @@ class GameSession:
         self.audit.write({"event": "policy_start", "profile": (profile or {}).get("id")})
         return {"policy": started, "attached": self.attached, "backend": self.backend}
 
+    def submit_intent(self, params: dict | None = None) -> dict:
+        """External low-frequency model intent into the running policy arbiter."""
+        policy = self._policy
+        if policy is None:
+            return {"accepted": False, "reason": "no policy running"}
+        data = params or {}
+        intent = data.get("intent") if isinstance(data.get("intent"), dict) else data
+        accepted = policy.submit_intent(intent)
+        return {"accepted": bool(accepted), "intent": intent}
+
     def policy_stop(self, params: dict | None = None) -> dict:
         policy, self._policy = self._policy, None
         if policy is None:

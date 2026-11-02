@@ -382,6 +382,15 @@ class PolicyRunner:
         self._temporal_state: dict | None = None
         self._situation: dict | None = None
         self._planner_intent: dict | None = None
+        instant = self._profile.get("instant_play")
+        instant = instant if isinstance(instant, dict) else {}
+        self._intent_enabled = bool(instant.get("intent_enabled", False))
+        self._planner_enabled = bool(instant.get("planner_enabled", True))
+        self._arbiter = None
+        self._intent_lock = threading.Lock()
+        self._active_intent: dict | None = None
+        self._retreat_until = 0.0
+        self._last_intent_action = 0.0
         self._attack_started = 0.0
         self._attack_scroll = 0.0
         self._progress_scroll = 0.0
@@ -596,6 +605,7 @@ class PolicyRunner:
             "observation": self._observation,
             "situation": self._situation,
             "planner_intent": self._planner_intent,
+            "active_intent": self._active_intent,
             "intent": self._intent,
             "player": {"x": round(float(self._anchor[0]), 4), "y": round(float(self._anchor[1]), 4)},
             "hit": self._last_hit,
@@ -760,6 +770,7 @@ class PolicyRunner:
                     if delay > 0:
                         self._sleep(delay)
                     continue
+                self._execute_active_intent()
                 self._maybe_engage(entities)
                 self._maybe_turn_shoot()
 
@@ -798,10 +809,11 @@ class PolicyRunner:
         if self._clock() < self._engage_suppressed_until:
             engage = False
         turning = self._clock() < self._turn_until
+        retreat = self._clock() < self._retreat_until
         for key in self._hold_keys:
             if key in self._held:
                 continue
-            if (engage or turning) and key == self._advance_key:
+            if (engage or turning or retreat) and key == self._advance_key:
                 continue
             self._controller.hold(key)
             self._held.add(key)
@@ -1091,9 +1103,70 @@ class PolicyRunner:
                 self._planner_intent = None
             self._update_attack_stall()
             self._update_progress_guard()
+            self._update_arbiter()
         except Exception:  # noqa: BLE001
             self._observation = None
             self._intent = None
+
+    def _update_arbiter(self) -> None:
+        try:
+            from .arbiter import IntentArbiter, local_intent_from_skill
+
+            skill = (self._intent or {}).get("skill") or "advance"
+            local = local_intent_from_skill(skill, reason=(self._intent or {}).get("reason") or "")
+            with self._intent_lock:
+                if self._arbiter is None:
+                    self._arbiter = IntentArbiter(local)
+                else:
+                    self._arbiter.set_local(local)
+                if self._intent_enabled and self._planner_enabled and self._planner_intent:
+                    self._arbiter.submit(self._planner_intent, origin="planner")
+                self._active_intent = self._arbiter.current()
+        except Exception:  # noqa: BLE001
+            self._active_intent = None
+
+    def submit_intent(self, intent: dict) -> bool:
+        """模型/外部低频决策入口：线程安全地提交 Intent。"""
+        try:
+            from .arbiter import IntentArbiter, local_intent_from_skill
+
+            with self._intent_lock:
+                if self._arbiter is None:
+                    self._arbiter = IntentArbiter(local_intent_from_skill("advance"))
+                return bool(self._arbiter.submit(intent, origin="model"))
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _execute_active_intent(self) -> None:
+        """把 active intent 中少数安全技能变成动作；默认关闭，供 A/B。"""
+        if not self._intent_enabled or not self._active_intent:
+            return
+        skill = str(self._active_intent.get("skill") or "")
+        now = self._clock()
+        if skill == "jump":
+            if (now - self._last_intent_action) * 1000.0 >= 700.0 and self._jump_keys:
+                self._tap(self._jump_keys[0], 140.0)
+                self._last_intent_action = now
+            return
+        if skill in ("dodge_left", "dodge_right"):
+            if (now - self._last_intent_action) * 1000.0 < 500.0:
+                return
+            direction = self._resolve_key("left" if skill == "dodge_left" else "right")
+            if direction:
+                if self._advance_key in self._held:
+                    self._release_key(self._advance_key)
+                if self._jump_keys:
+                    self._tap(self._jump_keys[0], 120.0)
+                self._tap(direction, 150.0)
+                self._last_intent_action = now
+            return
+        if skill == "retreat":
+            self._retreat_until = now + 0.35
+            if self._advance_key in self._held:
+                self._release_key(self._advance_key)
+            if self._jump_keys:
+                self._tap(self._jump_keys[0], 120.0)
+            self._last_intent_action = now
 
     def _update_progress_guard(self) -> None:
         """独立于 intent：3 秒没有推进就抑制 engage 并跳一下，避免被敌人/墙卡死。"""
