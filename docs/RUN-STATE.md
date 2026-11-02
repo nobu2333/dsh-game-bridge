@@ -382,4 +382,10 @@
 - 修复 DPI bug：Windows 125% 缩放下，`GetMonitorInfoW` 给 1536x864、DXcam 给 1920x1080，attach 报“没有显示器与窗口匹配”。`windows.py` 现在在导入时设 per-monitor v2 DPI awareness，attach/snapshot 正常拿到 960x540。
 - 实机：policy 45s、约 38.5Hz；但角色还在老茶壶家/大地图，`scroll_s≈-0.03`，没有进入 Forest Follies；地图入口仍未找到。
 - 现状：游戏窗口已 topmost、engine 可 attach/capture；需要人工把角色走到 Forest Follies 入口（或下一步做地图航点），才能开始关卡内 baseline。
+
+## 2026-11-02 23:35 Forest Follies 首轮 baseline（用户已进关）
+
+- 60s policy：ticks 2096、约 33.3Hz、actions 573、escapes 16；scroll 最好到 -2.521，约 37.8s 出现一次 death/reset，结束在 -1.845。
+- `evaluate --game cuphead --level forest-follies`：episodes 5、damage 1、deaths 0、best progress **2.639 screens**、DangerCard 4 张全是 candidate。
+- 结论：首轮只到约 2.6 屏，离旧记录的 6.4 屏还有明显差距；先继续采 60s episode，再按死亡位置分类。仍未通关。
 - Cuphead 仍在下载；暂无实机新数据。
