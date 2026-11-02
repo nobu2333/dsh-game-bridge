@@ -15,12 +15,14 @@
    - 先验收 L2 准确率和 A/B，再扩大模型环。
 4. **仍未通关；README 不能写「已通关」。**
 
-## Goal
+## Goal（另一台 DSH 主机，不是当前会话）
 
 - id: `goal-283c1ac6-f742-4469-b1ae-5b4968ae946b`
 - revision: 7（objective 已改成文档版，max rounds 80）
-- **phase: paused / disarmed** —— 模型不能自行 resume，需要用户在 DSH 界面点一次「恢复 goal」。
-- 若 goal 未恢复，自动轮次不会继续；下一次用户消息后需手动继续。
+- **phase: paused / disarmed** —— 模型不能自行 resume，需要用户在那台机器的 DSH 界面点一次「恢复 goal」。
+- 若 goal 未恢复，那边的自动轮次不会继续。
+
+> **2026-11-02 注**：这个 goal 属于另一台电脑上的 DSH 运行；当前 `dsh-game-bridge` 工作区的 DSH 会话**没有 goal**。下面的暂停/恢复说明只对那台机器有效，不要在当前会话里寻找或恢复它。
 
 ## 目标摘要
 
@@ -38,7 +40,7 @@
 - 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。
 - 工具面已补 `game_intent`（stdio `submit_intent` + 插件工具）：默认 advisory，执行当前只覆盖 jump/dodge/retreat；需 `game_policy start intent_enabled=true` 或 `profile.instant_play.intent_enabled=true`。
 - L2 准确率：10 点采样中 3 个 stale 正确、7 个 gameplay 位置与截图一致；仍有人工核对缺口。
-- goal：paused，需要用户在 DSH 界面恢复。
+- goal：另一台机器上 paused（当前会话**没有 goal**，无需恢复）。
 
 ### 历史进度（2026-10-30，提交 `8e4d8fa`）
 
@@ -56,7 +58,7 @@
 
 ### P0 先拿到「为什么过不去」的证据（1–2 天）
 
-1. 恢复 goal；清理残留 driver；用当前 HEAD 跑 10 局 baseline（record=true, game=cuphead, level=forest-follies）。
+1. 若继续原来那台机器，先恢复那边的 goal；**当前会话没有 goal**，直接清理残留 driver，用当前 HEAD 跑 10 局 baseline（record=true, game=cuphead, level=forest-follies）。
 2. 对 6.4 屏附近的 episode 做 review：把死亡分类为坠落 / 蘑菇 / 花妖弹幕 / 跳早 / 跳晚 / 其他，统计每类次数。
 3. 固定指标：clear rate、best progress、damage/run、death location、hz、time-to-control。
 4. 决策延迟 A/B：同一批 20 个 SituationReport，比较 `deepseek-flash + max`（当前主会话）、`deepseek-flash + off/low`（直接 LLM 调用，最小 prompt，maxTokens≤128）、可选本地小模型；记录 p50/p95 与 intent 正确率。p95 > 1s 就不做 1–2Hz 模型环。
@@ -363,7 +365,7 @@
 ### 当前阻塞/需要的决定
 - 继续用主模型在关内做战术决策，延迟不可接受；
 - 可选：A) 事件驱动，只在卡住/低置信时由模型介入；B) 用更快的 L3 小模型；C) 模型只做姿态/参数，Python 做战术。
-- goal 仍为 paused（模型无法自行 resume，需要用户在界面恢复）。
+- （另一台机器）goal 仍为 paused（模型无法自行 resume，需要用户在那台机器的界面恢复）。
 
 ### 未完成
 - 未通关；README 未写；L2 准确率还没到“10 点全部人工核对”的严格标准；无模型 A/B。
