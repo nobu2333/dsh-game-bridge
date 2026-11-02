@@ -311,6 +311,7 @@ class PolicyRunner:
             or _point(combat.get("anchor"))
             or DEFAULT_PLAYER_ANCHOR
         )
+        self._initial_anchor = self._anchor
 
         stuck = combat.get("stuck")
         stuck = stuck if isinstance(stuck, dict) else {}
@@ -737,6 +738,15 @@ class PolicyRunner:
                         self._scroll_s = 0.0
                         self._last_danger_id = None
                         self._hp_signature = None
+                        self._anchor = self._initial_anchor
+                        self._player_candidate = None
+                        self._player_score = 0.0
+                        self._player_seen_at = 0.0
+                        self._player_missing = 0
+                        self._temporal = None
+                        self._temporal_state = None
+                        self._situation = None
+                        self._planner_intent = None
                         if self._locator is not None:
                             self._locator.reset()
                     self._prev_scene = self._scene
@@ -1028,7 +1038,11 @@ class PolicyRunner:
             }
             temporal_input = []
             anchor_point = (float(self._anchor[0]), float(self._anchor[1]))
+            player_age_ms = (max(0.0, self._clock() - self._player_seen_at) * 1000.0 if self._player_seen_at else None)
+            player_stale = player_age_ms is None or player_age_ms > 400 or self._player_missing > 5
             for track in getattr(self, "_tracks", [])[:8]:
+                if player_stale:
+                    break
                 # 过滤“自己打出去的子弹/特效”：速度快、正在远离玩家。
                 if track.speed > 0.35 and _approaching(track, anchor_point) < -0.05:
                     continue
