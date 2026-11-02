@@ -425,6 +425,9 @@ class PolicyRunner:
         self._player_every = max(1, int(_as_float(player_cfg.get("every_n_ticks"), 3) or 3))
         self._player_source: Callable[..., Any] | None = None
         self._player_candidate = None
+        self._player_score = 0.0
+        self._player_seen_at = 0.0
+        self._player_missing = 0
         # 关卡记忆：滚动坐标 + 可选的 DangerCard 列表（由会话按 game/level 注入）。
         self._locator = None
         self._dangers = self._profile.get("danger_cards")
@@ -608,6 +611,9 @@ class PolicyRunner:
             "active_intent": self._active_intent,
             "intent": self._intent,
             "player": {"x": round(float(self._anchor[0]), 4), "y": round(float(self._anchor[1]), 4)},
+            "player_confidence": round(float(self._player_score), 3),
+            "player_age_ms": (round(max(0.0, self._clock() - self._player_seen_at) * 1000.0) if self._player_seen_at else None),
+            "player_missing": int(self._player_missing),
             "hit": self._last_hit,
             "tracks": [
                 {
@@ -1625,27 +1631,34 @@ class PolicyRunner:
         except Exception:  # noqa: BLE001 - 追踪失败只损失本拍精度
             return
         if not isinstance(found, dict):
+            self._player_missing += 1
             return
         x = _as_float(found.get("x"), None)
         y = _as_float(found.get("y"), None)
         score = _as_float(found.get("score"), 0.0) or 0.0
         if x is None or y is None or score < 0.35:
+            self._player_missing += 1
             return
         previous_x, previous_y = self._anchor
         distance = math.hypot(x - previous_x, y - previous_y)
         # 单帧模板可能误匹配到别的精灵：大幅度跳变需要连续两帧一致才接受。
         if distance > 0.25:
             if score < 0.9:
+                self._player_missing += 1
                 return
             candidate = getattr(self, "_player_candidate", None)
             if candidate is None or math.hypot(x - candidate[0], y - candidate[1]) > 0.08:
                 self._player_candidate = (x, y)
+                self._player_missing += 1
                 return
         self._player_candidate = None
         # 轻量平滑，避免锚点抖动导致闪避/交战判定抖。
         x = previous_x * 0.35 + x * 0.65
         y = previous_y * 0.35 + y * 0.65
         self._anchor = (min(max(x, 0.0), 1.0), min(max(y, 0.0), 1.0))
+        self._player_score = round(float(score), 3)
+        self._player_seen_at = self._clock()
+        self._player_missing = 0
 
     def latest_frame(self) -> np.ndarray | None:
         """最近一帧原始 BGR（给异步 OCR/场景线程读取；不要修改它）。"""
