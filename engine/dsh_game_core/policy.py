@@ -379,6 +379,8 @@ class PolicyRunner:
         self._observation: dict | None = None
         self._intent: dict | None = None
         self._temporal = None
+        self._temporal_state: dict | None = None
+        self._situation: dict | None = None
         self._attack_started = 0.0
         self._attack_scroll = 0.0
         self._progress_scroll = 0.0
@@ -591,6 +593,7 @@ class PolicyRunner:
             "scroll_s": round(float(self._scroll_s), 3),
             "danger": self._nearby_danger,
             "observation": self._observation,
+            "situation": self._situation,
             "intent": self._intent,
             "player": {"x": round(float(self._anchor[0]), 4), "y": round(float(self._anchor[1]), 4)},
             "hit": self._last_hit,
@@ -1018,6 +1021,7 @@ class PolicyRunner:
                 {"x": float(self._anchor[0]), "y": float(self._anchor[1])},
                 temporal_input,
             )
+            self._temporal_state = temporal
             obs_entities = []
             for item in temporal.get("threats", []):
                 obs_entities.append(
@@ -1043,6 +1047,39 @@ class PolicyRunner:
                 scroll_s=float(self._scroll_s),
             )
             self._intent = choose_skill(self._observation)
+            try:
+                from .situation import describe
+
+                world_raw = {
+                    "ts": self._clock(),
+                    "scene": self._scene,
+                    "player": {
+                        "x": float(self._anchor[0]),
+                        "y": float(self._anchor[1]),
+                        "vx": (temporal.get("player") or {}).get("vx", 0.0),
+                        "vy": (temporal.get("player") or {}).get("vy", 0.0),
+                        "hp": self._current_hp(),
+                    },
+                    "threats": [
+                        {
+                            "id": item.get("id"),
+                            "dx": item.get("dx"),
+                            "dy": item.get("dy"),
+                            "vx": item.get("vx"),
+                            "vy": item.get("vy"),
+                            "distance": item.get("distance"),
+                            "ttc": item.get("ttc"),
+                            "side": item.get("side"),
+                            "role": item.get("role"),
+                            "confidence": 0.7,
+                        }
+                        for item in temporal.get("threats", [])
+                    ],
+                    "progress": {"scroll_s": float(self._scroll_s), "stalled_ms": 0},
+                }
+                self._situation = describe(world_raw, hp=self._current_hp())
+            except Exception:  # noqa: BLE001
+                self._situation = None
             self._update_attack_stall()
             self._update_progress_guard()
         except Exception:  # noqa: BLE001

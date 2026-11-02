@@ -53,6 +53,7 @@ STATUS_KEYS = {
     "scroll_s",
     "danger",
     "observation",
+    "situation",
     "intent",
     "player",
     "tracks",
