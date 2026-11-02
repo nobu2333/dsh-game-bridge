@@ -1069,6 +1069,10 @@ class PolicyRunner:
                 entities=obs_entities,
                 prompt=None,
                 scroll_s=float(self._scroll_s),
+                player_confidence=(round(float(self._player_score), 3) if self._player_seen_at else None),
+                player_age_ms=(
+                    round(max(0.0, self._clock() - self._player_seen_at) * 1000.0) if self._player_seen_at else None
+                ),
             )
             self._intent = choose_skill(self._observation)
             try:
@@ -1083,6 +1087,8 @@ class PolicyRunner:
                         "vx": (temporal.get("player") or {}).get("vx", 0.0),
                         "vy": (temporal.get("player") or {}).get("vy", 0.0),
                         "hp": self._current_hp(),
+                        "confidence": self._player_score,
+                        "age_ms": (max(0.0, self._clock() - self._player_seen_at) * 1000.0 if self._player_seen_at else None),
                     },
                     "threats": [
                         {

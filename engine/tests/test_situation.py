@@ -53,3 +53,17 @@ def test_situation_skips_stale_threats_and_reports_space():
     assert all(event["type"] != "threat_charging" for event in report["events"])
     assert report["player_state"]["space_left"] == 0.4
     assert report["player_state"]["space_right"] == 0.6
+
+def test_situation_flags_player_uncertainty():
+    report = describe(
+        {
+            "scene": "gameplay",
+            "player": {"x": 0.5, "y": 0.8, "confidence": 0.3, "age_ms": 800},
+            "threats": [],
+        },
+        hp=3,
+    )
+    assert "low_player_confidence" in report["uncertainty"]
+    assert "player_stale" in report["uncertainty"]
+    assert report["player_state"]["confidence"] == 0.3
+    assert report["player_state"]["age_ms"] == 800

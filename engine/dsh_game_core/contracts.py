@@ -117,6 +117,8 @@ class WorldState:
                 "vx": round(_clamp(_num(player.get("vx")), -2.0, 2.0), 4),
                 "vy": round(_clamp(_num(player.get("vy")), -2.0, 2.0), 4),
                 "hp": player.get("hp"),
+                "confidence": round(_clamp(_num(player.get("confidence"), 1.0), 0.0, 1.0), 3) if player.get("confidence") is not None else None,
+                "age_ms": round(_clamp(_num(player.get("age_ms")), 0.0, 60000.0), 0) if player.get("age_ms") is not None else None,
             },
             threats=threats[:8],
             hazards=[item for item in (raw.get("hazards") or []) if isinstance(item, dict)][:8],

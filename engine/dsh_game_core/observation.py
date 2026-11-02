@@ -28,6 +28,8 @@ def build_observation(
     scroll_s: float | None = None,
     ledges: list[dict] | None = None,
     terrain_gap: bool | None = None,
+    player_confidence: float | None = None,
+    player_age_ms: float | None = None,
 ) -> dict:
     """Normalize raw state into an observation used by skill selection."""
     player = player or {}
@@ -54,6 +56,8 @@ def build_observation(
         "scene": str(scene or "unknown"),
         "hp": hp,
         "player": {"x": _num(player.get("x"), 0.5), "y": _num(player.get("y"), 0.8)},
+        "player_confidence": player_confidence,
+        "player_age_ms": player_age_ms,
         "prompt": prompt,
         "scroll_s": scroll_s,
         "counts": {"entities": len(tracks), "enemies": len(enemies)},

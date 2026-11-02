@@ -114,6 +114,12 @@ def describe(world: WorldState | dict, *, hp: int | None = None) -> dict:
         uncertainty.append("low_threat_confidence")
     if not threats:
         uncertainty.append("no_threat_tracks")
+    player_confidence = state.player.get("confidence")
+    player_age_ms = state.player.get("age_ms")
+    if player_confidence is not None and float(player_confidence) < 0.5:
+        uncertainty.append("low_player_confidence")
+    if player_age_ms is not None and float(player_age_ms) > 400:
+        uncertainty.append("player_stale")
 
     report = SituationReport(
         ts=state.ts,
@@ -126,6 +132,8 @@ def describe(world: WorldState | dict, *, hp: int | None = None) -> dict:
             "x": round(px, 3),
             "space_left": round(space_left, 3),
             "space_right": round(space_right, 3),
+            "confidence": player_confidence,
+            "age_ms": player_age_ms,
         },
         uncertainty=uncertainty[:5],
         source="python",
