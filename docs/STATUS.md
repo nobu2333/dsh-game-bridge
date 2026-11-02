@@ -1,6 +1,7 @@
 # 现状与交班（STATUS）
 
-> 更新：2026-10-30（第 20 轮，通用玩法基线：WorldState + 60 Hz 状态策略 + 本地档案层）。**当前工程状态以本文件 + `git log` 为准**；
+> 更新：2026-10-30（第 20 轮，通用玩法基线：WorldState + 60 Hz 状态策略 + 本地档案层）。
+> **2026-11-02 补充：本文的 10-30 状态已落后；当前状态、卡点与测试数字以 `docs/RUN-STATE.md` 为准。**
 > 设计理由看 `docs/DESIGN.md`，数据形状与降级规则看 `docs/STATE.md`，发布步骤看 `docs/RELEASE.md`。
 
 ## 一句话
@@ -22,8 +23,8 @@
 | 通用玩法基线 | ✅ 单测通过（真实对局待复验） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 44/44、`pytest engine/tests` 154/154；memory/API provider **未实现**；集成/真实对局未复验 |
 | 市场收录 | ⏳ 待提交 | 仓库已 public，按 MARKETPLACE 提交 |
 
-工具面（13 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
-`game_events` · `game_attach` · `game_state` · `game_policy` · `game_memory` · `game_act` ·
+工具面（14 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
+`game_events` · `game_attach` · `game_state` · `game_policy` · `game_intent` · `game_memory` · `game_act` ·
 `game_plan` · `game_status` · `game_stop`。
 
 ## 一次跑完的验证

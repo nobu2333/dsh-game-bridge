@@ -231,6 +231,8 @@ def serve(stdin=None, stdout=None) -> int:
                 result = session.policy_start(params)
             elif method == "policy_stop":
                 result = session.policy_stop(params)
+            elif method == "submit_intent":
+                result = session.submit_intent(params)
             elif method == "status":
                 result = session.status()
             elif method == "stop":

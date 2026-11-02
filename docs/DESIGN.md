@@ -45,6 +45,7 @@
 | `game_attach` | 绑定窗口（用户授权步骤） | 一次 | M2 ✅ |
 | `game_state` | 读一次通用世界状态 WorldState（场景 / HP / 实体 / UI） | 模型需要时 | 通用基线 ✅ |
 | `game_policy` | 起停本地 60 Hz 状态策略（按 profile 射击/前进/闪避/脱困） | 一次/战斗阶段 | 通用基线 ✅（dry-run） |
+| `game_intent` | 向运行中的策略提交带 TTL/优先级的战术 Intent（建议性，不直接按键） | 0.2–1Hz | L3 通道 ✅（默认 advisory） |
 | `game_memory` | 本地游戏档案（profile）CRUD 与选用 | 开局 / 换游戏 | 通用基线 ✅ |
 | `game_act` | 单步按键（默认 dry-run） | 一次/动作 | M2 ✅ |
 | `game_stop` | 松手 + 解绑 | 随时，越易越好 | M2 ✅ |

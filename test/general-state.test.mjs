@@ -348,6 +348,18 @@ test('game_policy render reports running, stopped and idle states', () => {
   assert.match(idle.text, /^Policy status: not running\./)
 })
 
+test('game_intent render reports accepted and rejected intents', () => {
+  const tool = toolset()
+  const [accepted] = tool('game_intent').output.render(
+    {},
+    { accepted: true, intent: { goal: 'advance', skill: 'advance', ttl_ms: 1500 } },
+  )
+  assert.match(accepted.text, /^Intent accepted: goal=advance, skill=advance, ttl=1500ms\./)
+
+  const [rejected] = tool('game_intent').output.render({}, { accepted: false, reason: 'no policy running' })
+  assert.match(rejected.text, /^Intent not accepted: no policy running\./)
+})
+
 test('game_memory render covers list/get/save/delete/use results', () => {
   const tool = toolset()
   const render = (result) => tool('game_memory').output.render({}, { result })[0]

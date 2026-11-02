@@ -67,6 +67,7 @@ test('apply() registers the current tool surface', () => {
       'game_attach',
       'game_controls',
       'game_events',
+      'game_intent',
       'game_memory',
       'game_plan',
       'game_policy',
@@ -87,11 +88,15 @@ test('game_attach refuses loudly when the engine is unavailable', async () => {
   await assert.rejects(() => definition.execute({ window: 'SomeGame' }, {}), /not ready/)
 })
 
-test('game_state and game_policy refuse loudly when the engine is unavailable', async () => {
+test('game_state, game_policy and game_intent refuse loudly when the engine is unavailable', async () => {
   const ctx = fakeCtx()
   apply(ctx)
   await assert.rejects(() => tool(ctx, 'game_state').execute({}, {}), /not ready/)
   await assert.rejects(() => tool(ctx, 'game_policy').execute({ action: 'status' }, {}), /not ready/)
+  await assert.rejects(
+    () => tool(ctx, 'game_intent').execute({ intent: { goal: 'advance', skill: 'advance' } }, {}),
+    /not ready/,
+  )
 })
 
 test('game_memory works without an engine and validates the profile id', async () => {

@@ -298,7 +298,7 @@ async function main() {
   if (sequence.includes('game_act')) console.log(`dry-run action seen: ${sawDryRun}`)
 
   assert.equal(run.code, 0, `headless exited ${run.code}\nstderr:\n${run.stderr}\nstdout:\n${run.stdout}`)
-  for (const name of ['game_selftest', 'game_snapshot', 'game_attach', 'game_act', 'game_stop', 'game_state', 'game_policy', 'game_memory']) {
+  for (const name of ['game_selftest', 'game_snapshot', 'game_attach', 'game_act', 'game_stop', 'game_state', 'game_policy', 'game_intent', 'game_memory']) {
     assert.ok(toolNames.includes(name), `${name} was not exposed to the model`)
   }
   assert.ok(sawToolResult, 'the tool result did not come back to the model')

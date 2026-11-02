@@ -72,3 +72,16 @@ def test_stdio_protocol_answers_and_contains_errors():
     assert responses[0]["ok"] is True
     assert responses[1]["ok"] is False and responses[1]["error"]["code"] == "UNKNOWN_METHOD"
     assert responses[2]["ok"] is False and responses[2]["error"]["code"] == "INTERNAL"
+
+
+def test_stdio_submit_intent_without_policy_reports_not_running():
+    stdin = io.StringIO(
+        '{"id": 1, "method": "submit_intent", "params": {"intent": {"goal": "advance", "skill": "advance", "ttl_ms": 1000}}}\n'
+    )
+    stdout = io.StringIO()
+    assert serve(stdin, stdout) == 0
+
+    response = json.loads(stdout.getvalue())
+    assert response["ok"] is True
+    assert response["result"]["accepted"] is False
+    assert response["result"]["reason"] == "no policy running"
