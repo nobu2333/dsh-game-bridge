@@ -118,7 +118,7 @@ def describe(world: WorldState | dict, *, hp: int | None = None) -> dict:
     player_age_ms = state.player.get("age_ms")
     if player_confidence is not None and float(player_confidence) < 0.5:
         uncertainty.append("low_player_confidence")
-    if player_age_ms is not None and float(player_age_ms) > 400:
+    if player_age_ms is None or float(player_age_ms) > 400:
         uncertainty.append("player_stale")
 
     report = SituationReport(
