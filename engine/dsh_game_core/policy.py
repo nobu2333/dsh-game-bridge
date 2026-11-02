@@ -376,6 +376,8 @@ class PolicyRunner:
         self._macros = macros if isinstance(macros, list) else []
         self._macro_used = set()
         self._macro_state = None
+        self._observation: dict | None = None
+        self._intent: dict | None = None
         terrain = self._profile.get("terrain")
         terrain = terrain if isinstance(terrain, dict) else {}
         self._gap_enabled = bool(terrain.get("gap_enabled", False))
@@ -583,6 +585,8 @@ class PolicyRunner:
             "last_entities": int(self._last_entities),
             "scroll_s": round(float(self._scroll_s), 3),
             "danger": self._nearby_danger,
+            "observation": self._observation,
+            "intent": self._intent,
             "player": {"x": round(float(self._anchor[0]), 4), "y": round(float(self._anchor[1]), 4)},
             "hit": self._last_hit,
             "tracks": [
@@ -738,6 +742,7 @@ class PolicyRunner:
                 memory_started = self._clock()
                 self._update_memory(previous_frame, frame)
                 self._mark_timing("memory", memory_started)
+                self._update_observation(entities)
                 self._check_danger_outcome()
                 if self._route_macro_tick():
                     self._ticks += 1
@@ -979,6 +984,41 @@ class PolicyRunner:
         if state["index"] >= len(steps):
             self._macro_state = None
         return True
+
+    def _update_observation(self, entities: list[dict]) -> None:
+        """Build the generic observation + chosen skill (diagnostic; does not change actions yet)."""
+        try:
+            from .observation import build_observation, choose_skill
+
+            role_map = {
+                int(item.get("id")): item
+                for item in self._entity_roles
+                if isinstance(item, dict) and item.get("id") is not None
+            }
+            obs_entities = []
+            for track in getattr(self, "_tracks", [])[:8]:
+                role = (role_map.get(int(track.id)) or {}).get("role")
+                distance = abs(float(track.x) - float(self._anchor[0]))
+                obs_entities.append(
+                    {
+                        "role": role,
+                        "distance": round(distance, 4),
+                        "behind": float(track.x) < float(self._anchor[0]),
+                        "id": int(track.id),
+                    }
+                )
+            self._observation = build_observation(
+                scene=self._scene,
+                hp=self._current_hp(),
+                player={"x": float(self._anchor[0]), "y": float(self._anchor[1])},
+                entities=obs_entities,
+                prompt=None,
+                scroll_s=float(self._scroll_s),
+            )
+            self._intent = choose_skill(self._observation)
+        except Exception:  # noqa: BLE001
+            self._observation = None
+            self._intent = None
 
     def _maybe_turn_shoot(self) -> None:
         """背后有 approaching/chaser 时：停步、短点转向持续射击，再恢复推进。

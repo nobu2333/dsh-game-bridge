@@ -52,6 +52,8 @@ STATUS_KEYS = {
     "last_entities",
     "scroll_s",
     "danger",
+    "observation",
+    "intent",
     "player",
     "tracks",
     "hit",
