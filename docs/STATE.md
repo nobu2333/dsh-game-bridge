@@ -278,8 +278,8 @@ provider 只能覆盖它声明的字段；它失败时保留下层结果，并�
 |:--|:--|:--|
 | `game_attach` | `window`，可选 `profile` | 绑定窗口（授权步骤）；带 `profile` 时记住 `runtime.profileId`；profile 缺失不导致 attach 失败 |
 | `game_state` | 无 | 按当前 profile 调引擎 `state`，返回 §2 的 WorldState；渲染一行摘要（`scene=…, hp=…, entities=N, prompt=…`）并附前台/遮挡警告 |
-| `game_policy` | `action`: `start` / `stop` / `status`；start 可选 `intent_enabled` | `start` 用当前 profile 起 60 Hz `PolicyRunner`（需先 attach，否则 `NOT_ATTACHED`）；`intent_enabled=true` 允许 `game_intent` 的 Intent 驱动有限动作；`stop` 松手并返回最终统计 |
-| `game_intent` | `intent` JSON | 向运行中的策略提交带 TTL/优先级的战术 Intent（goal/skill/risk/target_id）；**建议性**，不直接按键，执行还取决于 `game_policy start intent_enabled=true` 或 `profile.instant_play.intent_enabled` 与本地仲裁 |
+| `game_policy` | `action`: `start` / `stop` / `status`；start 可选 `intent_enabled` | `start` 用当前 profile 起 60 Hz `PolicyRunner`（需先 attach，否则 `NOT_ATTACHED`）；`intent_enabled=true` 允许 `game_intent` 的 Intent 驱动有限动作（当前 jump/dodge/retreat）；`stop` 松手并返回最终统计 |
+| `game_intent` | `intent` JSON | 向运行中的策略提交带 TTL/优先级的战术 Intent（goal/skill/risk/target_id）；**建议性**，不直接按键；当前执行只覆盖 jump/dodge/retreat，其它 skill 只更新 `active_intent` |
 | `game_memory` | `action`: `list` / `get` / `save` / `delete` / `use`，`id`，`data` | 操作 §3 的本地档案库；`save` 校验 id 与 JSON，`use` 设置当前 `runtime.profileId`。**不读游戏内存** |
 | `game_plan` | 方向键 + 时长 | 20 Hz 有界方向闭环（hold/tap/advance），不吃 WorldState；与 `game_policy` 是两种分工 |
 | `game_snapshot` | 无 | 原始帧 + OCR，不是状态模型；排查「状态为什么不对」时用它看原图 |
