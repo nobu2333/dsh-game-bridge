@@ -378,6 +378,8 @@ class PolicyRunner:
         self._macro_state = None
         self._observation: dict | None = None
         self._intent: dict | None = None
+        self._attack_started = 0.0
+        self._attack_scroll = 0.0
         terrain = self._profile.get("terrain")
         terrain = terrain if isinstance(terrain, dict) else {}
         self._gap_enabled = bool(terrain.get("gap_enabled", False))
@@ -1016,9 +1018,28 @@ class PolicyRunner:
                 scroll_s=float(self._scroll_s),
             )
             self._intent = choose_skill(self._observation)
+            self._update_attack_stall()
         except Exception:  # noqa: BLE001
             self._observation = None
             self._intent = None
+
+    def _update_attack_stall(self) -> None:
+        """攻击意图持续但进度不涨时，短暂抑制 engage，强制推进绕过敌人。"""
+        intent = self._intent or {}
+        if intent.get("skill") != "attack":
+            self._attack_started = 0.0
+            return
+        now = self._clock()
+        if self._attack_started <= 0.0:
+            self._attack_started = now
+            self._attack_scroll = float(self._scroll_s)
+            return
+        elapsed = now - self._attack_started
+        progress = abs(float(self._scroll_s) - float(self._attack_scroll))
+        if elapsed >= 2.5 and progress < 0.05:
+            self._engage_suppressed_until = now + 1.2
+            self._attack_started = now
+            self._attack_scroll = float(self._scroll_s)
 
     def _maybe_turn_shoot(self) -> None:
         """背后有 approaching/chaser 时：停步、短点转向持续射击，再恢复推进。
