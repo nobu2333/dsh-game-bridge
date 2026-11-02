@@ -388,4 +388,14 @@
 - 60s policy：ticks 2096、约 33.3Hz、actions 573、escapes 16；scroll 最好到 -2.521，约 37.8s 出现一次 death/reset，结束在 -1.845。
 - `evaluate --game cuphead --level forest-follies`：episodes 5、damage 1、deaths 0、best progress **2.639 screens**、DangerCard 4 张全是 candidate。
 - 结论：首轮只到约 2.6 屏，离旧记录的 6.4 屏还有明显差距；先继续采 60s episode，再按死亡位置分类。仍未通关。
+
+## 2026-11-03 00:00 第二轮 baseline：6.4 屏已过，卡点移到 7.0 屏
+
+- 180s（base profile）：15 episodes、7 damage、**7 deaths**、best progress **7.339 screens**；旧 6.4 屏平台段已经越过。
+- 7.0 屏全分辨率帧：下层平台 + 一只橙色飞花（射紫色弹）+ 两只地面花，玩家 HP1，policy 在同一位置停约 10s 后死亡。
+- A/B：
+  - `jump_every_ms=420, engage_radius=0`：best 5.675、6 deaths，**更差**；
+  - base + `macros` 在 -7.0 触发（jump/right）：best 4.538、7 deaths，**没跑到触发点**，不能评估宏本身。
+- 结论：**不要继续全局调参**；当前卡点是 7.0 屏下层平台→上层平台的跳跃 + 飞花弹幕。下一轮用固定序列/手动 handoff 验证这一小段，再决定 profile 宏。
+- 记录修正：death scene 现在会额外写 `{"type":"death"}`，evaluate 才能统计 deaths。
 - Cuphead 仍在下载；暂无实机新数据。
