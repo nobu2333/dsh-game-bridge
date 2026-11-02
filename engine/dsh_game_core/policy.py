@@ -380,6 +380,8 @@ class PolicyRunner:
         self._intent: dict | None = None
         self._attack_started = 0.0
         self._attack_scroll = 0.0
+        self._progress_scroll = 0.0
+        self._progress_since = 0.0
         terrain = self._profile.get("terrain")
         terrain = terrain if isinstance(terrain, dict) else {}
         self._gap_enabled = bool(terrain.get("gap_enabled", False))
@@ -1019,9 +1021,27 @@ class PolicyRunner:
             )
             self._intent = choose_skill(self._observation)
             self._update_attack_stall()
+            self._update_progress_guard()
         except Exception:  # noqa: BLE001
             self._observation = None
             self._intent = None
+
+    def _update_progress_guard(self) -> None:
+        """独立于 intent：3 秒没有推进就抑制 engage 并跳一下，避免被敌人/墙卡死。"""
+        now = self._clock()
+        scroll = float(self._scroll_s)
+        if abs(scroll - self._progress_scroll) > 0.02:
+            self._progress_scroll = scroll
+            self._progress_since = now
+            return
+        if self._progress_since <= 0.0:
+            self._progress_since = now
+            return
+        if now - self._progress_since >= 3.0:
+            self._engage_suppressed_until = now + 1.5
+            if self._jump_keys:
+                self._tap(self._jump_keys[0], 140.0)
+            self._progress_since = now
 
     def _update_attack_stall(self) -> None:
         """攻击意图持续但进度不涨时，短暂抑制 engage，强制推进绕过敌人。"""
