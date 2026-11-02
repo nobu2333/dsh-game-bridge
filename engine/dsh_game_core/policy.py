@@ -378,6 +378,7 @@ class PolicyRunner:
         self._macro_state = None
         self._observation: dict | None = None
         self._intent: dict | None = None
+        self._temporal = None
         self._attack_started = 0.0
         self._attack_scroll = 0.0
         self._progress_scroll = 0.0
@@ -993,28 +994,50 @@ class PolicyRunner:
         """Build the generic observation + chosen skill (diagnostic; does not change actions yet)."""
         try:
             from .observation import build_observation, choose_skill
+            from .temporal import TemporalState
 
+            if self._temporal is None:
+                self._temporal = TemporalState()
             role_map = {
                 int(item.get("id")): item
                 for item in self._entity_roles
                 if isinstance(item, dict) and item.get("id") is not None
             }
-            obs_entities = []
+            temporal_input = []
             for track in getattr(self, "_tracks", [])[:8]:
-                role = (role_map.get(int(track.id)) or {}).get("role")
-                distance = abs(float(track.x) - float(self._anchor[0]))
+                temporal_input.append(
+                    {
+                        "id": int(track.id),
+                        "x": float(track.x),
+                        "y": float(track.y),
+                        "role": (role_map.get(int(track.id)) or {}).get("role"),
+                    }
+                )
+            temporal = self._temporal.update(
+                self._clock(),
+                {"x": float(self._anchor[0]), "y": float(self._anchor[1])},
+                temporal_input,
+            )
+            obs_entities = []
+            for item in temporal.get("threats", []):
                 obs_entities.append(
                     {
-                        "role": role,
-                        "distance": round(distance, 4),
-                        "behind": float(track.x) < float(self._anchor[0]),
-                        "id": int(track.id),
+                        "role": item.get("role"),
+                        "distance": item.get("distance"),
+                        "behind": float(item.get("dx") or 0.0) < 0.0,
+                        "dx": item.get("dx"),
+                        "dy": item.get("dy"),
+                        "vx": item.get("vx"),
+                        "vy": item.get("vy"),
+                        "ttc": item.get("ttc"),
+                        "side": item.get("side"),
+                        "id": item.get("id"),
                     }
                 )
             self._observation = build_observation(
                 scene=self._scene,
                 hp=self._current_hp(),
-                player={"x": float(self._anchor[0]), "y": float(self._anchor[1])},
+                player=temporal.get("player") or {"x": float(self._anchor[0]), "y": float(self._anchor[1])},
                 entities=obs_entities,
                 prompt=None,
                 scroll_s=float(self._scroll_s),
