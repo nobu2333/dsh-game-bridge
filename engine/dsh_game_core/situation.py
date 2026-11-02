@@ -44,6 +44,9 @@ def describe(world: WorldState | dict, *, hp: int | None = None) -> dict:
         key=lambda item: (item.ttc is None, item.ttc if item.ttc is not None else 9.0, item.distance),
     )
     for threat in threats[:4]:
+        age_ms = threat.age_ms if hasattr(threat, "age_ms") else None
+        if age_ms is not None and age_ms > 400:
+            continue
         if threat.ttc is not None and threat.ttc <= 1.2 and threat.distance <= 0.45:
             side = _side_text(threat.side)
             events.append(
@@ -95,6 +98,8 @@ def describe(world: WorldState | dict, *, hp: int | None = None) -> dict:
         options.append("retreat")
 
     px = _f(state.player.get("x"), 0.5)
+    space_left = px
+    space_right = 1.0 - px
     if px <= 0.12 or px >= 0.88:
         events.append(
             SituationEvent(type="cornered", text="接近屏幕边缘，空间受限", confidence=0.5, evidence=f"x={px}")
@@ -115,7 +120,13 @@ def describe(world: WorldState | dict, *, hp: int | None = None) -> dict:
         scene=state.scene,
         events=events[:10],
         options=list(dict.fromkeys(options))[:8],
-        player_state={"hp": player_hp, "cornered": px <= 0.12 or px >= 0.88},
+        player_state={
+            "hp": player_hp,
+            "cornered": px <= 0.12 or px >= 0.88,
+            "x": round(px, 3),
+            "space_left": round(space_left, 3),
+            "space_right": round(space_right, 3),
+        },
         uncertainty=uncertainty[:5],
         source="python",
     )

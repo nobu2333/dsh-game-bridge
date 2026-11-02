@@ -99,6 +99,7 @@ class TemporalState:
                     "ttc": ttc,
                     "side": _side(dx, dy),
                     "visible": track_id in active,
+                    "age_ms": round(max(0.0, now - samples[-1][0]) * 1000.0),
                 }
             )
         output.sort(key=lambda item: (item["ttc"] is None, item["ttc"] or 9.0, item["distance"]))

@@ -22,3 +22,11 @@ def test_temporal_state_empty_and_prune():
     state.update(1.0, {"x": 0.5, "y": 0.8}, [{"id": 2, "x": 0.6, "y": 0.8}])
     out = state.update(3.0, {"x": 0.5, "y": 0.8}, [])
     assert out["threats"] == []
+
+def test_temporal_age_reported():
+    from dsh_game_core.temporal import TemporalState
+    state = TemporalState(history_ms=600)
+    state.update(1.0, {"x": 0.5, "y": 0.8}, [{"id": 1, "x": 0.7, "y": 0.8}])
+    out = state.update(1.1, {"x": 0.5, "y": 0.8}, [])
+    assert "age_ms" in out["threats"][0]
+    assert out["threats"][0]["age_ms"] >= 100

@@ -1021,7 +1021,11 @@ class PolicyRunner:
                 if isinstance(item, dict) and item.get("id") is not None
             }
             temporal_input = []
+            anchor_point = (float(self._anchor[0]), float(self._anchor[1]))
             for track in getattr(self, "_tracks", [])[:8]:
+                # 过滤“自己打出去的子弹/特效”：速度快、正在远离玩家。
+                if track.speed > 0.35 and _approaching(track, anchor_point) < -0.05:
+                    continue
                 temporal_input.append(
                     {
                         "id": int(track.id),
@@ -1086,6 +1090,7 @@ class PolicyRunner:
                             "side": item.get("side"),
                             "role": item.get("role"),
                             "confidence": 0.7,
+                            "age_ms": item.get("age_ms"),
                         }
                         for item in temporal.get("threats", [])
                     ],

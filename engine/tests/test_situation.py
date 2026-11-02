@@ -38,3 +38,18 @@ def test_describe_gap_low_hp_and_empty():
     empty = describe({}, hp=3)
     assert empty["events"][0]["type"] == "no_immediate_threat"
     assert "no_threat_tracks" in empty["uncertainty"]
+
+def test_situation_skips_stale_threats_and_reports_space():
+    report = describe(
+        {
+            "scene": "gameplay",
+            "player": {"x": 0.4, "y": 0.8},
+            "threats": [
+                {"id": 9, "distance": 0.1, "ttc": 0.2, "side": "left", "age_ms": 800, "confidence": 0.8}
+            ],
+        },
+        hp=3,
+    )
+    assert all(event["type"] != "threat_charging" for event in report["events"])
+    assert report["player_state"]["space_left"] == 0.4
+    assert report["player_state"]["space_right"] == 0.6

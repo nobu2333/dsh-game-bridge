@@ -52,6 +52,7 @@ class ThreatState:
     ttc: float | None
     confidence: float
     side: str = ""
+    age_ms: float = 0.0
 
     @classmethod
     def from_raw(cls, raw: dict) -> "ThreatState | None":
@@ -72,6 +73,7 @@ class ThreatState:
             ttc=(round(_clamp(_num(raw.get("ttc")), 0.0, 5.0), 4) if raw.get("ttc") is not None else None),
             confidence=round(_clamp(_num(raw.get("confidence"), 0.5), 0.0, 1.0), 3),
             side=_text(raw.get("side"), 12),
+            age_ms=round(_clamp(_num(raw.get("age_ms")), 0.0, 10000.0), 0),
         )
 
     def to_dict(self) -> dict:
@@ -86,6 +88,7 @@ class ThreatState:
             "ttc": self.ttc,
             "confidence": self.confidence,
             "side": self.side,
+            "age_ms": self.age_ms,
         }
 
 
@@ -204,6 +207,9 @@ class SituationReport:
             player_state={
                 "hp": player.get("hp"),
                 "cornered": bool(player.get("cornered")),
+                "x": round(_clamp(_num(player.get("x"), 0.5), 0.0, 1.0), 3) if player.get("x") is not None else None,
+                "space_left": round(_clamp(_num(player.get("space_left")), 0.0, 1.0), 3) if player.get("space_left") is not None else None,
+                "space_right": round(_clamp(_num(player.get("space_right")), 0.0, 1.0), 3) if player.get("space_right") is not None else None,
             },
             uncertainty=[str(item)[:40] for item in raw.get("uncertainty") or []][:8],
             source=_text(raw.get("source") or "python", 16),
