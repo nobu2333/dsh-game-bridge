@@ -41,3 +41,17 @@ def test_to_engine_profile_defaults():
     info = summary(profile)
     assert info["advance"] == "RIGHT"
     assert info["hold"] == ["X"]
+
+from dsh_game_core.instant_play import InstantPlayMetrics
+
+
+def test_instant_play_metrics_marks_once_and_reports():
+    metrics = InstantPlayMetrics(now=100.0)
+    metrics.mark("controls", now=105.5)
+    metrics.mark("first_action", now=106.0)
+    metrics.mark("controls", now=200.0)  # keep first mark
+    summary = metrics.summary()
+    assert summary["time_to_controls"] == 5.5
+    assert summary["time_to_first_action"] == 6.0
+    assert summary["time_to_menu"] is None
+    assert summary["events"]["controls"] == 5.5

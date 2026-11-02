@@ -74,3 +74,32 @@ def summary(profile: dict) -> dict:
         "advance": (profile.get("combat") or {}).get("advance"),
         "coldstart": profile.get("coldstart"),
     }
+
+import time
+
+
+class InstantPlayMetrics:
+    """Tracks time-to-first-action / controls / menu / gameplay."""
+
+    def __init__(self, now: float | None = None) -> None:
+        self.start = time.monotonic() if now is None else float(now)
+        self.events: dict[str, float] = {}
+
+    def mark(self, name: str, now: float | None = None) -> float:
+        timestamp = time.monotonic() if now is None else float(now)
+        self.events.setdefault(str(name), timestamp)
+        return round(timestamp - self.start, 3)
+
+    def time_to(self, name: str) -> float | None:
+        if name not in self.events:
+            return None
+        return round(self.events[name] - self.start, 3)
+
+    def summary(self) -> dict:
+        return {
+            "time_to_first_action": self.time_to("first_action"),
+            "time_to_controls": self.time_to("controls"),
+            "time_to_menu": self.time_to("menu"),
+            "time_to_gameplay": self.time_to("gameplay"),
+            "events": {name: round(value - self.start, 3) for name, value in self.events.items()},
+        }
