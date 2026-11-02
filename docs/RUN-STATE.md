@@ -420,4 +420,12 @@
 - 颜色 continuity 版本 300s：13 deaths、best **6.812**；handoff 在 -6.6/-6.9 均未触发（best 5.587/4.751）。
 - 当前真正瓶颈是**从起点稳定到达 6.5 屏**，而不是 7.0 宏本身。
 - 下一轮：A/B 闪避半径/冷却与交战距离（提高生存），或重复跑到 6.5 后立即 handoff；不再折腾模板。
+
+## 2026-11-03 00:40 Round 5：clean reset 失败，游戏需重新进关
+
+- 发现暂停菜单有 `RESUME / RETRY / OPTIONS / EXIT TO MAP`；本想把 `ESC → DOWN → Z` 固定成“RETRY 重置”，但自动化选到了 **OPTIONS**，把分辨率从 960x540 改成了 400x300（后又循环到 1280x600）。
+- 随后 5 次所谓 clean baseline 实际是在 options/大地图上跑：peak ≈0、hz 20–26，**数据无效，不要使用**。
+- 游戏当前停在大地图（1280x600，商店附近），还没有回到 Forest Follies。
+- 有效的仍是之前 300s base：13 deaths、best 6.812；player continuity fix 保留。
+- 下一轮前提：人工进入 Forest Follies；之后再修 reset（先 OCR 确认 pause，再选 RETRY，不能盲按 DOWN）。
 - Cuphead 仍在下载；暂无实机新数据。
