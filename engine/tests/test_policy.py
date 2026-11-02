@@ -54,6 +54,7 @@ STATUS_KEYS = {
     "danger",
     "observation",
     "situation",
+    "planner_intent",
     "intent",
     "player",
     "tracks",

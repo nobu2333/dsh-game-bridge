@@ -381,6 +381,7 @@ class PolicyRunner:
         self._temporal = None
         self._temporal_state: dict | None = None
         self._situation: dict | None = None
+        self._planner_intent: dict | None = None
         self._attack_started = 0.0
         self._attack_scroll = 0.0
         self._progress_scroll = 0.0
@@ -594,6 +595,7 @@ class PolicyRunner:
             "danger": self._nearby_danger,
             "observation": self._observation,
             "situation": self._situation,
+            "planner_intent": self._planner_intent,
             "intent": self._intent,
             "player": {"x": round(float(self._anchor[0]), 4), "y": round(float(self._anchor[1]), 4)},
             "hit": self._last_hit,
@@ -1078,8 +1080,15 @@ class PolicyRunner:
                     "progress": {"scroll_s": float(self._scroll_s), "stalled_ms": 0},
                 }
                 self._situation = describe(world_raw, hp=self._current_hp())
+                try:
+                    from .planner import choose_intent
+
+                    self._planner_intent = choose_intent(self._situation, hp=self._current_hp())
+                except Exception:  # noqa: BLE001
+                    self._planner_intent = None
             except Exception:  # noqa: BLE001
                 self._situation = None
+                self._planner_intent = None
             self._update_attack_stall()
             self._update_progress_guard()
         except Exception:  # noqa: BLE001
