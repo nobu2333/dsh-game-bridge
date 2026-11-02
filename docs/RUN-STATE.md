@@ -1,7 +1,19 @@
 # RUN STATE（本地续跑笔记，不入库）
 
 > 作用：上下文被压缩/会话中断后，先读这份文件恢复状态。
-> 最后更新：2026-10-30 19:40 左右
+> 最后更新：2026-11-02 21:50（顶部为当前判断；下面是按时间追加的续跑记录）
+
+## 当前判断（2026-11-02 整理）
+
+> 结论：**通关卡点是 L1 执行，不是 L3 决策；决策时间卡的是「主模型进 1–2Hz 战术环」这条路线。** 这两件事要分开。
+
+1. **通关卡点：Forest Follies 约 6.4 屏的平台/障碍段。** 10-30 实机最好 6.401 屏；11-02 模型 intent 实验最好 6.158 屏；都停在坑/双层平台/木桩-花妖-红蘑菇组合区。现有 L1 的跳/冲刺/gap/ledge/route macro 还不能稳定通过该段，需要针对该段的 episode 复盘和落点/路线技能。
+2. **决策时间：9.12s / 8.93s，p95≈9s，TTL 2.5–3s。** 按 30–60Hz 算，一次决策覆盖 270–540 帧；Cuphead 的跳跃/弹幕窗口是 0.2–0.5s，9s 慢约 20–45 倍。主模型可以做 10s 级姿态/策略/复盘，不能做逐跳/逐弹幕，也不适合 1–2Hz 的 L3 环。
+3. **当前决策：**
+   - 通关优先：补 L1 平台段技能与该段 episode 复盘，不把主模型放进快环；
+   - L3：事件驱动（卡住/死亡/低置信才问模型），或用更快的 L3（小模型/子 agent）；主模型 9s 不做 1–2Hz；
+   - 先验收 L2 准确率和 A/B，再扩大模型环。
+4. **仍未通关；README 不能写「已通关」。**
 
 ## Goal
 
@@ -18,35 +30,62 @@
 - P2：game_review 工具化、参数 preset、可选攻略、副本游戏矩阵、通关稳定性；
 - 最终验收：Cuphead Forest Follies 从大地图 10 局≥7 通关 + 可复现 A/B 证据；引擎无游戏专用代码。
 
-## 当前进度（截至最后提交）
+## 当前进度（2026-11-02）
 
-- HEAD: `8e4d8fa` `perf: limit OCR threads, lower scene-thread priority, player every 8 ticks`
-- 测试：引擎 192 passed，插件 44 passed。
+- HEAD: `ec094d9`；测试：引擎 **241**、插件 44、集成 11/11（本地实测）。
+- 目标未变：Forest Follies 从大地图 10 局 ≥7 通关；**仍未通关**。
+- 实机最好进度：10-30 **6.401 屏**；11-02 模型 intent 最后 **6.158 屏**；卡点仍是 6.4 屏平台段。
+- 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。
+- L2 准确率：10 点采样中 3 个 stale 正确、7 个 gameplay 位置与截图一致；仍有人工核对缺口。
+- goal：paused，需要用户在 DSH 界面恢复。
+
+### 历史进度（2026-10-30，提交 `8e4d8fa`）
+
 - 帧率：分阶段计时已接入；样本 grab 5.3ms / entities 4.2 / player 2.6 / memory 1.3；单次样本 **41.6Hz**，另一次 44Hz；仍会波动，目标稳定 ≥40。
 - 玩家追踪：每 8 拍一次 + 颜色校验；Cuphead profile `face_back=false`、`engage_max_ms=2500`。
 - 坐标漂移：卡片链式合并修复后 `cards=2 mean=0.089 max=0.100 <= 0.2`。
-- DangerCard：结果回写/换技能阶梯已实机验证；A/B 只有单对样本：
-  - knowledge off 60s：进度 -0.087 屏，HP 3；
-  - knowledge on 60s：进度 -2.295 屏，HP 1，validated 卡 acted；
-  - 样本不足，不能下结论。
+- DangerCard：结果回写/换技能阶梯已实机验证；A/B 只有单对样本（knowledge off -0.087 屏 / on -2.295 屏），样本不足。
 - 卡账本：约 22 张；response tries 9 / avoided 4 / failures 5（avoid_rate 0.444），mean efficacy ~0.496。
 - 录制：异步录制线程；episode 有 meta/events/frames。
-- 已知问题：
-  1. 感知仍是匿名运动簇，没有对象级理解/敌人模板/chaser 语义；
-  2. Cuphead profile 关闭了 face_back，且没有 turn_and_shoot，所以背后追击者不会回头打；
-  3. 静态危险物（地面毒蘑菇）纯帧差会漏；
-  4. A/B 没有自动跑批，只有单对样本；
-  5. 帧率波动，尚未稳定 ≥40；
-  6. 地图入口仍靠提示图标 + 手动方向，没有 walk-until-affordance。
+- 已知问题（当时）：匿名运动簇、face_back 关闭、静态危险物漏检、A/B 无跑批、帧率波动、地图入口无导航。
 
-## 下一步（按优先级）
+## 后续计划建议（2026-11-02）
 
-1. **对象级理解**：新增 `entity_memory.py`（tracklet ID + 颜色直方图/缩略模板 + 角色统计 + 外观聚类）；从轨迹外观聚类，按行为/结果推断 approaching/harmful/chaser/projectile/pickup。
-2. **turn_and_shoot**：策略技能：停步 → 转身/锁定 → 持续射击 N ms → 恢复推进；条件：后方有 approaching/chaser 轨迹且后方不是墙（用 scroll/stuck/空间判断）；profile 行为先验更新。
-3. **静态危险物检测**：颜色/模板/边缘；从受击帧自动裁剪候选模板。
-4. **A/B 跑批**：交替 knowledge on/off 各 N 局，写 `evaluate` 统计；当前 driver 已支持 `{"knowledge": false}`。
-5. **帧率稳定**：必要时 OCR 子进程化 / 录制降频 / grab 优化。
-6. **game_review 工具化 + 补丁 A/B**。
+> 原则：先拿证据，再改执行；先通关，再扩模型环；不把主模型放进快环。
+
+### P0 先拿到「为什么过不去」的证据（1–2 天）
+
+1. 恢复 goal；清理残留 driver；用当前 HEAD 跑 10 局 baseline（record=true, game=cuphead, level=forest-follies）。
+2. 对 6.4 屏附近的 episode 做 review：把死亡分类为坠落 / 蘑菇 / 花妖弹幕 / 跳早 / 跳晚 / 其他，统计每类次数。
+3. 固定指标：clear rate、best progress、damage/run、death location、hz、time-to-control。
+4. 决策延迟 A/B：同一批 20 个 SituationReport，比较 `deepseek-flash + max`（当前主会话）、`deepseek-flash + off/low`（直接 LLM 调用，最小 prompt，maxTokens≤128）、可选本地小模型；记录 p50/p95 与 intent 正确率。p95 > 1s 就不做 1–2Hz 模型环。
+5. 同步 STATUS/README 的当前状态（或明确指向本文件）。
+
+### P1 打通 6.4 屏（2–4 天）
+
+1. 用 episode 证据补 L1 平台技能：retreat-align、jump-to-landing、apex dash、ledge/gap with target x；全部走 profile 参数化。
+2. 用 profile `macros` 做该段的确定性路线（scroll_s 触发 + 分步 hold/tap），先拿 first clear；不写进引擎。
+3. 10 局 A/B：baseline vs route；≥7/10 过 6.4，再冲 full clear。
+4. 如果 route 仍不过，回到 episode 找具体帧，不继续全局参数扫描。
+
+### P2 稳定通关 + 从地图出发（3–5 天）
+
+1. 10–20 局 full runs；修 top 3 death causes；每改一项做 A/B。
+2. 地图入口：profile 航点/宏，或改进 walk-until-affordance；验收从大地图 10 局 ≥7 通关。
+3. L2 准确率 10 点人工核对；A/B 证据留本地，不提交录像/账本。
+
+### P3 模型 L3（可与 P1/P2 并行，但不阻塞）
+
+1. 主模型只做事件驱动（卡住/死亡/低置信），TTL 5–10s 的姿态/路线建议；不做 1–2Hz。
+2. 若要实时 L3，单独接一个快速 L3（直接 `ctx.llm` 调用或本地小模型，不复用主会话/完整 agent loop）；先测 p95 < 1s（含解析/提交）再接线。
+3. 验收：模型介入提升 clear rate / 降低 damage，且不增加卡死。
+
+### 不建议做
+
+- 不要用调 TTL/伪造新鲜度来迁就 9s 模型；
+- 不要在 6.4 屏打通前继续堆感知/对象记忆特性；
+- 不要把 Cuphead 专用逻辑写进引擎；路线宏只能放 profile；
+- 不要在 10 局 ≥7 通关前写「已通关」。
 
 ## 运行环境/命令
 
