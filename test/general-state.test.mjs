@@ -346,6 +346,15 @@ test('game_policy render reports running, stopped and idle states', () => {
 
   const [idle] = tool('game_policy').output.render({}, { action: 'status', policy: null })
   assert.match(idle.text, /^Policy status: not running\./)
+
+  const [withIntent] = tool('game_policy').output.render(
+    {},
+    {
+      action: 'status',
+      policy: { ...policy, active_intent: { skill: 'jump', arbiter: 'model' } },
+    },
+  )
+  assert.match(withIntent.text, /intent=jump \(model\)/)
 })
 
 test('game_intent render reports accepted and rejected intents', () => {
