@@ -431,6 +431,27 @@ def test_find_player_color_fallback_and_garbage():
     assert state_module.find_player(None, profile) is None
     assert state_module.find_player(frame, {"player": {"template_png_base64": "not-base64!!"}}) is None
 
+
+def test_find_player_color_prefers_nearby_anchor():
+    frame = np.zeros((120, 200, 3), dtype=np.uint8)
+    # Player-sized red blob near the previous anchor.
+    frame[50:70, 90:110] = (20, 20, 220)
+    # Larger red flower far away; without continuity it would win on area.
+    frame[80:110, 10:40] = (20, 20, 220)
+    profile = {
+        "player": {
+            "colors": [{"r_min": 180, "g_max": 80, "b_max": 80}],
+            "min_pixels": 20,
+            "search_radius": 0.30,
+        }
+    }
+    near = state_module.find_player(frame, profile, previous=(0.5, 0.5))
+    assert near is not None
+    assert abs(near["x"] - 0.5) < 0.08 and abs(near["y"] - 0.5) < 0.08
+    far = state_module.find_player(frame, profile)
+    assert far is not None
+    assert far["x"] < 0.25  # legacy no-previous behavior still picks the largest blob
+
 def test_detect_prompt_icon_template():
     frame = np.zeros((180, 320, 3), dtype=np.uint8)
     icon = np.zeros((40, 36, 3), dtype=np.uint8)

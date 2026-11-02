@@ -711,8 +711,14 @@ def _player_color_valid(frame: np.ndarray, section: Mapping, found: dict) -> boo
         return True
 
 
-def _find_player_color(frame: np.ndarray, profile: Any) -> dict | None:
-    """Color-blob fallback: profile.player.colors = [{r_min,g_min,b_min,...}], largest blob."""
+def _find_player_color(frame: np.ndarray, profile: Any, previous: Any = None) -> dict | None:
+    """Color-blob fallback: profile.player.colors = [{r_min,g_min,b_min,...}].
+
+    Without ``previous`` the largest blob wins (legacy). With a previous anchor,
+    only blobs inside the profile search radius are considered and the nearest
+    one wins: a red flower/enemy must not steal the player anchor just because
+    it is larger.
+    """
     section = _player_section(profile)
     mask = _player_color_mask(frame, section.get("colors"))
     if mask is None:
@@ -726,19 +732,30 @@ def _find_player_color(frame: np.ndarray, profile: Any) -> dict | None:
         if cv2.countNonZero(gray) < min_pixels:
             return None
         count, labels, stats, centroids = cv2.connectedComponentsWithStats(gray, connectivity=8)
+        prev = _previous_point(previous)
+        radius = _number(section.get("search_radius"), 0.30)
         best = None
         for label in range(1, count):
             area = int(stats[label, cv2.CC_STAT_AREA])
-            if area < min_pixels or (best is not None and area <= best[0]):
+            if area < min_pixels:
                 continue
             cx, cy = centroids[label]
-            best = (area, float(cx) / w, float(cy) / h)
+            nx, ny = float(cx) / w, float(cy) / h
+            distance = math.hypot(nx - prev[0], ny - prev[1]) if prev is not None else 0.0
+            if prev is not None and distance > radius:
+                continue
+            # Nearest wins; area only breaks ties at the same distance.
+            candidate = (distance, -area, nx, ny)
+            if best is None or candidate < best:
+                best = candidate
         if best is None:
+            # No plausible blob near the previous anchor: keep the old anchor
+            # instead of jumping to a far red flower.
             return None
-        area, cx, cy = best
+        _distance, _neg_area, nx, ny = best
         return {
-            "x": round(_clamp(cx, 0.0, 1.0), 4),
-            "y": round(_clamp(cy, 0.0, 1.0), 4),
+            "x": round(_clamp(nx, 0.0, 1.0), 4),
+            "y": round(_clamp(ny, 0.0, 1.0), 4),
             "score": round(min(1.0, _number(section.get("color_score"), 0.55)), 4),
             "method": "color",
         }
@@ -857,7 +874,7 @@ def find_player(frame_bgr: Any, profile: Any = None, previous: Any = None) -> di
             found = _match_player_template(frame, section, template, previous=_previous_point(previous))
             if found is not None and _player_color_valid(frame, section, found):
                 return found
-        return _find_player_color(frame, profile)
+        return _find_player_color(frame, profile, previous=_previous_point(previous))
     except Exception:  # noqa: BLE001 - perception must never raise
         return None
 
