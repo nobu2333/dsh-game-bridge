@@ -398,4 +398,12 @@
   - base + `macros` 在 -7.0 触发（jump/right）：best 4.538、7 deaths，**没跑到触发点**，不能评估宏本身。
 - 结论：**不要继续全局调参**；当前卡点是 7.0 屏下层平台→上层平台的跳跃 + 飞花弹幕。下一轮用固定序列/手动 handoff 验证这一小段，再决定 profile 宏。
 - 记录修正：death scene 现在会额外写 `{"type":"death"}`，evaluate 才能统计 deaths。
+
+## 2026-11-03 00:15 Player continuity fix + 7.0 evidence
+
+- 7.0 全分辨率帧暴露玩家追踪误判：颜色 fallback 把左下的红/橙花当成玩家（(0.056,0.948)），真实 Cuphead 在 (0.50,0.56)；HP1，右上有飞花。
+- 已修 `_find_player_color`：有 previous anchor 时只考虑 search_radius 内的 blob，取最近而非最大；离线在 7.0 帧上返回 (0.502,0.559)。测试 245。
+- 修复后 base 180s：17 episodes、10 damage、6 deaths、best **6.797**；仍未通关，7.0 未过。
+- 其它尝试：handoff 没跑到 7.0（best 4.751）；knowledge-on best 6.293；周期跳/route-macro 变体均更差。run-to-run 方差仍大。
+- 下一步：用修复后的 base 多跑几局，观察 player_age/stale 是否下降；再在 7.0 做 handoff/宏。
 - Cuphead 仍在下载；暂无实机新数据。
