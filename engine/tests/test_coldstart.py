@@ -42,3 +42,14 @@ def test_build_profile_shape():
     assert profile["controls"]["jump"]["source"] == "probe"
     assert profile["verified_in_game"] is True
     assert profile["conflicts"]
+
+def test_keyname_candidates_map_directions():
+    from dsh_game_core.coldstart import keyname_candidates
+
+    candidates = keyname_candidates(["RIGHT", "a", "DOWN", "Z", "SPACE"])
+    actions = {item["key"]: item["action"] for item in candidates}
+    assert actions["RIGHT"] == "move_right"
+    assert actions["a"] == "move_left"
+    assert actions["DOWN"] == "move_down"
+    assert actions["SPACE"] == "jump"
+    assert "Z" not in actions

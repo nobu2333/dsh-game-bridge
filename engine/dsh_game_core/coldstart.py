@@ -122,6 +122,39 @@ def probe_to_candidates(probe_results: dict[str, dict]) -> list[dict]:
     return candidates
 
 
+KEYNAME_ACTIONS = {
+    "right": "move_right",
+    "d": "move_right",
+    "left": "move_left",
+    "a": "move_left",
+    "up": "move_up",
+    "w": "move_up",
+    "down": "move_down",
+    "s": "move_down",
+    "space": "jump",
+    "x": "attack",
+}
+
+
+def keyname_candidates(keys: list[str] | tuple[str, ...]) -> list[dict]:
+    """Weak, game-agnostic prior: standard key names often mean standard actions."""
+    candidates: list[dict] = []
+    for key in keys or []:
+        action = KEYNAME_ACTIONS.get(str(key).strip().lower())
+        if not action:
+            continue
+        candidates.append(
+            {
+                "action": action,
+                "key": key,
+                "source": "prior",
+                "confidence": 0.50,
+                "evidence": "key name convention",
+            }
+        )
+    return candidates
+
+
 def build_profile(
     *,
     engine: str = "unknown",
