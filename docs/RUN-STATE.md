@@ -428,4 +428,12 @@
 - 游戏当前停在大地图（1280x600，商店附近），还没有回到 Forest Follies。
 - 有效的仍是之前 300s base：13 deaths、best 6.812；player continuity fix 保留。
 - 下一轮前提：人工进入 Forest Follies；之后再修 reset（先 OCR 确认 pause，再选 RETRY，不能盲按 DOWN）。
+
+## 2026-11-03 00:50 Round 6：reset 已加 OCR 门，仍卡在进关
+
+- 游戏进程还在，但窗口被最小化；恢复后仍在大地图（1280x600，商店附近），不在 Forest Follies。
+- 地图上试了商店/红白靶点附近移动，仍未找到 Forest Follies 入口；红白靶点不是该关入口。
+- clean reset 已改成 OCR 门控：只有 pause 文本里出现 `RETRY` 才按 DOWN+Z；大地图 pause（RESUME/OPTIONS/EXIT TO TITLE/QUIT）只关闭菜单。实机在 map 上验证 `reset=False`，分辨率未再改变。
+- 本轮没有新的关卡内数据；有效 baseline 仍是 13 deaths / best 6.812；玩家连续性修复保留。
+- 下一轮必须人工进关，否则只能在 map 上空转。
 - Cuphead 仍在下载；暂无实机新数据。
