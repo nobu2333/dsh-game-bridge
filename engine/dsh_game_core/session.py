@@ -561,6 +561,9 @@ class GameSession:
         self._last_recorded_scene = scene
         if scene in ("death", "equip", "cutscene"):
             self._recorder.add_event({"type": "scene", "scene": scene})
+            if scene == "death":
+                # evaluate.py counts death events; the scene tag alone is not a death.
+                self._recorder.add_event({"type": "death"})
             episode = self._save_episode(scene)
             if scene == "death":
                 self._record_death_card(episode)

@@ -249,6 +249,32 @@ def test_hp_drop_saves_damage_episode():
     assert saved == ["forest-follies-damage"]
     session.close()
 
+def test_death_scene_records_death_event(tmp_path, monkeypatch):
+    monkeypatch.setenv("DSH_GAME_BRIDGE_DATA_DIR", str(tmp_path))
+    session = GameSession(
+        engine=FakeEngine(),
+        gate=SafetyGate(process_source=lambda: [], takeover_source=lambda: False, process_ttl_s=0),
+    )
+    events = []
+
+    class Recorder:
+        def add_event(self, event):
+            events.append(event)
+
+        def save(self, tag):
+            return str(tmp_path / "episode")
+
+    session._recorder = Recorder()
+    session._record_game = "cuphead"
+    session._record_level = "forest-follies"
+    session._start_recorder = lambda: None
+    session._record_death_card = lambda episode: None
+    session._maybe_record_scene("death")
+    assert {"type": "scene", "scene": "death"} in events
+    assert {"type": "death"} in events
+    session.close()
+
+
 def test_hp_drop_creates_candidate_danger_card(tmp_path, monkeypatch):
     monkeypatch.setenv("DSH_GAME_BRIDGE_DATA_DIR", str(tmp_path))
     session = GameSession(
