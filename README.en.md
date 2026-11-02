@@ -147,7 +147,7 @@ Call it after restarting: it answers both "did I install it into the right place
 | `game_events` | Cheap frame-difference event (baseline / static / changed / scene_cut) |
 | `game_attach` | Attach to a window (the user-authorization step; optional `profile` parameter) |
 | `game_state` | Read one general WorldState (scene, HP, entities, UI text) from the current frame |
-| `game_policy` | Start / stop / status the local 60 Hz reactive policy driven by the loaded game profile |
+| `game_policy` | Start / stop / status the local 60 Hz reactive policy driven by the loaded game profile; start accepts `intent_enabled` |
 | `game_intent` | Submit a TTL-bound tactical Intent to the running policy (advisory; never presses keys directly) |
 | `game_memory` | Manage local game profiles (list / get / save / delete / use) — data only, **not** OS memory reading |
 | `game_act` | Press one gamepad button (dry-run by default; real backends refuse when the attached window is not foreground) |

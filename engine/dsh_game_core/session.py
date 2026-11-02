@@ -1107,6 +1107,11 @@ class GameSession:
             raise EngineError("NOT_ATTACHED", "还没有 attach 任何窗口：先调 game_attach，再调 game_policy")
         profile = params.get("profile")
         profile = dict(profile) if isinstance(profile, dict) else {}
+        if "intent_enabled" in params:
+            instant = profile.get("instant_play")
+            instant = dict(instant) if isinstance(instant, dict) else {}
+            instant["intent_enabled"] = bool(params.get("intent_enabled"))
+            profile["instant_play"] = instant
         self._record_game = str(params.get("game") or profile.get("id") or "unknown")[:48]
         self._record_level = str(params.get("level") or "level")[:48]
         self._record_knowledge = bool(params.get("knowledge", True))

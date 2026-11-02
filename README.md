@@ -41,7 +41,7 @@ dsh-game-bridge 把一块薄薄的插件壳装进 DSH，背后接一个本地引
 | `game_controls` | 当前后端接受的按钮/按键名 |
 | `game_attach` | 绑定窗口（用户授权步骤；可带 `profile`） |
 | `game_state` | 读一次通用世界状态 WorldState（场景 / HP / 实体 / UI 文本） |
-| `game_policy` | 起停本地 60 Hz 状态策略（按 profile 射击/前进/闪避/脱困） |
+| `game_policy` | 起停本地 60 Hz 状态策略（按 profile 射击/前进/闪避/脱困；start 可开 `intent_enabled`） |
 | `game_intent` | 向运行中的策略提交带 TTL 的战术 Intent（建议性，不直接按键） |
 | `game_memory` | 本地游戏档案（profile）的增删改查与选用——**不读游戏内存** |
 | `game_act` | 单步按键（默认 dry-run，只记录） |

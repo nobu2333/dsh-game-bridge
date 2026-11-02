@@ -32,11 +32,11 @@
 
 ## 当前进度（2026-11-02）
 
-- HEAD: `d509cb8`；测试：引擎 **242**、插件 **45**、集成 11/11（本地实测）。
+- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **243**、插件 **45**、集成 11/11（本地实测）。
 - 目标未变：Forest Follies 从大地图 10 局 ≥7 通关；**仍未通关**。
 - 实机最好进度：10-30 **6.401 屏**；11-02 模型 intent 最后 **6.158 屏**；卡点仍是 6.4 屏平台段。
 - 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。
-- 工具面已补 `game_intent`（stdio `submit_intent` + 插件工具）：默认 advisory，执行还需 `profile.instant_play.intent_enabled=true`。
+- 工具面已补 `game_intent`（stdio `submit_intent` + 插件工具）：默认 advisory，执行还需 `game_policy start intent_enabled=true` 或 `profile.instant_play.intent_enabled=true`。
 - L2 准确率：10 点采样中 3 个 stale 正确、7 个 gameplay 位置与截图一致；仍有人工核对缺口。
 - goal：paused，需要用户在 DSH 界面恢复。
 
@@ -370,6 +370,7 @@
 
 ## 2026-11-02 22:05 工具面接线
 
-- 新增 `game_intent`（引擎 stdio `submit_intent` + 插件工具）：低频战术 Intent，默认 advisory；本地 60 Hz 策略继续跑，执行还需 `profile.instant_play.intent_enabled=true`。
-- 测试：插件 45、引擎 242、集成 11/11。
+- 新增 `game_intent`（引擎 stdio `submit_intent` + 插件工具）：低频战术 Intent，默认 advisory；本地 60 Hz 策略继续跑，执行还需 `game_policy start intent_enabled=true` 或 `profile.instant_play.intent_enabled=true`。
+- `game_policy start` 新增 `intent_enabled` 开关，可显式开启 intent 执行（默认关）。
+- 测试：插件 45、引擎 243、集成 11/11。
 - Cuphead 仍在下载；暂无实机新数据。

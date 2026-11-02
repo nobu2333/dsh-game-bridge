@@ -75,6 +75,7 @@ class FakePolicy:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.stopped = False
+        self.intent = None
         FakePolicy.instances.append(self)
 
     def start(self):
@@ -83,6 +84,10 @@ class FakePolicy:
     def stop(self):
         self.stopped = True
         return self.status()
+
+    def submit_intent(self, intent):
+        self.intent = intent
+        return True
 
     def status(self):
         return {
@@ -164,11 +169,12 @@ def test_policy_start_status_and_stop(monkeypatch):
     session, fg_state = _make_session()
     session.attach({"window": "Game"})
 
-    started = session.policy_start({"profile": {"id": "cuphead"}})
+    started = session.policy_start({"profile": {"id": "cuphead"}, "intent_enabled": True})
     assert started["policy"]["running"] is True
     first = FakePolicy.instances[-1]
     assert first.kwargs["tick_hz"] == 60
     assert callable(first.kwargs["capture"])
+    assert first.kwargs["profile"]["instant_play"]["intent_enabled"] is True
 
     assert session.status()["policy"]["running"] is True
     again = session.policy_start({"profile": {"id": "cuphead"}})
@@ -186,6 +192,23 @@ def test_policy_requires_attach():
     with pytest.raises(EngineError) as error:
         session.policy_start({})
     assert error.value.code == "NOT_ATTACHED"
+
+
+def test_submit_intent_round_trips_to_running_policy(monkeypatch):
+    import dsh_game_core.policy as policy_module
+
+    FakePolicy.instances.clear()
+    monkeypatch.setattr(policy_module, "PolicyRunner", FakePolicy)
+    session, _fg_state = _make_session()
+    session.attach({"window": "Game"})
+    session.policy_start({"profile": {"id": "cuphead"}})
+
+    intent = {"goal": "advance", "skill": "advance", "ttl_ms": 1000}
+    result = session.submit_intent({"intent": intent})
+    assert result["accepted"] is True
+    assert result["intent"]["skill"] == "advance"
+    assert FakePolicy.instances[-1].intent["goal"] == "advance"
+    session.policy_stop()
 
 
 def test_policy_start_refuses_when_real_backend_target_not_foreground(monkeypatch):
