@@ -51,6 +51,7 @@ class ThreatState:
     distance: float
     ttc: float | None
     confidence: float
+    side: str = ""
 
     @classmethod
     def from_raw(cls, raw: dict) -> "ThreatState | None":
@@ -70,6 +71,7 @@ class ThreatState:
             distance=round(_clamp(_num(raw.get("distance")), 0.0, 2.0), 4),
             ttc=(round(_clamp(_num(raw.get("ttc")), 0.0, 5.0), 4) if raw.get("ttc") is not None else None),
             confidence=round(_clamp(_num(raw.get("confidence"), 0.5), 0.0, 1.0), 3),
+            side=_text(raw.get("side"), 12),
         )
 
     def to_dict(self) -> dict:
@@ -83,6 +85,7 @@ class ThreatState:
             "distance": self.distance,
             "ttc": self.ttc,
             "confidence": self.confidence,
+            "side": self.side,
         }
 
 
