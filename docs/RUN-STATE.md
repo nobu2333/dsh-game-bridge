@@ -639,3 +639,10 @@
   - level_memory：segments 13、deaths 37、damage 320、hotspots 13；当前 s:-5 死亡8/伤害79，preferred=jump。
 - 说明：按关加载、guide 注入、LevelMemory 热点/动作统计均已进入策略状态；仍不改变动作。
 - 未通关；README 未写；驱动关闭。
+
+## 2026-11-03 20:00 grounded gating A/B（负）
+
+- 周期 jump/dash 仅在 grounded 时触发：10 局 3.08/2.22/2.66/2.57/2.85/4.49/2.77/2.20/2.49/4.18；平均 2.95。
+- 对照 4.19：明显更差；空中/冲刺中的跳跃其实在躲弹幕，不应一律禁止。
+- 已回退代码；保留 action_state 只读。
+- 未通关；README 未写；驱动关闭。
