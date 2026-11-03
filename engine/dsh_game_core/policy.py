@@ -1091,6 +1091,19 @@ class PolicyRunner:
             self._macro_state = None
         return True
 
+    def _death_cause(self) -> str:
+        obs = self._observation or {}
+        player = obs.get("player") or {}
+        x = _as_float(player.get("x"), None)
+        hp = obs.get("hp")
+        if x is not None and float(x) < 0.15:
+            return "cornered"
+        if hp is not None and int(hp) <= 1:
+            return "low_hp"
+        if isinstance(self._last_hit, dict):
+            return "hit"
+        return "unknown"
+
     def _capture_death_context(self) -> None:
         if self._scene != "death" or self._death_context_done:
             return
@@ -1098,6 +1111,7 @@ class PolicyRunner:
         self._death_context = {
             "ts": self._clock(),
             "scroll_s": round(float(self._scroll_s), 3),
+            "cause": self._death_cause(),
             "hp": self._current_hp(),
             "last_hit": self._last_hit,
             "action_state": self._action_state(),
@@ -1120,7 +1134,7 @@ class PolicyRunner:
                 self._memory_hit_t = hit_t
                 self._hurt_until = self._clock() + 0.35
             if self._scene == "death" and not self._memory_death_done:
-                memory.record_death(float(self._scroll_s))
+                memory.record_death(float(self._scroll_s), self._death_cause())
                 self._memory_death_done = True
             now = self._clock()
             if self._memory_action_at <= 0.0:
