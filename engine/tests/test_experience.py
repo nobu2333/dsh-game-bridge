@@ -37,3 +37,15 @@ def test_context_coarse_ignores_ttc_distance():
     b = Context(scene="gameplay", hp=3, threat_side="left", threat_ttc=0.8, threat_distance=0.4)
     assert a.key() != b.key()
     assert a.key(coarse=True) == b.key(coarse=True)
+
+def test_skill_stats_advantage():
+    from dsh_game_core.experience import SkillStats
+    stats = SkillStats()
+    key = "k"
+    stats.update(key, "advance", 0.0)
+    stats.update(key, "jump", 1.0)
+    info = stats.advantage(key, "jump", baseline="advance")
+    assert info is not None
+    assert info["advantage"] == 1.0
+    assert info["n_action"] == 1
+    assert stats.advantage(key, "jump", baseline="missing") is None

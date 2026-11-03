@@ -173,6 +173,21 @@ class SkillStats:
             return None
         return round(bucket["total"] / bucket["n"], 4)
 
+    def advantage(self, context_key: str, action: str, *, baseline: str = "advance") -> dict | None:
+        """Return (action_mean - baseline_mean, n_action, n_baseline) or None."""
+        key = str(context_key)
+        action_bucket = (self._stats.get(key) or {}).get(str(action))
+        base_bucket = (self._stats.get(key) or {}).get(str(baseline))
+        if not action_bucket or not base_bucket:
+            return None
+        if action_bucket["n"] <= 0 or base_bucket["n"] <= 0:
+            return None
+        return {
+            "advantage": round(action_bucket["total"] / action_bucket["n"] - base_bucket["total"] / base_bucket["n"], 4),
+            "n_action": int(action_bucket["n"]),
+            "n_baseline": int(base_bucket["n"]),
+        }
+
     def to_dict(self) -> dict:
         return {
             "version": 1,

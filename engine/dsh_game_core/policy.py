@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import ctypes
 import math
+import random
 import threading
 import time
 from collections import deque
@@ -397,6 +398,10 @@ class PolicyRunner:
         self._learning_path = str(learning.get("path") or "") or None
         self._learning_window_ms = max(200.0, _as_float(learning.get("window_ms"), 1000.0) or 1000.0)
         self._learning_death_window = max(1, int(_as_float(learning.get("death_window"), 20) or 20))
+        self._learning_explore = max(0.0, min(1.0, _as_float(learning.get("explore_rate"), 0.1) or 0.1))
+        self._learning_margin = _as_float(learning.get("promotion_margin"), 0.02) or 0.02
+        self._learning_min_samples = max(1, int(_as_float(learning.get("promotion_samples"), 4) or 4))
+        self._learning_rng = random.Random(7)
         self._learner = None
         self._learning_pending: dict | None = None
         self._learning_updates = 0
@@ -1254,7 +1259,19 @@ class PolicyRunner:
             context = context_from_observation(self._observation)
             actions = ["advance", "jump", "dodge_left", "dodge_right", "retreat"]
             action = self._learner.choose(context, actions, epsilon=self._learning_epsilon, min_tries=2)
-            if action in ("jump", "dodge_left", "dodge_right", "retreat"):
+            execute = action == "advance"
+            if not execute:
+                info = self._learner.stats.advantage(context.key(coarse=True), action, baseline="advance")
+                if (
+                    info is not None
+                    and info["n_action"] >= self._learning_min_samples
+                    and info["n_baseline"] >= self._learning_min_samples
+                    and info["advantage"] >= self._learning_margin
+                ):
+                    execute = True
+                elif self._learning_rng.random() < self._learning_explore:
+                    execute = True
+            if execute and action in ("jump", "dodge_left", "dodge_right", "retreat"):
                 if self._arbiter is None:
                     self._arbiter = IntentArbiter(local_intent_from_skill("advance"))
                 self._arbiter.submit(
@@ -1269,6 +1286,8 @@ class PolicyRunner:
                     },
                     origin="learner",
                 )
+            if not execute:
+                action = "advance"
             self._learning_pending = {
                 "key": context.key(coarse=True),
                 "action": action,
