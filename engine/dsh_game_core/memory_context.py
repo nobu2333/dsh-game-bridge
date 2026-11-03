@@ -33,7 +33,7 @@ def build_memory_context(
         except Exception:  # noqa: BLE001
             pass
         game_data = getattr(loader, "game_data", None) or {}
-        for key in ("game", "entities", "ui", "general"):
+        for key in ("game", "entities", "ui", "general", "guides"):
             payload = game_data.get(key)
             if isinstance(payload, dict) and payload:
                 data[key] = payload
@@ -56,7 +56,10 @@ def build_memory_context(
                 pass
 
     facts = []
-    for card in guide_cards or []:
+    guide_source = guide_cards
+    if not guide_source and isinstance(data.get("guides"), dict):
+        guide_source = list(data["guides"].get("game") or []) + list(data["guides"].get("level") or [])
+    for card in guide_source or []:
         if not isinstance(card, dict):
             continue
         scope = str(card.get("scope") or "level")

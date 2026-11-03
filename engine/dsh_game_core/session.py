@@ -1152,6 +1152,16 @@ class GameSession:
             self._memory_loader = MemoryLoader(root)
             self._memory_loader.load_game(self._record_game)
             level_memory = self._memory_loader.load_level(self._record_game, self._record_level)
+            try:
+                from .memory import GuideStore
+
+                guide_store = GuideStore(os.path.join(self._data_root(), "guides"))
+                self._memory_loader.game_data["guides"] = {
+                    "game": guide_store.load_game(self._record_game),
+                    "level": guide_store.load(self._record_game, self._record_level),
+                }
+            except Exception:  # noqa: BLE001
+                pass
         except Exception:  # noqa: BLE001 - 记忆加载失败不影响开局
             self._memory_loader = None
             level_memory = None

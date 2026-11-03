@@ -616,3 +616,11 @@
 - 对照 jump420：20 局平均 4.19。
 - 结论：360 更差；恢复 420。参数扫描停止。
 - 未通关；README 未写；驱动关闭。
+
+## 2026-11-03 19:55 攻略优先接线
+
+- 从 Cuphead wiki 抓取 Forest Follies 的可用要点（Run&Gun/无 Boss/评分项/金币/粉色可弹反），只存要点，source_url、assisted=true。
+- 本地 GuideStore：game 卡 1 张、level 卡 1 张（C:\Users\xykan\AppData\Local\dsh-game-bridge\guides，未入库）。
+- Session.policy_start 现在还会加载 game/level guide cards，挂到 memory_loader.game_data["guides"]。
+- memory_context 支持从 game_data.guides 取 facts（仍受 scope/字符预算约束）。
+- 测试 273 passed。
