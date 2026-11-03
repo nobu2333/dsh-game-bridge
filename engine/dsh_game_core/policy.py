@@ -446,6 +446,8 @@ class PolicyRunner:
         self._player_score = 0.0
         self._player_seen_at = 0.0
         self._player_missing = 0
+        self._edge_since = 0.0
+        self._last_edge_escape = 0.0
         # 关卡记忆：滚动坐标 + 可选的 DangerCard 列表（由会话按 game/level 注入）。
         self._locator = None
         self._dangers = self._profile.get("danger_cards")
@@ -801,6 +803,7 @@ class PolicyRunner:
                 player_started = self._clock()
                 self._update_player(frame)
                 self._mark_timing("player", player_started)
+                self._maybe_edge_escape()
                 memory_started = self._clock()
                 self._update_memory(previous_frame, frame)
                 self._mark_timing("memory", memory_started)
@@ -1048,6 +1051,34 @@ class PolicyRunner:
         if state["index"] >= len(steps):
             self._macro_state = None
         return True
+
+    def _maybe_edge_escape(self) -> None:
+        """Generic corner escape: pressed against the left edge for a while -> jump/dash out."""
+        if self._scene != "gameplay":
+            self._edge_since = 0.0
+            return
+        now = self._clock()
+        if float(self._anchor[0]) >= 0.10:
+            self._edge_since = 0.0
+            return
+        if self._edge_since <= 0.0:
+            self._edge_since = now
+            return
+        if now - self._edge_since < 0.5 or now - self._last_edge_escape < 1.2:
+            return
+        advance = self._resolve_key(str((self._profile.get("combat") or {}).get("advance") or "right"))
+        if advance and advance in self._held:
+            self._release_key(advance)
+        if self._jump_keys:
+            self._tap(self._jump_keys[0], 140.0)
+        if self._dash_keys:
+            self._tap(self._dash_keys[0], 120.0)
+        if advance:
+            self._controller.hold(advance)
+            self._held.add(advance)
+        self._last_edge_escape = now
+        self._edge_since = 0.0
+        self._actions += 1
 
     def _update_observation(self, entities: list[dict]) -> None:
         """Build the generic observation + chosen skill (diagnostic; does not change actions yet)."""
