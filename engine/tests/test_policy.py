@@ -538,7 +538,16 @@ def test_policy_records_level_memory_visits():
     from dsh_game_core.level_memory import LevelMemory
 
     memory = LevelMemory("game", "level")
-    runner, _, _ = build_runner(budget_ticks=18, level_memory=memory)
+    runner, _, _ = build_runner(budget_ticks=130, level_memory=memory)
     status = run_to_completion(runner)
     assert status["level_memory"] is not None
     assert memory.summary()["segments"] >= 1
+
+def test_policy_records_level_memory_actions():
+    from dsh_game_core.level_memory import LevelMemory
+
+    memory = LevelMemory("game", "level")
+    runner, _, _ = build_runner(budget_ticks=130, level_memory=memory)
+    run_to_completion(runner)
+    actions = [seg.get("actions", {}) for seg in memory.segments.values()]
+    assert any(actions)

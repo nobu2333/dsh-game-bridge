@@ -219,6 +219,10 @@ class PolicyRunner:
         self._memory_observe_every = 6
         self._memory_hit_t = None
         self._memory_death_done = False
+        self._memory_action_at = 0.0
+        self._memory_action_scroll = 0.0
+        self._memory_action_hp = None
+        self._last_action_label = None
         self._clock = clock if callable(clock) else time.monotonic
         self._sleep = sleep if callable(sleep) else time.sleep
         # 可注入实体检测（单测用）；默认懒加载 .state.cheap_entities。
@@ -790,6 +794,10 @@ class PolicyRunner:
                         self._learning_recent = []
                         self._learning_death_done = False
                         self._learning_pending = None
+                        self._memory_death_done = False
+                        self._memory_action_at = 0.0
+                        self._memory_action_hp = None
+                        self._last_action_label = None
                         if self._locator is not None:
                             self._locator.reset()
                     self._prev_scene = self._scene
@@ -1085,6 +1093,26 @@ class PolicyRunner:
             if self._scene == "death" and not self._memory_death_done:
                 memory.record_death(float(self._scroll_s))
                 self._memory_death_done = True
+            now = self._clock()
+            if self._memory_action_at <= 0.0:
+                self._memory_action_at = now
+                self._memory_action_scroll = float(self._scroll_s)
+                self._memory_action_hp = self._current_hp()
+            elif now - self._memory_action_at >= 1.0:
+                hp_now = self._current_hp()
+                good = True
+                if hp_now is not None and self._memory_action_hp is not None:
+                    good = int(hp_now) >= int(self._memory_action_hp)
+                good = good and abs(float(self._scroll_s)) >= abs(self._memory_action_scroll) - 0.02
+                memory.record_action(
+                    self._memory_action_scroll,
+                    self._last_action_label or "advance",
+                    good=good,
+                )
+                self._memory_action_at = now
+                self._memory_action_scroll = float(self._scroll_s)
+                self._memory_action_hp = hp_now
+                self._last_action_label = None
         except Exception:  # noqa: BLE001
             return
 
@@ -1114,6 +1142,7 @@ class PolicyRunner:
             self._held.add(advance)
         self._last_edge_escape = now
         self._edge_since = 0.0
+        self._last_action_label = "jump"
         self._actions += 1
 
     def _update_observation(self, entities: list[dict]) -> None:
@@ -1278,6 +1307,8 @@ class PolicyRunner:
             return
         skill = str(self._active_intent.get("skill") or "")
         now = self._clock()
+        if skill in ("jump", "dodge_left", "dodge_right", "retreat"):
+            self._last_action_label = skill
         if skill == "jump":
             if (now - self._last_intent_action) * 1000.0 >= 700.0 and self._jump_keys:
                 self._tap(self._jump_keys[0], 140.0)
@@ -1602,6 +1633,7 @@ class PolicyRunner:
         for key in self._jump_keys:
             self._tap(key, self._dodge_press_ms)
         self._last_jump_at = now
+        self._last_action_label = "jump"
 
     def _maybe_dash(self) -> None:
         """赶路时按固定间隔按一次冲刺键（profile.combat.dash_every_ms）。"""
@@ -1616,6 +1648,7 @@ class PolicyRunner:
         for key in self._dash_keys:
             self._tap(key, self._dodge_press_ms)
         self._last_dash_at = now
+        self._last_action_label = "dash"
 
     def _escape(self) -> None:
         """卡住脱困：release(advance) → press(probe_keys, probe_ms) → hold(advance)。"""

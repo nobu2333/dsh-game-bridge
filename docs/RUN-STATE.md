@@ -578,3 +578,13 @@
 - 死亡分布在相邻段 -8/-7/-6/-5（bucket 0.5），严格同段无 hotspot；新增通用邻域聚合（radius 1.5）：zone_deaths=4，hotspots=6。
 - memory_report 可离线列出 hotspot；loading/saving 验证通过。
 - 未验证：preferred action（actions 未记录）、shadow A/B；README 未写；驱动关闭。
+
+## 2026-11-03 19:25 记忆完整验证（加载/保存/死亡/伤害/动作/shadow）
+
+- 继续跑死亡后：forest-follies 13 segments、deaths=7、damage=75–78、hotspots=9。
+- 新增动作→结果记录（1s 窗口，hp/进度判 good）：各 segment 已有 jump/dash/advance 的 n/good，preferred 开始出现（当前为 jump）。
+- 实机 status：
+  - level_memory.hotspot=true, preferred=jump；
+  - shadow_advice top=jump，reasons=[level_memory_preferred, hotspot]，仍 shadow=true，不改变动作。
+- 验证通过：进关加载、离开保存、死亡/受击/动作写入、hotspot 邻域聚合、shadow 使用记忆。
+- 未验证：shadow vs 默认 A/B；README 未写；驱动关闭。
