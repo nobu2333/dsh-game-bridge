@@ -113,7 +113,7 @@
       "press_ms": 160
     },
     "jump_every_ms": 0,
-    "dash_every_ms": 0,
+    "dash_every_ms": 800,
     "engage_radius": 0.2,
     "engage_hold_ms": 220,
     "stuck": {
