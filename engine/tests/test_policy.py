@@ -54,6 +54,7 @@ STATUS_KEYS = {
     "danger",
     "observation",
     "situation",
+    "level_memory",
     "planner_intent",
     "active_intent",
     "intent",
@@ -174,6 +175,7 @@ def build_runner(
     hp_source=None,
     on_danger_outcome=None,
     prompt_source=None,
+    level_memory=None,
 ):
     """构造一个由「虚拟时间 + 拍数预算」自动收尾的 runner。"""
     controller = controller or FakeController()
@@ -200,6 +202,7 @@ def build_runner(
         hp_source=hp_source,
         on_danger_outcome=on_danger_outcome,
         prompt_source=prompt_source,
+        level_memory=level_memory,
     )
     holder["runner"] = runner
     controller.clock = virtual.clock
@@ -529,3 +532,12 @@ def test_route_macro_executes_steps():
     log = [(call["action"], call["button"]) for call in controller.calls]
     assert ("hold", "RIGHT") in log
     assert ("hold", "Z") in log
+
+def test_policy_records_level_memory_visits():
+    from dsh_game_core.level_memory import LevelMemory
+
+    memory = LevelMemory("game", "level")
+    runner, _, _ = build_runner(budget_ticks=18, level_memory=memory)
+    status = run_to_completion(runner)
+    assert status["level_memory"] is not None
+    assert memory.summary()["segments"] >= 1

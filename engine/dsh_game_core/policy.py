@@ -209,11 +209,16 @@ class PolicyRunner:
         hp_source: Callable[[], Any] | None = None,
         on_danger_outcome: Callable[[str, str], Any] | None = None,
         prompt_source: Callable[[Any, Any], Any] | None = None,
+        level_memory: Any = None,
     ):
         self._capture = capture
         self._controller = controller
         self._gate = gate
         self._profile = profile if isinstance(profile, dict) else {}
+        self._level_memory = level_memory
+        self._memory_observe_every = 6
+        self._memory_hit_t = None
+        self._memory_death_done = False
         self._clock = clock if callable(clock) else time.monotonic
         self._sleep = sleep if callable(sleep) else time.sleep
         # 可注入实体检测（单测用）；默认懒加载 .state.cheap_entities。
@@ -632,6 +637,15 @@ class PolicyRunner:
             "danger": self._nearby_danger,
             "observation": self._observation,
             "situation": self._situation,
+            "level_memory": (
+                {
+                    "summary": self._level_memory.summary(),
+                    "hotspot": self._level_memory.hotspot(float(self._scroll_s)),
+                    "preferred": self._level_memory.preferred_action(float(self._scroll_s)),
+                }
+                if self._level_memory is not None
+                else None
+            ),
             "planner_intent": self._planner_intent,
             "active_intent": self._active_intent,
             "intent": self._intent,
@@ -804,6 +818,7 @@ class PolicyRunner:
                 self._update_player(frame)
                 self._mark_timing("player", player_started)
                 self._maybe_edge_escape()
+                self._update_level_memory()
                 memory_started = self._clock()
                 self._update_memory(previous_frame, frame)
                 self._mark_timing("memory", memory_started)
@@ -1051,6 +1066,24 @@ class PolicyRunner:
         if state["index"] >= len(steps):
             self._macro_state = None
         return True
+
+    def _update_level_memory(self) -> None:
+        """Record level-segment visits/damage/deaths; memory never changes actions yet."""
+        memory = self._level_memory
+        if memory is None:
+            return
+        try:
+            if self._ticks % self._memory_observe_every == 0:
+                memory.observe(float(self._scroll_s))
+            hit_t = (self._last_hit or {}).get("t") if isinstance(self._last_hit, dict) else None
+            if hit_t is not None and hit_t != self._memory_hit_t:
+                memory.record_damage(float(self._scroll_s), 1)
+                self._memory_hit_t = hit_t
+            if self._scene == "death" and not self._memory_death_done:
+                memory.record_death(float(self._scroll_s))
+                self._memory_death_done = True
+        except Exception:  # noqa: BLE001
+            return
 
     def _maybe_edge_escape(self) -> None:
         """Generic corner escape: pressed against the left edge for a while -> jump/dash out."""

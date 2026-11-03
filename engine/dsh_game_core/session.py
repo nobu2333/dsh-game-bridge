@@ -67,6 +67,7 @@ class GameSession:
         self._plan_thread: threading.Thread | None = None
         self._plan_stop = threading.Event()
         self._policy = None
+        self._memory_loader = None
         self._scene_cache = {"scene": None, "confidence": 0.0, "ts": 0.0}
         self._scene_stop = None
         self._scene_thread = None
@@ -1143,6 +1144,18 @@ class GameSession:
         if params.get("record"):
             self._start_recorder()
 
+        level_memory = None
+        try:
+            from .memory_loader import MemoryLoader
+
+            root = os.environ.get("DSH_GAME_BRIDGE_MEMORY_DIR") or os.path.join(self._data_root(), "memory")
+            self._memory_loader = MemoryLoader(root)
+            self._memory_loader.load_game(self._record_game)
+            level_memory = self._memory_loader.load_level(self._record_game, self._record_level)
+        except Exception:  # noqa: BLE001 - 记忆加载失败不影响开局
+            self._memory_loader = None
+            level_memory = None
+
         def capture():
             frame = self.engine.grab_raw(monitor=monitor, region=region)
             self._record_frame(frame)
@@ -1159,6 +1172,7 @@ class GameSession:
             scene_source=lambda: self._scene_cache.get("scene"),
             hp_source=lambda: self._scene_cache.get("hp"),
             on_danger_outcome=self._danger_outcome,
+            level_memory=level_memory,
         )
         started = self._policy.start()
         if params.get("scene_watch", True):
@@ -1183,6 +1197,12 @@ class GameSession:
             return {"stopped": False, "policy": None}
         status = policy.stop()
         self._stop_scene_watcher()
+        if self._memory_loader is not None:
+            try:
+                self._memory_loader.unload_level()
+            except Exception:  # noqa: BLE001
+                pass
+            self._memory_loader = None
         self._save_episode("stop")
         self.audit.write({"event": "policy_stop", **status})
         return {"stopped": True, "policy": status}
