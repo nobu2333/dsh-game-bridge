@@ -388,6 +388,7 @@ class PolicyRunner:
         self._temporal = None
         self._temporal_state: dict | None = None
         self._situation: dict | None = None
+        self._shadow_candidates: dict | None = None
         self._planner_intent: dict | None = None
         instant = self._profile.get("instant_play")
         instant = instant if isinstance(instant, dict) else {}
@@ -637,6 +638,7 @@ class PolicyRunner:
             "danger": self._nearby_danger,
             "observation": self._observation,
             "situation": self._situation,
+            "shadow_advice": self._shadow_candidates,
             "level_memory": (
                 {
                     "summary": self._level_memory.summary(),
@@ -1213,6 +1215,16 @@ class PolicyRunner:
                     "progress": {"scroll_s": float(self._scroll_s), "stalled_ms": 0},
                 }
                 self._situation = describe(world_raw, hp=self._current_hp())
+                try:
+                    from .candidates import score_actions
+
+                    self._shadow_candidates = score_actions(
+                        self._observation,
+                        level_memory=self._level_memory,
+                        scroll_s=float(self._scroll_s),
+                    )
+                except Exception:  # noqa: BLE001
+                    self._shadow_candidates = None
                 try:
                     from .planner import choose_intent
 

@@ -54,6 +54,7 @@ STATUS_KEYS = {
     "danger",
     "observation",
     "situation",
+    "shadow_advice",
     "level_memory",
     "planner_intent",
     "active_intent",
