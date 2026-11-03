@@ -630,3 +630,12 @@
 - PolicyRunner 接收 memory_loader，每 30 tick 组装 memory_context（当前 scope + guide facts + level memory，字符预算）。
 - status.memory_context 暴露给模型/决策层；仍不改变动作。
 - 测试 272 passed。
+
+## 2026-11-03 20:15 memory_context 实机验证
+
+- 进 Forest Follies 后 status.memory_context：
+  - scope=level, game=cuphead, level=forest-follies；
+  - guides=6 条（Run&Gun/评分项/金币/粉色弹反/无 Boss/提示），source URL 保留；
+  - level_memory：segments 13、deaths 37、damage 320、hotspots 13；当前 s:-5 死亡8/伤害79，preferred=jump。
+- 说明：按关加载、guide 注入、LevelMemory 热点/动作统计均已进入策略状态；仍不改变动作。
+- 未通关；README 未写；驱动关闭。
