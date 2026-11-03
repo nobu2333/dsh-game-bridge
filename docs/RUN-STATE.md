@@ -537,3 +537,11 @@
 - 已回退 policy 代码（未提交实验）、关闭 hit_dash，恢复 jump=420/dash=800/press=260。
 - 用户要求暂停：驱动已关闭、按键释放、无 play_server 进程；goal 暂停。
 - 未通关；README 未写。
+
+## 2026-11-03 14:55 记忆架构代码化
+
+- 新增 `level_memory.py`：scroll 分段的死亡/受击/动作成功率、hotspot/preferred、JSON 持久化。
+- 新增 `memory_loader.py`：游戏级 attach 加载、关卡级进入加载/离开卸载、安全 id 防穿越。
+- 新增 `docs/MEMORY.md`：作用域/目录/加载/攻略边界/元记忆/待办。
+- 测试 260 passed。未启动游戏（按要求）。
+- 待接入 Session/PolicyRunner：attach/进关/离关加载；death/damage/success 更新；hotspot 接候选评分。
