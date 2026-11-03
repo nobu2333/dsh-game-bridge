@@ -545,3 +545,11 @@
 - 新增 `docs/MEMORY.md`：作用域/目录/加载/攻略边界/元记忆/待办。
 - 测试 260 passed。未启动游戏（按要求）。
 - 待接入 Session/PolicyRunner：attach/进关/离关加载；death/damage/success 更新；hotspot 接候选评分。
+
+## 2026-11-03 15:15 记忆接线
+
+- Session.policy_start：加载 game memory + 当前 level memory（路径可由 DSH_GAME_BRIDGE_MEMORY_DIR 覆盖，默认 data_root/memory）。
+- Session.policy_stop：保存并卸载 level memory。
+- PolicyRunner：按 tick 记录 segment visits；fresh hit 记 damage；death 记一次 death；status 暴露 level_memory summary/hotspot/preferred。
+- 记忆暂不改变动作，只记录/显示。
+- 测试 261 passed；未运行游戏。
