@@ -33,12 +33,25 @@ def scan_memory(root: str | Path, *, game: str | None = None, level: str | None 
                 if level and path.stem != level:
                     continue
                 memory = LevelMemory.load(path, game_id=game_dir.name, level_id=path.stem)
-                hotspots = [
-                    {"segment": seg.get("key"), "deaths": seg.get("deaths", 0), "damage": seg.get("damage", 0)}
-                    for seg in memory.segments.values()
-                    if int(seg.get("deaths") or 0) >= 2
-                ]
-                hotspots.sort(key=lambda item: item["deaths"], reverse=True)
+                hotspots = []
+                for seg in memory.segments.values():
+                    key = str(seg.get("key") or "")
+                    try:
+                        index = int(key.split(":", 1)[1])
+                        scroll = index * memory.bucket
+                    except (ValueError, IndexError):
+                        continue
+                    zone = memory.zone_deaths(scroll)
+                    if zone >= 2:
+                        hotspots.append(
+                            {
+                                "segment": key,
+                                "zone_deaths": zone,
+                                "deaths": seg.get("deaths", 0),
+                                "damage": seg.get("damage", 0),
+                            }
+                        )
+                hotspots.sort(key=lambda item: item["zone_deaths"], reverse=True)
                 levels.append(
                     {
                         "level": path.stem,

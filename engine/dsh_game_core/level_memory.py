@@ -86,9 +86,25 @@ class LevelMemory:
     def query(self, scroll_s: float) -> dict | None:
         return self.segments.get(segment_key(scroll_s, bucket=self.bucket))
 
-    def hotspot(self, scroll_s: float, *, min_deaths: int = 2) -> bool:
-        segment = self.query(scroll_s)
-        return bool(segment and segment.get("deaths", 0) >= min_deaths)
+    def _near_segments(self, scroll_s: float, radius: float) -> list[dict]:
+        center = int(round(float(scroll_s) / self.bucket))
+        width = max(1, int(round(float(radius) / self.bucket)))
+        result = []
+        for offset in range(-width, width + 1):
+            key = f"s:{center + offset}"
+            segment = self.segments.get(key)
+            if segment:
+                result.append(segment)
+        return result
+
+    def zone_deaths(self, scroll_s: float, *, radius: float = 1.5) -> int:
+        return sum(int(seg.get("deaths") or 0) for seg in self._near_segments(scroll_s, radius))
+
+    def zone_damage(self, scroll_s: float, *, radius: float = 1.5) -> int:
+        return sum(int(seg.get("damage") or 0) for seg in self._near_segments(scroll_s, radius))
+
+    def hotspot(self, scroll_s: float, *, min_deaths: int = 2, radius: float = 1.5) -> bool:
+        return self.zone_deaths(scroll_s, radius=radius) >= min_deaths
 
     def preferred_action(self, scroll_s: float, *, min_samples: int = 2) -> str | None:
         segment = self.query(scroll_s)
@@ -110,7 +126,14 @@ class LevelMemory:
         segments = len(self.segments)
         deaths = sum(int(seg.get("deaths") or 0) for seg in self.segments.values())
         damage = sum(int(seg.get("damage") or 0) for seg in self.segments.values())
-        hotspots = sum(1 for seg in self.segments.values() if int(seg.get("deaths") or 0) >= 2)
+        hotspots = 0
+        for key in self.segments:
+            try:
+                scroll = int(str(key).split(":", 1)[1]) * self.bucket
+            except (ValueError, IndexError):
+                continue
+            if self.zone_deaths(scroll) >= 2:
+                hotspots += 1
         return {"game": self.game_id, "level": self.level_id, "segments": segments, "deaths": deaths, "damage": damage, "hotspots": hotspots}
 
     def to_dict(self) -> dict:

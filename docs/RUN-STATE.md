@@ -569,3 +569,12 @@
 - shadow 候选评分（hotspot/preferred 只影响分数）：完成，status.shadow_advice。
 - memory_context：按当前 scope + guide + 字符预算压缩上下文：完成。
 - 测试 268 passed；未运行游戏。
+
+## 2026-11-03 19:30 记忆实机验证
+
+- 进关后 policy_start：session 正确加载 `memory/games/cuphead/levels/forest-follies.json`（不是空 level.json）。
+- 发现 bug：死亡在 scene gate 分支，`_update_level_memory` 只在 gameplay 分支，deaths 不写；已把记录调用移入 scene gate。
+- 修复后 4 条死亡：forest-follies 9 segments、deaths=4、damage=47、actions 仍为空。
+- 死亡分布在相邻段 -8/-7/-6/-5（bucket 0.5），严格同段无 hotspot；新增通用邻域聚合（radius 1.5）：zone_deaths=4，hotspots=6。
+- memory_report 可离线列出 hotspot；loading/saving 验证通过。
+- 未验证：preferred action（actions 未记录）、shadow A/B；README 未写；驱动关闭。

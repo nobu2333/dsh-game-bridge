@@ -33,3 +33,11 @@ def test_save_load(tmp_path):
     assert restored.game_id == "cuphead"
     assert restored.summary()["damage"] == 2
     assert restored.query(-2.0)["damage"] == 2
+
+def test_zone_hotspot_aggregates_nearby_deaths():
+    memory = LevelMemory("g", "l", bucket=0.5)
+    for scroll in (-7.5, -6.8, -6.0, -5.2):
+        memory.record_death(scroll)
+    assert memory.hotspot(-6.5, radius=1.5) is True
+    assert memory.hotspot(0.0, radius=1.5) is False
+    assert memory.zone_deaths(-6.5, radius=1.5) == 4

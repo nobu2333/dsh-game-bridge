@@ -796,6 +796,7 @@ class PolicyRunner:
                 # 2.5) 场景门控：非 gameplay 只做恢复，不跑战斗策略。
                 if self._scene is not None and self._scene != "gameplay":
                     entities = self._entities(frame, previous_frame)
+                    self._update_level_memory()
                     self._release_all_keys()
                     self._finalize_learning_death()
                     self._maybe_recover()

@@ -13,7 +13,7 @@ def context_for(side: str) -> Context:
 def run_episode(learner: Learner, side: str, rng: random.Random, *, learn: bool) -> float:
     context = context_for(side)
     actions = ["jump", "advance"]
-    action = learner.choose(context, actions, epsilon=0.1) if learn else rng.choice(actions)
+    action = learner.choose(context, actions, epsilon=0.0) if learn else rng.choice(actions)
     if side == "left":
         reward = 1.0 if action == "jump" else -1.0
     else:
