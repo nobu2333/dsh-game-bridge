@@ -695,3 +695,11 @@
 - 第三批 10 局：2.81/3.55/3.30/4.39/2.70/4.39/3.87/4.65/4.25/2.90；平均 3.68；全死亡。
 - edge-off 三批合计 30 局约 4.13；旧 edge-on 20 局 4.19；平均无差异，只有 11.15 单局高值。
 - 结论：edge_escape 开关不是关键；保留 false 只因高值，不宣称提升。仍未通关。
+
+## 2026-11-03 21:55 阶段总结（round 77）
+
+- A：Cuphead Forest Follies 未通关。edge_escape 开关不开/关平均都约 4.1–4.2；最高 11.15 是离群值；20–30 局平均值没有达到 6.5。death_context/causes 已可用（cornered/hit），但“更早跳角落”A/B 为负。
+- 已证明无效/无收益：周期/无跳/冲刺参数、engage、turn/static、route macro、shadow top1、grounded gating、hit_dash、edge threshold、在线 action bandit、纯 memorized LevelMemory promotion。
+- B：Brotato（steam_api 入口点）、SuperTux beta（启动即退）、SuperTuxKart（下成 macOS .app）、Overcooked（双人/过场）均不适合当前 B 烟测；B 需要可用 Windows 单机游戏。
+- 记忆/guide/按关加载/shadow 只读已验证；未通关；README 未写。
+- 结论：继续自动调参/开关无法稳定通关；需要新的感知/时机能力或用户决定方向。
