@@ -561,3 +561,11 @@
 - GuideStore 扩展：scope=game/level/boss、source_type、assisted；game 级卡不要求 level，支持 load_game。
 - docs/MEMORY.md 已记录架构；测试 262 passed。
 - 未运行游戏（按要求）；下一步：hotspot/preferred 接候选评分（shadow），再跑游戏验证。
+
+## 2026-11-03 15:40 离线记忆闭环完成
+
+- LevelMemory + MemoryLoader + Session/Policy 接线：完成。
+- GuideStore 扩展 game/level/boss、source/assisted：完成。
+- shadow 候选评分（hotspot/preferred 只影响分数）：完成，status.shadow_advice。
+- memory_context：按当前 scope + guide + 字符预算压缩上下文：完成。
+- 测试 268 passed；未运行游戏。
