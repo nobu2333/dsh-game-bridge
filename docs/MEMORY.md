@@ -1,6 +1,6 @@
-# 记忆架构（草案 v0）
+# 记忆架构（v0，已接线）
 
-> 状态：已实现 `level_memory.py` / `memory_loader.py`；尚未接入 PolicyRunner/Session。
+> 状态：`level_memory.py` / `memory_loader.py` / `memory_context.py` / `memory_report.py` 已实现，并接入 Session/PolicyRunner（记录、上下文、shadow 只读）；目前不改变动作。
 > 原则：引擎不认游戏名/关卡名；`game_id` / `level_id` 由 session 传入，数据按作用域懒加载。
 
 ## 1. 作用域

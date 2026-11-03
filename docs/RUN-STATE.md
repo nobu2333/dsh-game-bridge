@@ -1,16 +1,18 @@
-# RUN STATE（本地续跑笔记，不入库）
+# RUN STATE（仓库内续跑笔记；本地路径用占位符）
 
 > 作用：上下文被压缩/会话中断后，先读这份文件恢复状态。
-> 最后更新：2026-11-03 01:05（顶部为当前判断；下面是按时间追加的续跑记录）
+> 最后更新：2026-11-03 23:10（顶部为当前判断；下面是按时间追加的续跑记录）
 
-## 当前判断（2026-11-03 整理）
+## 当前判断（2026-11-03 23:10 合并）
 
-> 结论：**现在最大的卡点是早期生存/稳定性，不是 6.4 屏平台段，也不是 L3 决策。** 6.4 已在少数长局越过；7.0 是更晚的卡点。
+> 结论：**A 轨仍未通关；今天的最好 11.15 屏是离群值，20–30 局平均 4.1–4.2 屏，没有稳定到 6.5。继续自动扫参数/开关没有稳定收益。**
 
-1. **典型一局死得很早。** 干净起点 5 条命：峰值 1.21–2.56 屏、持续 16–22 秒、hz 34.7–36.9，全部 death。6.812 / 7.339 是少数长局的 best，不代表常态。
-2. **6.4 / 7.0 的位置。** 6.4 平台段已在长局越过；7.0 是「下层平台 + 橙色飞花 + 地面花」的段，只有长局才到得了。没有看到 LEVEL COMPLETE。
-3. **决策时间仍是 9s 级**：9.12s / 8.93s，p95 ≈ 9s；不能进 1–2Hz 快环。L3 继续事件驱动，主模型不做逐跳/逐弹幕。
-4. **仍未通关；README 不能写「已通关」。**
+1. **A 轨现状：** 平均约 4.1–4.2 屏，最高 11.15（单局离群）；6.4 只在个别长局越过，7.0 仍不稳定可达；没有 LEVEL COMPLETE。
+2. **已证明无稳定收益：** 学习 action bandit / shadow top1 / grounded gating / hit_dash / edge threshold / engage / jump 参数扫描；edge_escape 开/关平均都约 4.1–4.2。
+3. **当前保留：** `dash_every_ms=800`、`dodge.press_ms=260`、`jump_every_ms=420`、`engage_radius=0.2`、`edge_escape=false`；memory / guide / death_context 目前只读。
+4. **决策时间 9s 级**（9.12s / 8.93s，p95≈9s），仍不能进 1–2Hz 快环；L3 保持事件驱动。
+5. **B 轨未完成：** Brotato 启动入口点错误，Overcooked 只有菜单/双人过场；需要可用的 Windows 单机游戏。
+6. **仍未通关；README 不能写「已通关」。**
 
 ## Goal（另一台 DSH 主机，不是当前会话）
 
@@ -31,13 +33,13 @@
 
 ## 当前进度（2026-11-03）
 
-- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **245**、插件 **45**、集成 11/11（本地实测）。
+- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **273**、插件 **45**、集成 11/11（本地实测）。
 - 目标未变：Forest Follies 从大地图 10 局 ≥7 通关；**仍未通关**。
-- 实机 best：7.339 屏（旧）/ 6.812 屏（玩家修复后）；干净一命一局典型峰值只有 1.21–2.56 屏。
+- 实机 best：7.339 屏（旧）/ 6.812 屏（玩家修复后）/ 11.15 屏（今日离群）；20–30 局平均约 4.1–4.2。
 - 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。
 - 工具面已补 `game_intent`（stdio `submit_intent` + 插件工具）：默认 advisory，执行当前只覆盖 jump/dodge/retreat；需 `game_policy start intent_enabled=true` 或 `profile.instant_play.intent_enabled=true`。
 - L2 准确率：10 点采样中 3 个 stale 正确、7 个 gameplay 位置与截图一致；仍有人工核对缺口。
-- 当前会话 goal：`goal-80d14fcf-...`，用户已暂停（phase paused, revision 4）；Cuphead 已由用户关闭。
+- 当前会话 goal：`goal-80d14fcf-...`，用户已暂停（phase paused, revision 4）；今天 A 轨运行结束后驱动已关闭，实机是否在运行以用户为准。
 
 ### 历史进度（2026-10-30，提交 `8e4d8fa`）
 
@@ -49,45 +51,49 @@
 - 录制：异步录制线程；episode 有 meta/events/frames。
 - 已知问题（当时）：匿名运动簇、face_back 关闭、静态危险物漏检、A/B 无跑批、帧率波动、地图入口无导航。
 
-## 后续计划建议（2026-11-02）
+## 后续计划（2026-11-03 23:10）
 
-> **2026-11-03 修正**：下面 P0/P1 里“先打 6.4”的前提已被实测推翻——典型一局死在 1–2.6 屏。先做一命一局 10 局 baseline，按死亡位置降低早期死亡率；6.4/7.0 只在能稳定到 5–6 屏后再处理。
+> 前提：A 仍未通关；今天已证明“继续自动扫参数/开关”没有稳定收益。下一步先冻结配置、做证据/demo，不再做全局参数扫描。
 
-> 原则：先拿证据，再改执行；先通关，再扩模型环；不把主模型放进快环。
+### A 轨：Cuphead Forest Follies（优先）
 
-### P0 先拿到「为什么过不去」的证据（1–2 天）
+**A0 冻结配置 + 基线（先做）**
+- 固定 `dash_every_ms=800` / `jump_every_ms=420` / `dodge.press_ms=260` / `engage_radius=0.2` / `edge_escape=false`，不再改参数。
+- 跑 10–20 条干净一命（record=true），记录 peak、时长、death cause/position、hz；先看死亡分布，不只看均值。
+- 验收：10+ 条完整记录；11.15 离群局与 2–4 屏典型局有帧级差异证据。
 
-1. 若继续原来那台机器，先恢复那边的 goal；**当前会话没有 goal**，直接清理残留 driver，用当前 HEAD 跑 10 局 baseline（record=true, game=cuphead, level=forest-follies）。
-2. 对每条命/每个死亡 episode 做 review：按 0–3 屏、3–6 屏、6 屏后分类，统计位置和死因（花妖/弹幕/坠落/卡住）。
-3. 固定指标：clear rate、best progress、damage/run、death location、hz、time-to-control。
-4. 决策延迟 A/B：同一批 20 个 SituationReport，比较 `deepseek-flash + max`（当前主会话）、`deepseek-flash + off/low`（直接 LLM 调用，最小 prompt，maxTokens≤128）、可选本地小模型；记录 p50/p95 与 intent 正确率。p95 > 1s 就不做 1–2Hz 模型环。
-5. 同步 STATUS/README 的当前状态（或明确指向本文件）。
+**A1 死因复盘（1–2 天）**
+- 用 `death_context` + episode 帧，把死亡分为 `cornered` / `hit` / `fall` / `stuck`，对比 11.15 离群局与典型局。
+- 找出第一个分歧帧（站位、弹幕、输入时机）；不要先加反射。
 
-### P1 先降低早期死亡（2–4 天）
+**A2 一次只改一个通用技能（每个 10 条 A/B）**
+- 候选 1：预判弹幕的提前 jump/dash（不是受击后的 hit_dash）。
+- 候选 2：被击退后的回中/避免贴左边缘。
+- 候选 3：近身花妖的停火/清场时机。
+- 通过标准：均值 ≥ +0.5 屏且最差局不恶化；否则回退。两个实验无收益就停，转 A3。
 
-1. 按 0–3 屏的死亡位置分类，优先修最常见的 1–2 类（花妖 / 弹幕 / 坠落 / 卡住）。
-2. 每次只改一个 profile 参数（dodge 半径/冷却、engage 距离、stuck），10 条命 A/B；目标把 1–3 屏死亡率降下来。
-3. 稳定到 5–6 屏后，再用 episode 证据补 6.4/7.0 的平台/飞花段；路线宏只放 profile。
-4. 不在 7.0 宏上继续盲调，直到能稳定到达。
+**A3 人工示范 / route macro（若 A2 无收益）**
+- 人工打通 0–6.5 屏的一段，录 episode 帧+输入；把路线写成 profile macro（scroll 触发、分步 hold/tap），引擎不加 Cuphead 分支。
+- 先验证稳定到 6.5；再处理 7.0 平台/飞花；最后用 10 局 ≥7 通关验收。
 
-### P2 稳定通关 + 从地图出发（3–5 天）
+### B 轨：泛化烟测（不阻塞 A）
 
-1. 10–20 局 full runs；修 top 3 death causes；每改一项做 A/B。
-2. 地图入口：profile 航点/宏，或改进 walk-until-affordance；验收从大地图 10 局 ≥7 通关。
-3. L2 准确率 10 点人工核对；A/B 证据留本地，不提交录像/账本。
+- 目标：第二款 Windows 单机、键盘、可快速进 gameplay 的游戏；零引擎改动。
+- 优先 Brotato 的正规 Steam 安装（当前入口点错误是 DLL/破解问题，不再替换系统 DLL）；备选 VVVVVV/Celeste demo 或 itch.io 的 Godot demo。
+- 验收：attach、菜单、按键映射、首次有效动作、time_to_controls≤5 分钟、LevelMemory 加载/卸载；不要求通关。
+- 若本周找不到可用游戏，标记 B blocked，A 继续。
 
-### P3 模型 L3（可与 P1/P2 并行，但不阻塞）
+### 工程/文档
 
-1. 主模型只做事件驱动（卡住/死亡/低置信），TTL 5–10s 的姿态/路线建议；不做 1–2Hz。
-2. 若要实时 L3，单独接一个快速 L3（直接 `ctx.llm` 调用或本地小模型，不复用主会话/完整 agent loop）；先测 p95 < 1s（含解析/提交）再接线。
-3. 验收：模型介入提升 clear rate / 降低 damage，且不增加卡死。
+- 更新 README/STATUS 测试数为 **273 engine / 45 plugin**；集成 11/11 复跑一次。
+- 不提交本地 profile/录像/账本/guide；引擎保持零游戏分支。
+- 通关前不写「已通关」。
 
-### 不建议做
+### 停止规则
 
-- 不要用调 TTL/伪造新鲜度来迁就 9s 模型；
-- 不要在 6.4 屏打通前继续堆感知/对象记忆特性；
-- 不要把 Cuphead 专用逻辑写进引擎；路线宏只能放 profile；
-- 不要在 10 局 ≥7 通关前写「已通关」。
+- 不再做全局参数扫描（jump/dash/engage/edge 已扫完，平均无提升）。
+- A2 两个实验无收益 → 走 A3 人工示范/route，不无限自动调参。
+- B 找不到游戏 → B blocked，A 继续。
 
 ## 运行环境/命令
 
@@ -377,7 +383,7 @@
 
 ## 2026-11-02 23:10 首轮实机启动（Cuphead 下载完成）
 
-- 游戏：`E:\Cuphead-SteamRIP.com\Cuphead\Cuphead.exe`；必须用 `-screen-fullscreen 0 -screen-width 960 -screen-height 540 -popupwindow` 启动，否则全屏窗口抓不到（DXcam 只看到桌面）。
+- 游戏：`<game-dir>\Cuphead.exe`；必须用 `-screen-fullscreen 0 -screen-width 960 -screen-height 540 -popupwindow` 启动，否则全屏窗口抓不到（DXcam 只看到桌面）。
 - 修复 DPI bug：Windows 125% 缩放下，`GetMonitorInfoW` 给 1536x864、DXcam 给 1920x1080，attach 报“没有显示器与窗口匹配”。`windows.py` 现在在导入时设 per-monitor v2 DPI awareness，attach/snapshot 正常拿到 960x540。
 - 实机：policy 45s、约 38.5Hz；但角色还在老茶壶家/大地图，`scroll_s≈-0.03`，没有进入 Forest Follies；地图入口仍未找到。
 - 现状：游戏窗口已 topmost、engine 可 attach/capture；需要人工把角色走到 Forest Follies 入口（或下一步做地图航点），才能开始关卡内 baseline。
@@ -620,7 +626,7 @@
 ## 2026-11-03 19:55 攻略优先接线
 
 - 从 Cuphead wiki 抓取 Forest Follies 的可用要点（Run&Gun/无 Boss/评分项/金币/粉色可弹反），只存要点，source_url、assisted=true。
-- 本地 GuideStore：game 卡 1 张、level 卡 1 张（C:\Users\xykan\AppData\Local\dsh-game-bridge\guides，未入库）。
+- 本地 GuideStore：game 卡 1 张、level 卡 1 张（`%LOCALAPPDATA%\dsh-game-bridge\guides`，未入库）。
 - Session.policy_start 现在还会加载 game/level guide cards，挂到 memory_loader.game_data["guides"]。
 - memory_context 支持从 game_data.guides 取 facts（仍受 scope/字符预算约束）。
 - 测试 271 passed。
@@ -703,3 +709,10 @@
 - B：Brotato（steam_api 入口点）、SuperTux beta（启动即退）、SuperTuxKart（下成 macOS .app）、Overcooked（双人/过场）均不适合当前 B 烟测；B 需要可用 Windows 单机游戏。
 - 记忆/guide/按关加载/shadow 只读已验证；未通关；README 未写。
 - 结论：继续自动调参/开关无法稳定通关；需要新的感知/时机能力或用户决定方向。
+
+## 2026-11-03 23:10 文档合并
+
+- 顶部判断合并到 round 77 阶段总结；后续计划改为 A0–A3 / B 轨 / 停止规则。
+- 测试数统一为引擎 **273**、插件 **45**；README/STATUS/MEMORY 同步。
+- 脱敏：去掉文档里的本机 Cuphead 路径和用户名路径，改用 `<game-dir>` / `%LOCALAPPDATA%`。
+- 仍未通关；README 未写。
