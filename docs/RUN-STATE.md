@@ -646,3 +646,9 @@
 - 对照 4.19：明显更差；空中/冲刺中的跳跃其实在躲弹幕，不应一律禁止。
 - 已回退代码；保留 action_state 只读。
 - 未通关；README 未写；驱动关闭。
+
+## 2026-11-03 20:10 计划更新：B 选定 Brotato
+
+- B 轨具体化：Brotato（Godot，单机，俯视自动射击），窗口化 960x540；零引擎改动验证 engine/attach/按键/菜单/开局/移动、time_to_controls≤5min、首次动作、game_id=brotato 的 LevelMemory 加载/卸载；不要求通关，不污染 A。
+- Overcooked（双人）仅作为后续多 agent/协作专项，不纳入本次 B。
+- A 保持不变：当前 4.19 平均、9.92 最高、未通关；下一步死亡原因分类/时序/安全方向。
