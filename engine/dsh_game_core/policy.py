@@ -390,6 +390,14 @@ class PolicyRunner:
         self._arbiter = None
         self._intent_lock = threading.Lock()
         self._active_intent: dict | None = None
+        learning = self._profile.get("learning")
+        learning = learning if isinstance(learning, dict) else {}
+        self._learning_enabled = bool(learning.get("enabled", False))
+        self._learning_epsilon = max(0.0, min(1.0, _as_float(learning.get("epsilon"), 0.1) or 0.1))
+        self._learning_path = str(learning.get("path") or "") or None
+        self._learner = None
+        self._learning_pending: dict | None = None
+        self._learning_updates = 0
         self._retreat_until = 0.0
         self._last_intent_action = 0.0
         self._attack_started = 0.0
@@ -521,6 +529,11 @@ class PolicyRunner:
             self._controller.release_all()
         except Exception:  # noqa: BLE001 - 收尾失败不掩盖主流程
             pass
+        if self._learner is not None and self._learning_path:
+            try:
+                self._learner.save(self._learning_path)
+            except Exception:  # noqa: BLE001
+                pass
         with self._lock:
             self._held.clear()
             if self._started_at is not None and self._stop_reason is None:
@@ -1135,6 +1148,7 @@ class PolicyRunner:
             self._update_attack_stall()
             self._update_progress_guard()
             self._update_arbiter()
+            self._update_learning()
         except Exception:  # noqa: BLE001
             self._observation = None
             self._intent = None
@@ -1198,6 +1212,62 @@ class PolicyRunner:
             if self._jump_keys:
                 self._tap(self._jump_keys[0], 120.0)
             self._last_intent_action = now
+
+    def _update_learning(self) -> None:
+        """可选在线学习：通用 Context → 动作 → 结果回写；动作只覆盖 jump/dodge/retreat/advance。"""
+        if not self._learning_enabled or self._observation is None:
+            return
+        try:
+            from .arbiter import IntentArbiter, local_intent_from_skill
+            from .experience import Outcome
+            from .learner import Learner, context_from_observation
+
+            if self._learner is None:
+                self._learner = Learner.load(self._learning_path) if self._learning_path else Learner()
+            now = self._clock()
+            pending = self._learning_pending
+            if pending is not None and now - float(pending["at"]) >= 0.4:
+                hp_now = self._current_hp()
+                damage = 0
+                if hp_now is not None and pending.get("hp") is not None:
+                    damage = max(0, int(pending["hp"]) - int(hp_now))
+                progress = abs(float(self._scroll_s)) - abs(float(pending.get("scroll") or 0.0))
+                outcome = Outcome(damage=damage, progress_delta=round(progress, 4), died=self._scene == "death")
+                self._learner.stats.update(pending["key"], pending["action"], outcome.reward())
+                self._learning_updates += 1
+                self._learning_pending = None
+                if self._learning_path and self._learning_updates % 10 == 0:
+                    self._learner.save(self._learning_path)
+
+            if self._learning_pending is not None:
+                return
+            context = context_from_observation(self._observation)
+            actions = ["advance", "jump", "dodge_left", "dodge_right", "retreat"]
+            action = self._learner.choose(context, actions, epsilon=self._learning_epsilon)
+            if action in ("jump", "dodge_left", "dodge_right", "retreat"):
+                if self._arbiter is None:
+                    self._arbiter = IntentArbiter(local_intent_from_skill("advance"))
+                self._arbiter.submit(
+                    {
+                        "goal": "avoid" if action in ("jump", "dodge_left", "dodge_right") else "retreat",
+                        "skill": action,
+                        "risk": "medium",
+                        "ttl_ms": 1200,
+                        "priority": 5,
+                        "reason": "learner",
+                        "source": "learner",
+                    },
+                    origin="learner",
+                )
+            self._learning_pending = {
+                "key": context.key(),
+                "action": action,
+                "at": now,
+                "hp": self._current_hp(),
+                "scroll": float(self._scroll_s),
+            }
+        except Exception:  # noqa: BLE001
+            return
 
     def _update_progress_guard(self) -> None:
         """独立于 intent：3 秒没有推进就抑制 engage 并跳一下，避免被敌人/墙卡死。"""

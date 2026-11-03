@@ -43,3 +43,14 @@ def test_jsonl_and_trace_roundtrip(tmp_path):
     trace = trace_from_dicts(rows)
     assert trace.steps[0].action == "dodge_left"
     assert trace.steps[0].context.hp == 2
+
+def test_context_from_observation():
+    from dsh_game_core.learner import context_from_observation
+
+    ctx = context_from_observation(
+        {"scene": "gameplay", "hp": 2, "enemy_ahead": True, "enemy_side": "left", "enemy_ttc": 0.3, "player": {"x": 0.4}}
+    )
+    assert ctx.hp == 2
+    assert ctx.threat_side == "left"
+    assert ctx.threat_ttc == 0.3
+    assert ctx.space_left == 0.4

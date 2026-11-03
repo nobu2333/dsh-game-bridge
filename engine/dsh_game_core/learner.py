@@ -127,3 +127,24 @@ def trace_from_dicts(rows: list[dict], *, died: bool = False) -> EpisodeTrace:
             )
         )
     return trace
+
+def context_from_observation(observation: dict) -> Context:
+    """Map a generic observation to a learning Context (no game-specific names)."""
+    obs = observation or {}
+    threat = {}
+    if obs.get("enemy_ahead") or obs.get("enemy_behind"):
+        threat = {
+            "side": obs.get("enemy_side") or ("behind" if obs.get("enemy_behind") else ""),
+            "ttc": obs.get("enemy_ttc"),
+            "distance": obs.get("enemy_distance"),
+        }
+    return Context(
+        scene=str(obs.get("scene") or "unknown"),
+        hp=obs.get("hp"),
+        threat_side=str(threat.get("side") or ""),
+        threat_ttc=threat.get("ttc"),
+        threat_distance=threat.get("distance"),
+        space_left=(obs.get("player") or {}).get("x"),
+        space_right=None,
+        move_type="",
+    )
