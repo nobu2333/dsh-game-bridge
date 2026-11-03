@@ -652,3 +652,9 @@
 - B 轨具体化：Brotato（Godot，单机，俯视自动射击），窗口化 960x540；零引擎改动验证 engine/attach/按键/菜单/开局/移动、time_to_controls≤5min、首次动作、game_id=brotato 的 LevelMemory 加载/卸载；不要求通关，不污染 A。
 - Overcooked（双人）仅作为后续多 agent/协作专项，不纳入本次 B。
 - A 保持不变：当前 4.19 平均、9.92 最高、未通关；下一步死亡原因分类/时序/安全方向。
+
+## 2026-11-03 20:40 B 轨烟测
+
+- Brotato：进程可启动但弹“Brotato.exe - 无法找到入口”；尝试用 steam_api64.rne 替换 DLL（已备份）仍失败，已还原原 DLL。
+- Overcooked（备选）：窗口化启动成功；engine attach 成功；OCR 菜单/按键提示正常；probe_controls 9 键耗时 7.94s；可进主菜单/加入玩家/过场；ESC 可暂停。但它双人/过场为主，未进入可操作关卡，不作为完整 B 验证。
+- 结论：B 轨未完成；需要可单机、键盘、可快速进 gameplay 的第二款游戏，或修复 Brotato 运行库/模拟 DLL。未改引擎；未通关；README 未写。
