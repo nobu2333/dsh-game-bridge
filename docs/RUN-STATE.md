@@ -672,3 +672,11 @@
 - 把 left-edge 阈值 0.10→0.14 且受击时立即 jump/dash：10 局 4.57/3.82/3.36/2.12/3.65/3.87/1.84/3.93/2.82/3.87；平均 3.39，低于 4.19。
 - 结论：更早/更频繁地从角落跳出会破坏节奏；回退。保留 death_context 和原 edge escape。
 - 未通关；README 未写；驱动关闭。
+
+## 2026-11-03 21:25 死因落库
+
+- PolicyRunner 将通用死因写入 LevelMemory：cornered/low_hp/hit/unknown（基于 x<0.15、hp<=1、last_hit）。
+- 实机 3 条：cause=cornered scroll -4.074 x0.116 hp1；hit scroll -2.027 x0.209 hp2；cornered scroll -3.204 x0.021 hp?。
+- LevelMemory causes Counter: {'cornered':2,'hit':1}。
+- 结论：死因结构可用；最高频为 cornered，但之前“更早跳角落”A/B 为负，不能简单加反射。
+- 未通关；README 未写；驱动关闭。
