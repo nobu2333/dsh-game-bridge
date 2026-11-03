@@ -602,3 +602,10 @@
 - jump/dash/edge 设置窗口（jump 450ms、dash 250ms）；fresh hit 设 hurt 350ms。
 - status.action_state 暴露；暂未用于接管动作。
 - 测试 271 passed。
+
+## 2026-11-03 19:50 gated shadow promotion A/B（仍负）
+
+- 仅 hotspot + grounded + !hurt 时执行 shadow top；10 局 5.18/1.80/3.49/3.24/2.68/3.33/2.74/2.14/3.43/4.16；平均 3.22，仍低于默认 4.19。
+- 结论：问题不是执行窗口，而是 shadow top 本身不够可靠/过于局部；继续 promotion 无意义。
+- 已回退代码、关闭 memory.promote；保留 shadow 只读。
+- 下一步：不要用 top1 接管；要么学习更好的打分，要么把记忆只作为风险提示给模型/仲裁。
