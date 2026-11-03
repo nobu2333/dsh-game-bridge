@@ -398,6 +398,8 @@ class PolicyRunner:
         self._learner = None
         self._learning_pending: dict | None = None
         self._learning_updates = 0
+        self._learning_recent: list[dict] = []
+        self._learning_death_done = False
         self._retreat_until = 0.0
         self._last_intent_action = 0.0
         self._attack_started = 0.0
@@ -760,6 +762,9 @@ class PolicyRunner:
                         self._temporal_state = None
                         self._situation = None
                         self._planner_intent = None
+                        self._learning_recent = []
+                        self._learning_death_done = False
+                        self._learning_pending = None
                         if self._locator is not None:
                             self._locator.reset()
                     self._prev_scene = self._scene
@@ -767,6 +772,7 @@ class PolicyRunner:
                 if self._scene is not None and self._scene != "gameplay":
                     entities = self._entities(frame, previous_frame)
                     self._release_all_keys()
+                    self._finalize_learning_death()
                     self._maybe_recover()
                     self._ticks += 1
                     delay = self._period
@@ -1234,6 +1240,8 @@ class PolicyRunner:
                 progress = abs(float(self._scroll_s)) - abs(float(pending.get("scroll") or 0.0))
                 outcome = Outcome(damage=damage, progress_delta=round(progress, 4), died=self._scene == "death")
                 self._learner.stats.update(pending["key"], pending["action"], outcome.reward())
+                self._learning_recent.append({"key": pending["key"], "action": pending["action"], "at": now})
+                self._learning_recent = self._learning_recent[-20:]
                 self._learning_updates += 1
                 self._learning_pending = None
                 if self._learning_path and self._learning_updates % 10 == 0:
@@ -1260,12 +1268,28 @@ class PolicyRunner:
                     origin="learner",
                 )
             self._learning_pending = {
-                "key": context.key(),
+                "key": context.key(coarse=True),
                 "action": action,
                 "at": now,
                 "hp": self._current_hp(),
                 "scroll": float(self._scroll_s),
             }
+        except Exception:  # noqa: BLE001
+            return
+
+    def _finalize_learning_death(self) -> None:
+        """Death: back-propagate negative credit to recent learner steps."""
+        if not self._learning_enabled or self._learning_death_done or not self._learning_recent:
+            return
+        try:
+            recent = self._learning_recent[-10:]
+            penalty = -2.0 / max(1, len(recent))
+            for item in recent:
+                self._learner.stats.update(item["key"], item["action"], penalty)
+            self._learning_death_done = True
+            self._learning_recent = []
+            if self._learning_path:
+                self._learner.save(self._learning_path)
         except Exception:  # noqa: BLE001
             return
 

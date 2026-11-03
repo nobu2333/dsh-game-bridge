@@ -47,18 +47,28 @@ class Context:
     move_type: str = ""
     version: int = CONTEXT_VERSION
 
-    def key(self) -> str:
-        payload = {
-            "v": self.version,
-            "scene": _symbol(self.scene),
-            "hp": None if self.hp is None else int(self.hp),
-            "side": _symbol(self.threat_side, 8),
-            "ttc": None if self.threat_ttc is None else _bucket(self.threat_ttc, scale=0.25),
-            "distance": None if self.threat_distance is None else _bucket(self.threat_distance, scale=0.15),
-            "left": None if self.space_left is None else _bucket(self.space_left, scale=0.25),
-            "right": None if self.space_right is None else _bucket(self.space_right, scale=0.25),
-            "move": _symbol(self.move_type),
-        }
+    def key(self, *, coarse: bool = False) -> str:
+        if coarse:
+            payload = {
+                "v": self.version,
+                "scene": _symbol(self.scene),
+                "hp": None if self.hp is None else int(self.hp),
+                "side": _symbol(self.threat_side, 8),
+                "left": None if self.space_left is None else _bucket(self.space_left, scale=0.34),
+                "right": None if self.space_right is None else _bucket(self.space_right, scale=0.34),
+            }
+        else:
+            payload = {
+                "v": self.version,
+                "scene": _symbol(self.scene),
+                "hp": None if self.hp is None else int(self.hp),
+                "side": _symbol(self.threat_side, 8),
+                "ttc": None if self.threat_ttc is None else _bucket(self.threat_ttc, scale=0.25),
+                "distance": None if self.threat_distance is None else _bucket(self.threat_distance, scale=0.15),
+                "left": None if self.space_left is None else _bucket(self.space_left, scale=0.25),
+                "right": None if self.space_right is None else _bucket(self.space_right, scale=0.25),
+                "move": _symbol(self.move_type),
+            }
         raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
 

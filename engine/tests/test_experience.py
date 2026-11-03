@@ -31,3 +31,9 @@ def test_skill_stats_ucb_and_persistence():
     restored = SkillStats.from_dict(payload)
     assert restored.mean(ctx, "jump") == 1.0
     assert restored.summary()["samples"] == 2
+
+def test_context_coarse_ignores_ttc_distance():
+    a = Context(scene="gameplay", hp=3, threat_side="left", threat_ttc=0.2, threat_distance=0.1)
+    b = Context(scene="gameplay", hp=3, threat_side="left", threat_ttc=0.8, threat_distance=0.4)
+    assert a.key() != b.key()
+    assert a.key(coarse=True) == b.key(coarse=True)
