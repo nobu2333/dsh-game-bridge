@@ -360,8 +360,11 @@ def normalize_guide_card(raw: Any, *, now: Any = None) -> dict | None:
     if not isinstance(raw, dict):
         return None
     game = _safe_id(raw.get("game"), "unknown")
+    scope = str(raw.get("scope") or "level").strip().lower()
+    if scope not in ("game", "level", "boss"):
+        scope = "level"
     level = _safe_id(raw.get("level"), "")
-    if not level:
+    if scope != "game" and not level:
         return None
     facts = raw.get("facts")
     if not isinstance(facts, list):
@@ -385,6 +388,9 @@ def normalize_guide_card(raw: Any, *, now: Any = None) -> dict | None:
         "id": _safe_id(raw.get("id"), f"{game}/{level}/guide-{uuid.uuid4().hex[:8]}"),
         "game": game,
         "level": level,
+        "scope": scope,
+        "source_type": str(raw.get("source_type") or "web")[:24],
+        "assisted": bool(raw.get("assisted", True)),
         "title": str(raw.get("title") or "")[:120],
         "source_url": source[:300],
         "fetched_at": _now(raw.get("fetched_at") or now),
@@ -402,12 +408,15 @@ class GuideStore:
     def __init__(self, root: str | os.PathLike[str]) -> None:
         self.root = Path(root)
 
-    def _path(self, game: str, level: str) -> Path:
-        return self.root / _safe_id(game, "unknown") / f"{_safe_id(level, 'unknown')}.guides.json"
+    def _path(self, game: str, level: str, scope: str = "level") -> Path:
+        game_id = _safe_id(game, "unknown")
+        if scope == "game":
+            return self.root / game_id / "game.guides.json"
+        return self.root / game_id / f"{_safe_id(level, 'unknown')}.guides.json"
 
-    def load(self, game: str, level: str) -> list[dict]:
+    def load(self, game: str, level: str, *, scope: str = "level") -> list[dict]:
         try:
-            data = json.loads(self._path(game, level).read_text(encoding="utf-8"))
+            data = json.loads(self._path(game, level, scope).read_text(encoding="utf-8"))
             cards = data.get("cards") if isinstance(data, dict) else []
         except Exception:  # noqa: BLE001
             cards = []
@@ -418,14 +427,18 @@ class GuideStore:
                 result.append(card)
         return result
 
+    def load_game(self, game: str) -> list[dict]:
+        return self.load(game, "", scope="game")
+
     def upsert(self, card: Any) -> dict | None:
         normalized = normalize_guide_card(card)
         if normalized is None:
             return None
         try:
-            path = self._path(normalized["game"], normalized["level"])
+            scope = normalized.get("scope") or "level"
+            path = self._path(normalized["game"], normalized["level"], scope)
             path.parent.mkdir(parents=True, exist_ok=True)
-            cards = self.load(normalized["game"], normalized["level"])
+            cards = self.load(normalized["game"], normalized["level"], scope=scope)
             cards = [existing for existing in cards if existing["id"] != normalized["id"]]
             cards.append(normalized)
             tmp = path.with_suffix(".tmp")

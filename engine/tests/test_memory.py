@@ -144,3 +144,21 @@ def test_split_chained_scrolls_over_budget(tmp_path):
     for item in cards:
         scrolls = item["stats"]["damage_scrolls"]
         assert max(scrolls) - min(scrolls) <= 0.2
+
+def test_guide_game_scope_and_assisted(tmp_path):
+    from dsh_game_core.memory import GuideStore, normalize_guide_card
+
+    game_card = normalize_guide_card(
+        {"game": "cuphead", "scope": "game", "facts": [{"type": "controls", "text": "Z jump"}], "source_url": "https://example.com"}
+    )
+    assert game_card is not None
+    assert game_card["scope"] == "game"
+    assert game_card["assisted"] is True
+    assert game_card["level"] == ""
+    assert normalize_guide_card({"game": "cuphead", "scope": "level"}) is None
+
+    store = GuideStore(tmp_path)
+    assert store.upsert(game_card) is not None
+    loaded = store.load_game("cuphead")
+    assert len(loaded) == 1
+    assert loaded[0]["facts"][0]["text"] == "Z jump"
