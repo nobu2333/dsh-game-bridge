@@ -658,3 +658,10 @@
 - Brotato：进程可启动但弹“Brotato.exe - 无法找到入口”；尝试用 steam_api64.rne 替换 DLL（已备份）仍失败，已还原原 DLL。
 - Overcooked（备选）：窗口化启动成功；engine attach 成功；OCR 菜单/按键提示正常；probe_controls 9 键耗时 7.94s；可进主菜单/加入玩家/过场；ESC 可暂停。但它双人/过场为主，未进入可操作关卡，不作为完整 B 验证。
 - 结论：B 轨未完成；需要可单机、键盘、可快速进 gameplay 的第二款游戏，或修复 Brotato 运行库/模拟 DLL。未改引擎；未通关；README 未写。
+
+## 2026-11-03 21:15 死亡上下文
+
+- PolicyRunner 新增 death_context：死亡瞬间记录 scroll/hp/last_hit/action_state/observation/situation/memory；status 暴露，新命重置。
+- 实机第一条：scroll -2.388, observation hp1, x=0.049（左边缘）, last_hit before177→after0, grounded, 无 enemy_ahead；说明是“被击退到左角 + 接触/低血”。
+- memory context 同帧含 guide + hotspot（s:-5 deaths11, preferred=advance）。
+- 未通关；README 未写。

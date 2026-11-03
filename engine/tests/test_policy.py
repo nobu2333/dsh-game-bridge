@@ -57,6 +57,7 @@ STATUS_KEYS = {
     "shadow_advice",
     "action_state",
     "memory_context",
+    "death_context",
     "level_memory",
     "planner_intent",
     "active_intent",

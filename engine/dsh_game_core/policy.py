@@ -398,6 +398,8 @@ class PolicyRunner:
         self._temporal_state: dict | None = None
         self._situation: dict | None = None
         self._shadow_candidates: dict | None = None
+        self._death_context: dict | None = None
+        self._death_context_done = False
         self._planner_intent: dict | None = None
         instant = self._profile.get("instant_play")
         instant = instant if isinstance(instant, dict) else {}
@@ -650,6 +652,7 @@ class PolicyRunner:
             "shadow_advice": self._shadow_candidates,
             "action_state": self._action_state(),
             "memory_context": self._memory_context,
+            "death_context": self._death_context,
             "level_memory": (
                 {
                     "summary": self._level_memory.summary(),
@@ -805,6 +808,8 @@ class PolicyRunner:
                         self._memory_action_at = 0.0
                         self._memory_action_hp = None
                         self._last_action_label = None
+                        self._death_context = None
+                        self._death_context_done = False
                         if self._locator is not None:
                             self._locator.reset()
                     self._prev_scene = self._scene
@@ -812,6 +817,7 @@ class PolicyRunner:
                 if self._scene is not None and self._scene != "gameplay":
                     entities = self._entities(frame, previous_frame)
                     self._update_level_memory()
+                    self._capture_death_context()
                     self._release_all_keys()
                     self._finalize_learning_death()
                     self._maybe_recover()
@@ -1084,6 +1090,21 @@ class PolicyRunner:
         if state["index"] >= len(steps):
             self._macro_state = None
         return True
+
+    def _capture_death_context(self) -> None:
+        if self._scene != "death" or self._death_context_done:
+            return
+        self._death_context_done = True
+        self._death_context = {
+            "ts": self._clock(),
+            "scroll_s": round(float(self._scroll_s), 3),
+            "hp": self._current_hp(),
+            "last_hit": self._last_hit,
+            "action_state": self._action_state(),
+            "observation": self._observation,
+            "situation": self._situation,
+            "memory": self._memory_context,
+        }
 
     def _update_level_memory(self) -> None:
         """Record level-segment visits/damage/deaths; memory never changes actions yet."""
