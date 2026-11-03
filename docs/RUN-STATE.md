@@ -588,3 +588,10 @@
   - shadow_advice top=jump，reasons=[level_memory_preferred, hotspot]，仍 shadow=true，不改变动作。
 - 验证通过：进关加载、离开保存、死亡/受击/动作写入、hotspot 邻域聚合、shadow 使用记忆。
 - 未验证：shadow vs 默认 A/B；README 未写；驱动关闭。
+
+## 2026-11-03 19:35 shadow promotion A/B（负）
+
+- hotspot 且 shadow top=jump/dash/retreat 时真正接管；10 局 1.86/3.40/3.23/2.47/5.04/3.18/4.07/2.25/2.59/2.70；平均 3.08；全死亡。
+- 对照默认动作（dash800/jump260）20 局平均 4.19。
+- 结论：shadow top 直接 promotion 不划算，已回退 promotion 代码、关闭 memory.promote；保留 shadow 只记录/展示。
+- 说明：记忆内容/热点已可信，但“用记忆建议直接接管动作”还需要更好的时机/仲裁，不能靠 top1。
