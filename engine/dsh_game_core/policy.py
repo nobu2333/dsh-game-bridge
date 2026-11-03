@@ -223,6 +223,8 @@ class PolicyRunner:
         self._memory_action_scroll = 0.0
         self._memory_action_hp = None
         self._last_action_label = None
+        self._jump_until = 0.0
+        self._dash_until = 0.0
         self._clock = clock if callable(clock) else time.monotonic
         self._sleep = sleep if callable(sleep) else time.sleep
         # 可注入实体检测（单测用）；默认懒加载 .state.cheap_entities。
@@ -643,6 +645,7 @@ class PolicyRunner:
             "observation": self._observation,
             "situation": self._situation,
             "shadow_advice": self._shadow_candidates,
+            "action_state": self._action_state(),
             "level_memory": (
                 {
                     "summary": self._level_memory.summary(),
@@ -1090,6 +1093,7 @@ class PolicyRunner:
             if hit_t is not None and hit_t != self._memory_hit_t:
                 memory.record_damage(float(self._scroll_s), 1)
                 self._memory_hit_t = hit_t
+                self._hurt_until = self._clock() + 0.35
             if self._scene == "death" and not self._memory_death_done:
                 memory.record_death(float(self._scroll_s))
                 self._memory_death_done = True
@@ -1115,6 +1119,19 @@ class PolicyRunner:
                 self._last_action_label = None
         except Exception:  # noqa: BLE001
             return
+
+    def _action_state(self) -> dict:
+        now = self._clock()
+        jumping = now < self._jump_until
+        dashing = now < self._dash_until
+        hurt = now < self._hurt_until
+        return {
+            "grounded": not (jumping or dashing or hurt),
+            "jumping": jumping,
+            "dashing": dashing,
+            "hurt": hurt,
+            "last_action": self._last_action_label,
+        }
 
     def _maybe_edge_escape(self) -> None:
         """Generic corner escape: pressed against the left edge for a while -> jump/dash out."""
@@ -1143,6 +1160,8 @@ class PolicyRunner:
         self._last_edge_escape = now
         self._edge_since = 0.0
         self._last_action_label = "jump"
+        self._jump_until = now + 0.45
+        self._dash_until = now + 0.25
         self._actions += 1
 
     def _update_observation(self, entities: list[dict]) -> None:
@@ -1634,6 +1653,7 @@ class PolicyRunner:
             self._tap(key, self._dodge_press_ms)
         self._last_jump_at = now
         self._last_action_label = "jump"
+        self._jump_until = now + 0.45
 
     def _maybe_dash(self) -> None:
         """赶路时按固定间隔按一次冲刺键（profile.combat.dash_every_ms）。"""
@@ -1649,6 +1669,7 @@ class PolicyRunner:
             self._tap(key, self._dodge_press_ms)
         self._last_dash_at = now
         self._last_action_label = "dash"
+        self._dash_until = now + 0.25
 
     def _escape(self) -> None:
         """卡住脱困：release(advance) → press(probe_keys, probe_ms) → hold(advance)。"""

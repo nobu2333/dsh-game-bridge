@@ -595,3 +595,10 @@
 - 对照默认动作（dash800/jump260）20 局平均 4.19。
 - 结论：shadow top 直接 promotion 不划算，已回退 promotion 代码、关闭 memory.promote；保留 shadow 只记录/展示。
 - 说明：记忆内容/热点已可信，但“用记忆建议直接接管动作”还需要更好的时机/仲裁，不能靠 top1。
+
+## 2026-11-03 19:40 动作状态
+
+- PolicyRunner 新增 action_state：grounded/jumping/dashing/hurt/last_action。
+- jump/dash/edge 设置窗口（jump 450ms、dash 250ms）；fresh hit 设 hurt 350ms。
+- status.action_state 暴露；暂未用于接管动作。
+- 测试 271 passed。
