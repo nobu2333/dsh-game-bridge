@@ -553,3 +553,11 @@
 - PolicyRunner：按 tick 记录 segment visits；fresh hit 记 damage；death 记一次 death；status 暴露 level_memory summary/hotspot/preferred。
 - 记忆暂不改变动作，只记录/显示。
 - 测试 261 passed；未运行游戏。
+
+## 2026-11-03 15:25 记忆/攻略离线接线完成
+
+- MemoryLoader 接进 Session：policy_start 加载 game+level，policy_stop 保存/卸载。
+- PolicyRunner 记录 segment visits/damage/death，status 暴露 level_memory summary/hotspot/preferred；暂不改动作。
+- GuideStore 扩展：scope=game/level/boss、source_type、assisted；game 级卡不要求 level，支持 load_game。
+- docs/MEMORY.md 已记录架构；测试 262 passed。
+- 未运行游戏（按要求）；下一步：hotspot/preferred 接候选评分（shadow），再跑游戏验证。
