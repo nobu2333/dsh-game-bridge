@@ -43,11 +43,11 @@ class Learner:
             for index in range(max(0, len(rewards) - max(1, credit_window)), len(rewards)):
                 rewards[index] += death_penalty
         for step, reward in zip(trace.steps, rewards):
-            self.stats.update(step.context.key(), step.action, reward)
+            self.stats.update(step.context.key(coarse=True), step.action, reward)
         return len(trace.steps)
 
-    def choose(self, context: Context, actions: list[str], *, epsilon: float = 0.1) -> str:
-        return self.stats.choose(context.key(), actions, epsilon=epsilon)
+    def choose(self, context: Context, actions: list[str], *, epsilon: float = 0.1, min_tries: int = 2) -> str:
+        return self.stats.choose(context.key(coarse=True), actions, epsilon=epsilon, min_tries=min_tries)
 
     def to_dict(self) -> dict:
         return {"version": self.version, "stats": self.stats.to_dict()}

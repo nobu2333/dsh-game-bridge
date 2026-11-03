@@ -140,7 +140,7 @@ class SkillStats:
         bucket["total"] += _num(reward)
         self._total[key] = self._total.get(key, 0) + 1
 
-    def choose(self, context_key: str, actions: list[str], *, epsilon: float = 0.1, c: float = 0.6, rng=None) -> str:
+    def choose(self, context_key: str, actions: list[str], *, epsilon: float = 0.1, c: float = 0.6, min_tries: int = 2, rng=None) -> str:
         candidates = [str(action) for action in actions if action]
         if not candidates:
             return "advance"
@@ -149,14 +149,16 @@ class SkillStats:
         if rng.random() < max(0.0, min(1.0, epsilon)):
             return rng.choice(candidates)
         stats = self._stats.get(key, {})
+        # 强制轮询：每个动作至少试 min_tries 次，避免 advance 一统天下。
+        for action in candidates:
+            bucket = stats.get(action)
+            if not bucket or bucket["n"] < max(1, int(min_tries)):
+                return action
         total = max(1, self._total.get(key, 0))
         best_action = candidates[0]
         best_score = float("-inf")
         for action in candidates:
             bucket = stats.get(action)
-            if not bucket or bucket["n"] <= 0:
-                # 未尝试动作优先，保证探索。
-                return action
             mean = bucket["total"] / bucket["n"]
             bonus = c * math.sqrt(math.log(total + 1.0) / bucket["n"])
             score = mean + bonus

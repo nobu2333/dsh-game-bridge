@@ -13,7 +13,7 @@ def test_learner_apply_and_death_credit():
     for _ in range(3):
         trace.add(ctx, "advance", Outcome(damage=0, progress_delta=0.2))
     assert learner.apply(trace) == 3
-    mean = learner.stats.mean(ctx.key(), "advance")
+    mean = learner.stats.mean(ctx.key(coarse=True), "advance")
     assert mean is not None
     assert mean < 0.4  # death penalty lowers the last steps
 
@@ -21,11 +21,11 @@ def test_learner_apply_and_death_credit():
 def test_learner_save_load(tmp_path):
     learner = Learner()
     ctx = Context(scene="gameplay", hp=3)
-    learner.stats.update(ctx.key(), "jump", 1.0)
+    learner.stats.update(ctx.key(coarse=True), "jump", 1.0)
     path = tmp_path / "learn.json"
     learner.save(path)
     restored = Learner.load(path)
-    assert restored.stats.mean(ctx.key(), "jump") == 1.0
+    assert restored.stats.mean(ctx.key(coarse=True), "jump") == 1.0
     assert restored.stats.summary()["samples"] == 1
 
 

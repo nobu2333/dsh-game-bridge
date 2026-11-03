@@ -395,6 +395,8 @@ class PolicyRunner:
         self._learning_enabled = bool(learning.get("enabled", False))
         self._learning_epsilon = max(0.0, min(1.0, _as_float(learning.get("epsilon"), 0.1) or 0.1))
         self._learning_path = str(learning.get("path") or "") or None
+        self._learning_window_ms = max(200.0, _as_float(learning.get("window_ms"), 1000.0) or 1000.0)
+        self._learning_death_window = max(1, int(_as_float(learning.get("death_window"), 20) or 20))
         self._learner = None
         self._learning_pending: dict | None = None
         self._learning_updates = 0
@@ -1232,7 +1234,7 @@ class PolicyRunner:
                 self._learner = Learner.load(self._learning_path) if self._learning_path else Learner()
             now = self._clock()
             pending = self._learning_pending
-            if pending is not None and now - float(pending["at"]) >= 0.4:
+            if pending is not None and now - float(pending["at"]) >= self._learning_window_ms / 1000.0:
                 hp_now = self._current_hp()
                 damage = 0
                 if hp_now is not None and pending.get("hp") is not None:
@@ -1251,7 +1253,7 @@ class PolicyRunner:
                 return
             context = context_from_observation(self._observation)
             actions = ["advance", "jump", "dodge_left", "dodge_right", "retreat"]
-            action = self._learner.choose(context, actions, epsilon=self._learning_epsilon)
+            action = self._learner.choose(context, actions, epsilon=self._learning_epsilon, min_tries=2)
             if action in ("jump", "dodge_left", "dodge_right", "retreat"):
                 if self._arbiter is None:
                     self._arbiter = IntentArbiter(local_intent_from_skill("advance"))
@@ -1282,7 +1284,7 @@ class PolicyRunner:
         if not self._learning_enabled or self._learning_death_done or not self._learning_recent:
             return
         try:
-            recent = self._learning_recent[-10:]
+            recent = self._learning_recent[-self._learning_death_window :]
             penalty = -2.0 / max(1, len(recent))
             for item in recent:
                 self._learner.stats.update(item["key"], item["action"], penalty)
