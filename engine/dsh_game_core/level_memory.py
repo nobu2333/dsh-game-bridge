@@ -52,6 +52,7 @@ class LevelMemory:
                 "visits": 0,
                 "deaths": 0,
                 "damage": 0,
+                "causes": {},
                 "actions": {},
                 "last_success": [],
                 "updated_at": time.time(),
@@ -63,9 +64,12 @@ class LevelMemory:
     def observe(self, scroll_s: float) -> None:
         self._segment(scroll_s)["visits"] += 1
 
-    def record_death(self, scroll_s: float) -> dict:
+    def record_death(self, scroll_s: float, cause: str | None = None) -> dict:
         segment = self._segment(scroll_s)
         segment["deaths"] += 1
+        label = str(cause or "unknown")[:24]
+        segment.setdefault("causes", {})
+        segment["causes"][label] = int(segment["causes"].get(label) or 0) + 1
         return segment
 
     def record_damage(self, scroll_s: float, amount: int = 1) -> dict:
@@ -127,6 +131,10 @@ class LevelMemory:
         deaths = sum(int(seg.get("deaths") or 0) for seg in self.segments.values())
         damage = sum(int(seg.get("damage") or 0) for seg in self.segments.values())
         hotspots = 0
+        causes: dict[str, int] = {}
+        for segment in self.segments.values():
+            for name, count in (segment.get("causes") or {}).items():
+                causes[name] = causes.get(name, 0) + int(count or 0)
         for key in self.segments:
             try:
                 scroll = int(str(key).split(":", 1)[1]) * self.bucket
@@ -134,7 +142,7 @@ class LevelMemory:
                 continue
             if self.zone_deaths(scroll) >= 2:
                 hotspots += 1
-        return {"game": self.game_id, "level": self.level_id, "segments": segments, "deaths": deaths, "damage": damage, "hotspots": hotspots}
+        return {"game": self.game_id, "level": self.level_id, "segments": segments, "deaths": deaths, "damage": damage, "hotspots": hotspots, "causes": causes}
 
     def to_dict(self) -> dict:
         return {

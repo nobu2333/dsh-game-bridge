@@ -41,3 +41,13 @@ def test_zone_hotspot_aggregates_nearby_deaths():
     assert memory.hotspot(-6.5, radius=1.5) is True
     assert memory.hotspot(0.0, radius=1.5) is False
     assert memory.zone_deaths(-6.5, radius=1.5) == 4
+
+def test_record_death_cause():
+    memory = LevelMemory("g", "l")
+    memory.record_death(-1.0, "cornered")
+    memory.record_death(-1.0, "cornered")
+    memory.record_death(-2.0, "low_hp")
+    summary = memory.summary()
+    assert summary["causes"]["cornered"] == 2
+    assert summary["causes"]["low_hp"] == 1
+    assert memory.query(-1.0)["causes"]["cornered"] == 2
