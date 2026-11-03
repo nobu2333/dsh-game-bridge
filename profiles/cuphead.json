@@ -110,7 +110,7 @@
       ],
       "threat_radius": 0.18,
       "cooldown_ms": 350,
-      "press_ms": 160
+      "press_ms": 260
     },
     "jump_every_ms": 0,
     "dash_every_ms": 800,
