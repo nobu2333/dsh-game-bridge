@@ -56,6 +56,7 @@ STATUS_KEYS = {
     "situation",
     "shadow_advice",
     "action_state",
+    "memory_context",
     "level_memory",
     "planner_intent",
     "active_intent",
@@ -178,6 +179,7 @@ def build_runner(
     on_danger_outcome=None,
     prompt_source=None,
     level_memory=None,
+    memory_loader=None,
 ):
     """构造一个由「虚拟时间 + 拍数预算」自动收尾的 runner。"""
     controller = controller or FakeController()
@@ -205,6 +207,7 @@ def build_runner(
         on_danger_outcome=on_danger_outcome,
         prompt_source=prompt_source,
         level_memory=level_memory,
+        memory_loader=memory_loader,
     )
     holder["runner"] = runner
     controller.clock = virtual.clock
@@ -552,3 +555,18 @@ def test_policy_records_level_memory_actions():
     run_to_completion(runner)
     actions = [seg.get("actions", {}) for seg in memory.segments.values()]
     assert any(actions)
+
+def test_policy_exposes_memory_context(tmp_path):
+    import json
+    from dsh_game_core.memory_loader import MemoryLoader
+
+    game = tmp_path / "games" / "g"
+    (game / "levels").mkdir(parents=True)
+    (game / "game.json").write_text(json.dumps({"id": "g"}), encoding="utf-8")
+    loader = MemoryLoader(tmp_path)
+    loader.load_game("g")
+    loader.load_level("g", "level")
+    runner, _, _ = build_runner(budget_ticks=40, memory_loader=loader, level_memory=loader.level_memory)
+    status = run_to_completion(runner)
+    assert status["memory_context"] is not None
+    assert status["memory_context"]["scope"] == "level"

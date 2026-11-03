@@ -624,3 +624,9 @@
 - Session.policy_start 现在还会加载 game/level guide cards，挂到 memory_loader.game_data["guides"]。
 - memory_context 支持从 game_data.guides 取 facts（仍受 scope/字符预算约束）。
 - 测试 271 passed。
+
+## 2026-11-03 20:05 memory_context 接入 status
+
+- PolicyRunner 接收 memory_loader，每 30 tick 组装 memory_context（当前 scope + guide facts + level memory，字符预算）。
+- status.memory_context 暴露给模型/决策层；仍不改变动作。
+- 测试 272 passed。

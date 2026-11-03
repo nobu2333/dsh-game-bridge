@@ -210,12 +210,15 @@ class PolicyRunner:
         on_danger_outcome: Callable[[str, str], Any] | None = None,
         prompt_source: Callable[[Any, Any], Any] | None = None,
         level_memory: Any = None,
+        memory_loader: Any = None,
     ):
         self._capture = capture
         self._controller = controller
         self._gate = gate
         self._profile = profile if isinstance(profile, dict) else {}
         self._level_memory = level_memory
+        self._memory_loader = memory_loader
+        self._memory_context: dict | None = None
         self._memory_observe_every = 6
         self._memory_hit_t = None
         self._memory_death_done = False
@@ -646,6 +649,7 @@ class PolicyRunner:
             "situation": self._situation,
             "shadow_advice": self._shadow_candidates,
             "action_state": self._action_state(),
+            "memory_context": self._memory_context,
             "level_memory": (
                 {
                     "summary": self._level_memory.summary(),
@@ -1117,6 +1121,14 @@ class PolicyRunner:
                 self._memory_action_scroll = float(self._scroll_s)
                 self._memory_action_hp = hp_now
                 self._last_action_label = None
+            if self._memory_loader is not None and self._ticks % 30 == 0:
+                from .memory_context import build_memory_context
+
+                self._memory_context = build_memory_context(
+                    self._memory_loader,
+                    scroll_s=float(self._scroll_s),
+                    max_chars=2000,
+                )
         except Exception:  # noqa: BLE001
             return
 

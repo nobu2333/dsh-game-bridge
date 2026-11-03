@@ -1183,6 +1183,7 @@ class GameSession:
             hp_source=lambda: self._scene_cache.get("hp"),
             on_danger_outcome=self._danger_outcome,
             level_memory=level_memory,
+            memory_loader=self._memory_loader,
         )
         started = self._policy.start()
         if params.get("scene_watch", True):
