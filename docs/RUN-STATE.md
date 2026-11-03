@@ -665,3 +665,10 @@
 - 实机第一条：scroll -2.388, observation hp1, x=0.049（左边缘）, last_hit before177→after0, grounded, 无 enemy_ahead；说明是“被击退到左角 + 接触/低血”。
 - memory context 同帧含 guide + hotspot（s:-5 deaths11, preferred=advance）。
 - 未通关；README 未写。
+
+## 2026-11-03 21:25 角落脱困阈值 A/B（负）
+
+- 死亡上下文样本：-2.388/x0.049、-4.13/x0.109、-3.425/x0.075，确认多次死在左边缘；一条 -0.001/x0.28 HP1。
+- 把 left-edge 阈值 0.10→0.14 且受击时立即 jump/dash：10 局 4.57/3.82/3.36/2.12/3.65/3.87/1.84/3.93/2.82/3.87；平均 3.39，低于 4.19。
+- 结论：更早/更频繁地从角落跳出会破坏节奏；回退。保留 death_context 和原 edge escape。
+- 未通关；README 未写；驱动关闭。
