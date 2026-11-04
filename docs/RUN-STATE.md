@@ -750,3 +750,9 @@
 - experiment_cli：status→RunMetrics、summary/compare；支持 bootstrap 中位数 CI 与 promote/no_gain/regression。
 - 机制完整性测试：默认机制都带 expected_trigger/effect/owner_test；option_canary 默认 disabled；periodic_jump/world_model applied>0；option_canary applied=0。
 - 测试：290 passed；未实机。
+
+## 2026-11-04 17:15 机制审计
+
+- mechanism_audit：enabled 期望 vs 实际 applied；disabled 必须 applied=0；缺失机制 fail。
+- experiment_cli 增加 audit 子命令；测试 295 passed。
+- 未实机；等电脑后先 audit status，再跑 A/B。

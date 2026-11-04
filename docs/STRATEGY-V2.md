@@ -261,3 +261,12 @@ experiments/<id>/
 - `test_mechanism_defaults.py`：所有默认机制必须有 expected_trigger/effect/owner_test；option_canary 默认 disabled；
 - 默认机制 live counters 测试：periodic_jump applied>0、world_model applied>0、option_canary applied=0；
 - 测试：290 passed。
+
+## 12. 机制审计（2026-11-04）
+
+- `mechanism_audit.py`：对 `status.mechanisms` 做 pass/fail：
+  - 该启用的机制 `applied > 0`；
+  - 该关闭的机制 `applied == 0`；
+  - 缺失机制直接失败。
+- CLI：`python -m dsh_game_core.experiment_cli audit status.json --profile profile.json`。
+- 这是“机制正确生效”的最后一道检查：不是看代码存在，而是看开关+计数一致。

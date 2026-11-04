@@ -76,7 +76,23 @@ def main(argv: list[str] | None = None) -> int:
     compare_parser.add_argument("--min-effect", type=float, default=0.5)
     compare_parser.add_argument("--min-ci-low", type=float, default=0.0)
     compare_parser.add_argument("--guardrail-drop", type=float, default=1.0)
+    audit_parser = sub.add_parser("audit")
+    audit_parser.add_argument("status")
+    audit_parser.add_argument("--profile")
     args = parser.parse_args(argv)
+
+    if args.command == "audit":
+        from .mechanism_audit import audit_mechanisms, expectations_from_profile
+
+        with open(args.status, encoding="utf-8") as handle:
+            status = json.load(handle)
+        profile = {}
+        if args.profile:
+            with open(args.profile, encoding="utf-8") as handle:
+                profile = json.load(handle)
+        audit = audit_mechanisms(status, expectations_from_profile(profile))
+        print(json.dumps(audit.to_dict(), ensure_ascii=False, indent=2))
+        return 0 if audit.ok else 2
 
     if args.command == "summary":
         runs = load_runs(args.runs)
