@@ -465,6 +465,9 @@ class PolicyRunner:
         self._player_missing = 0
         self._edge_since = 0.0
         self._last_edge_escape = 0.0
+        combat_cfg = self._profile.get("combat")
+        combat_cfg = combat_cfg if isinstance(combat_cfg, dict) else {}
+        self._edge_escape_enabled = bool(combat_cfg.get("edge_escape", True))
         # 关卡记忆：滚动坐标 + 可选的 DangerCard 列表（由会话按 game/level 注入）。
         self._locator = None
         self._dangers = self._profile.get("danger_cards")
@@ -1182,6 +1185,8 @@ class PolicyRunner:
 
     def _maybe_edge_escape(self) -> None:
         """Generic corner escape: pressed against the left edge for a while -> jump/dash out."""
+        if not self._edge_escape_enabled:
+            return
         if self._scene != "gameplay":
             self._edge_since = 0.0
             return
