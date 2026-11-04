@@ -768,3 +768,9 @@
 - scripts/ab_batch.py：一条命令跑 N 局，自动 apply canary、写 JSONL、每局 audit、输出 summary。
 - 用法：baseline / --canary jump_over；不启动 driver 时不会运行。
 - 测试 299 passed；未实机。
+
+## 2026-11-04 18:00 数据质量
+
+- status 增加 started_at；metrics_from_status 的 duration 可用。
+- canary 边界：非选中 option、冷却重复触发均有测试。
+- 测试 300 passed；未实机。

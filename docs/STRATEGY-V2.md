@@ -289,3 +289,9 @@ experiments/<id>/
 - 自动应用 profile 的 `options.execute/canary`，写 `tmp/experiments/<label>.jsonl`，每局 audit，输出 summary。
 - `batch.apply_canary` 是纯函数，单元测试覆盖基线与候选 profile。
 - 未实机；等 driver 可用时直接执行。
+
+## 15. 数据质量与 canary 边界（2026-11-04）
+
+- `status.started_at` 已暴露，`metrics_from_status` 可计算 duration；
+- canary 边界测试：选中项不匹配 → vetoed；冷却内再次触发 → applied 不增加、last_reason=cooldown；
+- 测试：300 passed。

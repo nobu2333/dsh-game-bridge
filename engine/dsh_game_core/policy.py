@@ -671,6 +671,7 @@ class PolicyRunner:
             "shadow_advice": self._shadow_candidates,
             "action_state": self._action_state(),
             "memory_context": self._memory_context,
+            "started_at": self._started_at,
             "mechanisms": self._mechanisms.snapshot(),
             "world_model": self._world_model,
             "option_shadow": self._option_shadow,
