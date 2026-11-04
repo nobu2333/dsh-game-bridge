@@ -616,3 +616,15 @@ def test_option_canary_executes_only_selected_option():
     assert snapshot["counts"]["triggered"] == 1
     assert snapshot["counts"]["applied"] == 1
     assert len(controller.calls) > 0
+
+def test_default_mechanisms_have_live_counters():
+    profile = dict(PROFILE)
+    profile["combat"] = {"jump_every_ms": 100, "dash_every_ms": 100, "advance": "RIGHT"}
+    runner, _, _ = build_runner(budget_ticks=200, profile=profile)
+    status = run_to_completion(runner)
+    mechanisms = status["mechanisms"]
+    assert mechanisms["periodic_jump"]["counts"]["evaluated"] > 0
+    assert mechanisms["periodic_jump"]["counts"]["applied"] > 0
+    assert mechanisms["world_model"]["counts"]["applied"] > 0
+    assert mechanisms["option_shadow"]["counts"]["evaluated"] > 0
+    assert mechanisms["option_canary"]["counts"]["applied"] == 0

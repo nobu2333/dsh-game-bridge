@@ -20,7 +20,7 @@
 | M3 20 Hz 闭环 | ✅（dry-run 已验证） | 实测 21.3 Hz；逐拍安全复检；stop 一拍内松手；真实后端已接线 |
 | 发布 | ✅ 2026-10-29 | npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`；发布版安装+自举+M1/M3 实测通过 |
 | 0.0.2 本地打包 | ✅ 2026-10-30 | wheel/sdist/tarball 构建校验；桌面 profile 安装 0.0.2（引擎缓存 0.0.2）；`game_selftest` 报 0.0.2；**未发布** |
-| 通用玩法基线 | ✅ 单测通过（真实对局已跑，未通关） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_intent`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 45/45、`pytest engine/tests` 286/286；集成 11/11；memory 已实现（记录/上下文/shadow 只读），API provider 未实现；真实对局最高 11.15 单局，仍未通关 |
+| 通用玩法基线 | ✅ 单测通过（真实对局已跑，未通关） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_intent`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 45/45、`pytest engine/tests` 290/290；集成 11/11；memory 已实现（记录/上下文/shadow 只读），API provider 未实现；真实对局最高 11.15 单局，仍未通关 |
 | 策略 v2 / 检测 | 🚧 设计 + 基础设施 | `docs/STRATEGY-V2.md`；`mechanisms.py` 运行时计数、`experiment.py` A/B 统计；下一步 Option/UtilityArbiter |
 | 市场收录 | ⏳ 待提交 | 仓库已 public，按 MARKETPLACE 提交 |
 

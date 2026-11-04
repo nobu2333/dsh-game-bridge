@@ -744,3 +744,9 @@
 - 新增 `option_canary` 机制：默认 disabled，applied=0；只有 profile `options.execute=true` 且 `canary=<id>` 才执行，且一次只允许一个 option。
 - 支持 jump_over/dash_through/strafe_left/strafe_right；前置 gameplay/grounded/非 hurt/冷却/选中选项匹配。
 - 测试：286 passed；默认关闭与单次执行均有测试；未实机，不能宣称收益。
+
+## 2026-11-04 17:00 P4 离线工具
+
+- experiment_cli：status→RunMetrics、summary/compare；支持 bootstrap 中位数 CI 与 promote/no_gain/regression。
+- 机制完整性测试：默认机制都带 expected_trigger/effect/owner_test；option_canary 默认 disabled；periodic_jump/world_model applied>0；option_canary applied=0。
+- 测试：290 passed；未实机。

@@ -251,3 +251,13 @@ experiments/<id>/
 - 安全前置：gameplay、grounded、非 hurt、冷却、选中 option 必须等于 canary；
 - 执行一次后写入 `_last_jump_at/_last_dash_at`，避免周期动作同帧叠加；
 - 仍不默认开启；实机 A/B 未做，不宣称收益。
+
+## 11. P4 离线工具（2026-11-04）
+
+- `experiment_cli.py`：
+  - `python -m dsh_game_core.experiment_cli summary runs.jsonl`
+  - `python -m dsh_game_core.experiment_cli compare baseline.jsonl candidate.jsonl --mechanism option_canary --min-runs 10 --min-effect 0.5`
+- `metrics_from_status()`：从 `policy.status` 提取 peak/duration/damage/deaths/cause/hz/clear；
+- `test_mechanism_defaults.py`：所有默认机制必须有 expected_trigger/effect/owner_test；option_canary 默认 disabled；
+- 默认机制 live counters 测试：periodic_jump applied>0、world_model applied>0、option_canary applied=0；
+- 测试：290 passed。
