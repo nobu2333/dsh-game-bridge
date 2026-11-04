@@ -151,4 +151,20 @@ def default_specs() -> list[MechanismSpec]:
             effect="status only; never keys",
             owner_test="tests/test_policy.py",
         ),
+        MechanismSpec(
+            id="world_model",
+            description="structured space/threat/self model",
+            expected_trigger="every observation update",
+            preconditions=("observation",),
+            effect="status only; never keys",
+            owner_test="tests/test_world_options.py",
+        ),
+        MechanismSpec(
+            id="option_shadow",
+            description="utility option selection (shadow)",
+            expected_trigger="every observation update",
+            preconditions=("world_model",),
+            effect="status only; never keys",
+            owner_test="tests/test_world_options.py",
+        ),
     ]

@@ -729,3 +729,12 @@
 - 测试数统一为引擎 **273**、插件 **45**；README/STATUS/MEMORY 同步。
 - 脱敏：去掉文档里的本机 Cuphead 路径和用户名路径，改用 `<game-dir>` / `%LOCALAPPDATA%`。
 - 仍未通关；README 未写。
+
+## 2026-11-04 16:20 离线 P1/P2（shadow）
+
+- 用户今天无法提供电脑；按约定只做离线部分，不启动游戏。
+- 新增 `world_model.py`：space（left/right/ground/edge/gap）、threats（type/side/lane/ttc/telegraph/distance）、self_state（hp/action）；`status.world_model`。
+- 新增 `options.py`：OptionSpec（前置/效果/冷却/最短承诺）+ 5 个 option（advance/strafe/jump_over/dash_through/stop_shoot）+ UtilityArbiter（安全否决/迟滞/承诺）；`status.option_shadow`，shadow=true，不执行。
+- 机制注册表新增 world_model / option_shadow 计数；`status.mechanisms`。
+- 测试 284 passed；未实机，未通关，README 未写。
+- 待电脑：验证 world_model/option_shadow 实际每帧更新、A/B、连续 3 批 promotion。

@@ -234,3 +234,11 @@ experiments/<id>/
 - 不让主模型进 30Hz 环；
 - 不把单局 11.15 当“提升”；
 - 不在未通关时写 README「茶杯头已通关」。
+
+## 9. 实现进度（2026-11-04）
+
+- P0 完成：`mechanisms.py` 计数、`experiment.py` A/B 判定、`status.mechanisms`；`edge_escape=false` 可观测 applied=0。
+- P1 完成（离线）：`world_model.py`（space/threats/self_state），`status.world_model`。
+- P2 完成（shadow）：`options.py`（OptionSpec + 5 个 option + UtilityArbiter 安全否决/承诺/冷却），`status.option_shadow`；只写状态，不执行按键。
+- 测试：284 passed。
+- 待实机：`world_model`/`option_shadow` 的 live counters、10 局 A/B、连续 3 批 promotion；离线结果不算“游戏内提升”。

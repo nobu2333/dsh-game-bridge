@@ -58,6 +58,8 @@ STATUS_KEYS = {
     "action_state",
     "memory_context",
     "mechanisms",
+    "world_model",
+    "option_shadow",
     "death_context",
     "level_memory",
     "planner_intent",
@@ -583,3 +585,12 @@ def test_edge_escape_switch_is_observable():
     assert status["mechanisms"]["edge_escape"]["enabled"] is False
     assert counts["applied"] == 0
     assert counts["evaluated"] > 0
+
+def test_policy_exposes_world_model_and_option_shadow():
+    runner, _, _ = build_runner(budget_ticks=30)
+    status = run_to_completion(runner)
+    assert status["world_model"] is not None
+    assert "space" in status["world_model"]
+    assert status["option_shadow"] is not None
+    assert status["option_shadow"]["shadow"] is True
+    assert status["mechanisms"]["option_shadow"]["counts"]["evaluated"] > 0

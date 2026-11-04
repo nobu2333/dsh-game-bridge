@@ -222,6 +222,11 @@ class PolicyRunner:
         from .mechanisms import MechanismRegistry, default_specs
 
         self._mechanisms = MechanismRegistry(default_specs())
+        from .options import UtilityArbiter, default_options
+
+        self._option_arbiter = UtilityArbiter(default_options())
+        self._world_model: dict | None = None
+        self._option_shadow: dict | None = None
         self._memory_observe_every = 6
         self._memory_hit_t = None
         self._memory_death_done = False
@@ -660,6 +665,8 @@ class PolicyRunner:
             "action_state": self._action_state(),
             "memory_context": self._memory_context,
             "mechanisms": self._mechanisms.snapshot(),
+            "world_model": self._world_model,
+            "option_shadow": self._option_shadow,
             "death_context": self._death_context,
             "level_memory": (
                 {
@@ -1344,6 +1351,34 @@ class PolicyRunner:
                 if self._shadow_candidates:
                     self._mechanisms.record("shadow_advice", "triggered")
                     self._mechanisms.record("shadow_advice", "noop", "read_only")
+                try:
+                    from .world_model import build_world_model
+
+                    memory_status = None
+                    if self._level_memory is not None:
+                        memory_status = {
+                            "summary": self._level_memory.summary(),
+                            "hotspot": self._level_memory.hotspot(float(self._scroll_s)),
+                            "preferred": self._level_memory.preferred_action(float(self._scroll_s)),
+                        }
+                    world = build_world_model(
+                        self._observation,
+                        action_state=self._action_state(),
+                        hp=self._current_hp(),
+                        level_memory=memory_status,
+                        scroll_s=float(self._scroll_s),
+                        ts=self._clock(),
+                    )
+                    self._mechanisms.record("world_model", "evaluated")
+                    self._world_model = world.to_dict()
+                    self._mechanisms.record("world_model", "applied", "status_only")
+                    self._option_shadow = self._option_arbiter.select(world, now_ms=self._clock() * 1000.0)
+                    self._mechanisms.record("option_shadow", "evaluated")
+                    self._mechanisms.record("option_shadow", "triggered", str(self._option_shadow.get("option")))
+                    self._mechanisms.record("option_shadow", "noop", "read_only")
+                except Exception:  # noqa: BLE001
+                    self._world_model = None
+                    self._option_shadow = None
                 try:
                     from .planner import choose_intent
 
