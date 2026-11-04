@@ -32,7 +32,12 @@ class AuditResult:
 
 
 def audit_mechanisms(status: dict, expectations: list[MechanismExpectation]) -> AuditResult:
-    mechanisms = (status or {}).get("mechanisms") or {}
+    payload = status or {}
+    if isinstance(payload.get("policy"), dict):
+        payload = payload["policy"]
+    elif isinstance(payload.get("status"), dict) and "mechanisms" not in payload:
+        payload = payload["status"]
+    mechanisms = payload.get("mechanisms") or {}
     checks = []
     ok = True
     for expectation in expectations:

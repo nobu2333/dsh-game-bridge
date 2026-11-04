@@ -756,3 +756,9 @@
 - mechanism_audit：enabled 期望 vs 实际 applied；disabled 必须 applied=0；缺失机制 fail。
 - experiment_cli 增加 audit 子命令；测试 295 passed。
 - 未实机；等电脑后先 audit status，再跑 A/B。
+
+## 2026-11-04 17:30 P4 跑批器
+
+- 新增 batch.py：注入式 collect_batch，自动跑 N 局、写 RunMetrics JSONL、每局 audit，返回 summary/audit_failures。
+- 不绑定 driver；实机只需注入 start/stop/status/reset/sleep。
+- 测试 298 passed；未实机。

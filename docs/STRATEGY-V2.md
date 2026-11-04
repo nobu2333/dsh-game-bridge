@@ -270,3 +270,13 @@ experiments/<id>/
   - 缺失机制直接失败。
 - CLI：`python -m dsh_game_core.experiment_cli audit status.json --profile profile.json`。
 - 这是“机制正确生效”的最后一道检查：不是看代码存在，而是看开关+计数一致。
+
+## 13. P4 跑批器（2026-11-04）
+
+- `batch.py`：注入式 `collect_batch`：
+  - start/stop/status/reset/sleep 全部由调用方提供；
+  - 每局等 death 或超时，转 RunMetrics 写 JSONL；
+  - 每局 mechanism audit，失败写入 audit_failures；
+  - 返回 summary。
+- 引擎不绑定具体 driver；实机时把 driver HTTP 调用注入即可。
+- 测试覆盖 start/stop/reset 计数、death envelope、audit failure。
