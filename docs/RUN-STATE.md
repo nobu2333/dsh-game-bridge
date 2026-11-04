@@ -781,3 +781,10 @@
 - 新增 experiments/specs/option-canary-jump-over.json：P4 第一个单机制 canary 设计。
 - .gitignore 排除本地 runs/frames/csv；只提交 spec/结论。
 - canary 横移先松前进再按方向，避免左右同时按住失效。
+
+## 2026-11-04 18:30 离线 P4 完成，等待电脑
+
+- 离线链路已完整：world_model + option shadow + default-off canary + mechanism counters/audit + batch collector + experiment CLI + spec 模板。
+- 测试 300 passed；未启动游戏。
+- 唯一剩余：P4 实机 10 局 A/B（baseline vs canary）与连续 3 批 promotion；必须有 Cuphead 窗口 + driver。
+- 今天用户无法提供电脑；继续离线只会重复小改动，不制造“进展”。
