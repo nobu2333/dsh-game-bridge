@@ -46,6 +46,19 @@ class BatchResult:
         }
 
 
+def apply_canary(profile: dict | None, canary: str | None) -> dict:
+    """Return a copy of profile with options.execute/canary set for one arm."""
+    result = dict(profile or {})
+    options = dict(result.get("options") or {}) if isinstance(result.get("options"), dict) else {}
+    options["execute"] = bool(canary)
+    if canary:
+        options["canary"] = str(canary)
+    else:
+        options.pop("canary", None)
+    result["options"] = options
+    return result
+
+
 def _policy_payload(status: dict) -> dict:
     if not isinstance(status, dict):
         return {}

@@ -70,3 +70,16 @@ def test_collect_batch_reports_audit_failure(tmp_path):
     )
     assert len(result.audit_failures) == 1
     assert result.audit_failures[0]["checks"][1]["mechanism"] == "option_canary"
+
+from dsh_game_core.batch import apply_canary
+
+
+def test_apply_canary():
+    profile = {"id": "x", "options": {"cooldown_ms": 600}}
+    baseline = apply_canary(profile, None)
+    assert baseline["options"]["execute"] is False
+    assert "canary" not in baseline["options"]
+    candidate = apply_canary(profile, "jump_over")
+    assert candidate["options"]["execute"] is True
+    assert candidate["options"]["canary"] == "jump_over"
+    assert profile["options"]["execute"] is False if "execute" in profile["options"] else True

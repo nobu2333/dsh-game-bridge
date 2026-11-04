@@ -762,3 +762,9 @@
 - 新增 batch.py：注入式 collect_batch，自动跑 N 局、写 RunMetrics JSONL、每局 audit，返回 summary/audit_failures。
 - 不绑定 driver；实机只需注入 start/stop/status/reset/sleep。
 - 测试 298 passed；未实机。
+
+## 2026-11-04 17:45 P4 实机入口
+
+- scripts/ab_batch.py：一条命令跑 N 局，自动 apply canary、写 JSONL、每局 audit、输出 summary。
+- 用法：baseline / --canary jump_over；不启动 driver 时不会运行。
+- 测试 299 passed；未实机。

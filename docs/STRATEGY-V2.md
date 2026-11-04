@@ -280,3 +280,12 @@ experiments/<id>/
   - 返回 summary。
 - 引擎不绑定具体 driver；实机时把 driver HTTP 调用注入即可。
 - 测试覆盖 start/stop/reset 计数、death envelope、audit failure。
+
+## 14. 实机跑批入口（2026-11-04）
+
+- `scripts/ab_batch.py`：通过本地 driver 跑 N 局：
+  - `python scripts/ab_batch.py --label baseline --runs 10`
+  - `python scripts/ab_batch.py --label canary-jump --runs 10 --canary jump_over`
+- 自动应用 profile 的 `options.execute/canary`，写 `tmp/experiments/<label>.jsonl`，每局 audit，输出 summary。
+- `batch.apply_canary` 是纯函数，单元测试覆盖基线与候选 profile。
+- 未实机；等 driver 可用时直接执行。
