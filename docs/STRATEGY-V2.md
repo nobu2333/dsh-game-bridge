@@ -242,3 +242,12 @@ experiments/<id>/
 - P2 完成（shadow）：`options.py`（OptionSpec + 5 个 option + UtilityArbiter 安全否决/承诺/冷却），`status.option_shadow`；只写状态，不执行按键。
 - 测试：284 passed。
 - 待实机：`world_model`/`option_shadow` 的 live counters、10 局 A/B、连续 3 批 promotion；离线结果不算“游戏内提升”。
+
+## 10. P3 canary（2026-11-04）
+
+- `status.mechanisms.option_canary`：默认 disabled，`applied=0`；
+- profile `options.execute=true` + `options.canary=<option id>` 才启用，且一次只允许一个 option；
+- 支持 canary：jump_over / dash_through / strafe_left / strafe_right；
+- 安全前置：gameplay、grounded、非 hurt、冷却、选中 option 必须等于 canary；
+- 执行一次后写入 `_last_jump_at/_last_dash_at`，避免周期动作同帧叠加；
+- 仍不默认开启；实机 A/B 未做，不宣称收益。

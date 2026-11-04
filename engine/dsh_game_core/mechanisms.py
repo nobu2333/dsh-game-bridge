@@ -167,4 +167,13 @@ def default_specs() -> list[MechanismSpec]:
             effect="status only; never keys",
             owner_test="tests/test_world_options.py",
         ),
+        MechanismSpec(
+            id="option_canary",
+            description="single-option execution canary (default off)",
+            enabled=False,
+            expected_trigger="shadow option equals profile options.canary",
+            preconditions=("grounded_or_safe", "cooldown"),
+            effect="one jump/dash/strafe action",
+            owner_test="tests/test_policy.py",
+        ),
     ]

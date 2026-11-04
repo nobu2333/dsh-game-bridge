@@ -594,3 +594,25 @@ def test_policy_exposes_world_model_and_option_shadow():
     assert status["option_shadow"] is not None
     assert status["option_shadow"]["shadow"] is True
     assert status["mechanisms"]["option_shadow"]["counts"]["evaluated"] > 0
+
+def test_option_canary_default_off():
+    runner, _, controller = build_runner(budget_ticks=40)
+    status = run_to_completion(runner)
+    counts = status["mechanisms"]["option_canary"]["counts"]
+    assert status["mechanisms"]["option_canary"]["enabled"] is False
+    assert counts["applied"] == 0
+    assert counts["evaluated"] > 0
+
+
+def test_option_canary_executes_only_selected_option():
+    profile = dict(PROFILE)
+    profile["options"] = {"execute": True, "canary": "jump_over", "cooldown_ms": 0}
+    runner, _, controller = build_runner(budget_ticks=1, profile=profile)
+    runner._scene = "gameplay"
+    runner._option_shadow = {"option": "jump_over", "shadow": True}
+    runner._maybe_execute_option_canary()
+    snapshot = runner.status()["mechanisms"]["option_canary"]
+    assert snapshot["enabled"] is True
+    assert snapshot["counts"]["triggered"] == 1
+    assert snapshot["counts"]["applied"] == 1
+    assert len(controller.calls) > 0

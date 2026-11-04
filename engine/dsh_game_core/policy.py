@@ -227,6 +227,13 @@ class PolicyRunner:
         self._option_arbiter = UtilityArbiter(default_options())
         self._world_model: dict | None = None
         self._option_shadow: dict | None = None
+        options_cfg = self._profile.get("options")
+        options_cfg = options_cfg if isinstance(options_cfg, dict) else {}
+        self._option_execute = bool(options_cfg.get("execute", False))
+        self._option_canary = str(options_cfg.get("canary") or "")
+        self._option_canary_cooldown_ms = int(options_cfg.get("cooldown_ms") or 600)
+        self._option_last_applied = 0.0
+        self._mechanisms.set_enabled("option_canary", self._option_execute and bool(self._option_canary))
         self._memory_observe_every = 6
         self._memory_hit_t = None
         self._memory_death_done = False
@@ -870,6 +877,7 @@ class PolicyRunner:
                         self._sleep(delay)
                     continue
                 self._execute_active_intent()
+                self._maybe_execute_option_canary()
                 self._maybe_engage(entities)
                 self._maybe_turn_shoot()
 
@@ -1743,6 +1751,61 @@ class PolicyRunner:
                     self._tap(key, self._dodge_press_ms)
                 self._last_dodge_at = now
                 return
+
+    def _maybe_execute_option_canary(self) -> None:
+        """Default-off P3 canary: execute at most one selected option."""
+        self._mechanisms.record("option_canary", "evaluated")
+        if not self._option_execute or not self._option_canary:
+            self._mechanisms.record("option_canary", "noop", "disabled")
+            return
+        if self._scene != "gameplay":
+            self._mechanisms.record("option_canary", "vetoed", "not_gameplay")
+            return
+        selected = str((self._option_shadow or {}).get("option") or "")
+        if selected != self._option_canary:
+            self._mechanisms.record("option_canary", "vetoed", "not_selected")
+            return
+        self._mechanisms.record("option_canary", "triggered", selected)
+        now = self._clock()
+        now_ms = now * 1000.0
+        if now_ms - self._option_last_applied < self._option_canary_cooldown_ms:
+            self._mechanisms.record("option_canary", "vetoed", "cooldown")
+            return
+        state = self._action_state()
+        if selected == "jump_over":
+            if not state.get("grounded") or not self._jump_keys:
+                self._mechanisms.record("option_canary", "vetoed", "not_grounded")
+                return
+            self._tap(self._jump_keys[0], self._dodge_press_ms)
+            self._jump_until = now + 0.45
+            self._last_jump_at = now
+            self._last_action_label = "jump"
+        elif selected == "dash_through":
+            if state.get("hurt") or not self._dash_keys:
+                self._mechanisms.record("option_canary", "vetoed", "hurt")
+                return
+            self._tap(self._dash_keys[0], self._dodge_press_ms)
+            self._dash_until = now + 0.25
+            self._last_dash_at = now
+            self._last_action_label = "dash"
+        elif selected in ("strafe_left", "strafe_right"):
+            direction = "left" if selected.endswith("left") else "right"
+            if state.get("hurt"):
+                self._mechanisms.record("option_canary", "vetoed", "hurt")
+                return
+            key = self._resolve_key(direction)
+            if not key:
+                self._mechanisms.record("option_canary", "vetoed", "no_key")
+                return
+            self._tap(key, 160.0)
+            self._last_action_label = selected
+        else:
+            self._mechanisms.record("option_canary", "vetoed", "unsupported_option")
+            return
+        self._option_last_applied = now_ms
+        self._last_action_label = self._last_action_label or selected
+        self._actions += 1
+        self._mechanisms.record("option_canary", "applied", selected)
 
     def _maybe_jump(self) -> None:
         """赶路时按固定间隔按一次跳跃键（profile.combat.jump_every_ms）。"""

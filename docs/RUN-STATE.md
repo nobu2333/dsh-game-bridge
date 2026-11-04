@@ -738,3 +738,9 @@
 - 机制注册表新增 world_model / option_shadow 计数；`status.mechanisms`。
 - 测试 284 passed；未实机，未通关，README 未写。
 - 待电脑：验证 world_model/option_shadow 实际每帧更新、A/B、连续 3 批 promotion。
+
+## 2026-11-04 16:45 P3 option canary（默认关闭）
+
+- 新增 `option_canary` 机制：默认 disabled，applied=0；只有 profile `options.execute=true` 且 `canary=<id>` 才执行，且一次只允许一个 option。
+- 支持 jump_over/dash_through/strafe_left/strafe_right；前置 gameplay/grounded/非 hurt/冷却/选中选项匹配。
+- 测试：286 passed；默认关闭与单次执行均有测试；未实机，不能宣称收益。
