@@ -774,3 +774,10 @@
 - status 增加 started_at；metrics_from_status 的 duration 可用。
 - canary 边界：非选中 option、冷却重复触发均有测试。
 - 测试 300 passed；未实机。
+
+## 2026-11-04 18:15 实验 spec 模板
+
+- 新增 experiments/README.md：目录、spec 字段、3 批判定、跑法、audit。
+- 新增 experiments/specs/option-canary-jump-over.json：P4 第一个单机制 canary 设计。
+- .gitignore 排除本地 runs/frames/csv；只提交 spec/结论。
+- canary 横移先松前进再按方向，避免左右同时按住失效。

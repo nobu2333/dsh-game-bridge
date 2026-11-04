@@ -1,0 +1,35 @@
+{
+  "name": "option-canary-jump-over",
+  "mechanism": "option_canary",
+  "baseline_label": "baseline",
+  "candidate_label": "canary-jump",
+  "primary_metric": "peak_screens",
+  "min_runs": 10,
+  "min_effect": 0.5,
+  "min_ci_low": 0.0,
+  "guardrail_drop": 1.0,
+  "alpha": 0.05,
+  "protocol": "3 independent batches",
+  "baseline_config": {
+    "options": {
+      "execute": false
+    },
+    "combat": {
+      "jump_every_ms": 420,
+      "dash_every_ms": 800,
+      "edge_escape": false
+    }
+  },
+  "candidate_config": {
+    "options": {
+      "execute": true,
+      "canary": "jump_over",
+      "cooldown_ms": 600
+    },
+    "combat": {
+      "jump_every_ms": 420,
+      "dash_every_ms": 800,
+      "edge_escape": false
+    }
+  }
+}

@@ -1798,7 +1798,13 @@ class PolicyRunner:
             if not key:
                 self._mechanisms.record("option_canary", "vetoed", "no_key")
                 return
+            advance = self._resolve_key(str((self._profile.get("combat") or {}).get("advance") or "right"))
+            if advance and advance in self._held:
+                self._release_key(advance)
             self._tap(key, 160.0)
+            if advance:
+                self._controller.hold(advance)
+                self._held.add(advance)
             self._last_action_label = selected
         else:
             self._mechanisms.record("option_canary", "vetoed", "unsupported_option")
