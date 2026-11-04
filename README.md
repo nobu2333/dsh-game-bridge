@@ -2,13 +2,13 @@
 
 **给 DeepSeek Harness 装上眼睛和手：让 DSH 看得懂游戏、也能替你玩。**
 
-[English](README.en.md) · [状态模型](docs/STATE.md) · [现状与交班](docs/STATUS.md)
+[English](README.en.md) · [状态模型](docs/STATE.md) · [现状与交班](docs/STATUS.md) · [策略 v2](docs/STRATEGY-V2.md)
 
 > 状态：**0.0.1 已发布**（npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`）；
 > **0.0.2 已本地打包并安装验证（未发布）**：引擎自举、桌面 profile 安装、真实抓屏/OCR、前台/遮挡诊断。
 > 已实测：从 registry 的 tarball 安装 → 引擎自举（PyPI）→ 真实抓屏/OCR → 20 Hz 闭环。
 > **通用玩法基线**（WorldState 视觉状态 + 60 Hz 状态策略 + 本地档案层）已落地；
-> memory / API provider 仍是设计位，**未实现**（详见 [docs/STATE.md](docs/STATE.md)）。
+> memory / API provider：memory 已实现（LevelMemory / GuideStore / 按关懒加载 / shadow 只读 / 机制计数）；API provider 仍是设计位（详见 [docs/STATE.md](docs/STATE.md) 与 [docs/STRATEGY-V2.md](docs/STRATEGY-V2.md)）。
 > **默认 dry-run 后端（只记录、不碰设备）**；真实注入已实机验证（2026-10-29：手柄 A + XInput 回读、键盘 W + `AsyncKeyState` 回读）；仅 Windows。
 
 ## 这是什么

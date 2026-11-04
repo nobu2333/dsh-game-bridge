@@ -1,7 +1,20 @@
 # RUN STATE（仓库内续跑笔记；本地路径用占位符）
 
 > 作用：上下文被压缩/会话中断后，先读这份文件恢复状态。
-> 最后更新：2026-11-03 23:10（顶部为当前判断；下面是按时间追加的续跑记录）
+> 最后更新：2026-11-04 10:35（顶部为当前判断；下面是按时间追加的续跑记录）
+
+## 2026-11-04 策略 v2 决策
+
+> 结论：继续调参数/开关已到尽头。局内策略要从“反射规则汤”升级为 **WorldModel → Mode → Option → UtilityArbiter → Executor**；每条机制必须有运行时计数与 A/B 统计，才能算生效。
+
+- 调研与架构：`docs/STRATEGY-V2.md`（Utility AI / GOAP / BT / Options / MPC / Cradle / Voyager / AlphaStar 取舍）。
+- 检测基础设施已实现：
+  - `engine/dsh_game_core/mechanisms.py`：机制注册表 + evaluated/triggered/applied/vetoed/noop/error 计数；`status.mechanisms`。
+  - `engine/dsh_game_core/experiment.py`：RunMetrics、批次统计、bootstrap 中位数 CI、promote/no_gain/regression/insufficient 判定。
+  - 已接入 periodic_jump / periodic_dash / edge_escape / shadow_advice / memory_context；`edge_escape=false` 可观测到 applied=0。
+- 当前测试：引擎 **278**、插件 **45**。
+- 下一步：Option 合约 + 5 个 option（shadow）→ UtilityArbiter（安全否决+承诺）→ 单机制 canary → 连续 3 批 A/B 才 promotion。
+- 仍然未通关；README 不写「已通关」。
 
 ## 当前判断（2026-11-03 23:10 合并）
 
@@ -17,8 +30,8 @@
 ## Goal（另一台 DSH 主机，不是当前会话）
 
 - id: `goal-283c1ac6-f742-4469-b1ae-5b4968ae946b`
-- revision: 7（objective 已改成文档版，max rounds 80）
-- **phase: paused / disarmed** —— 模型不能自行 resume，需要用户在那台机器的 DSH 界面点一次「恢复 goal」。
+- revision: 33（objective 已改成策略 v2 + 检测/量化，max rounds 120）
+- **phase: blocked / disarmed（需用户在 DSH 界面恢复；本轮不自行 resume）** —— 模型不能自行 resume，需要用户在那台机器的 DSH 界面点一次「恢复 goal」。
 - 若 goal 未恢复，那边的自动轮次不会继续。
 
 > **2026-11-02 注**：这个 goal 属于另一台电脑上的 DSH 运行；当前 `dsh-game-bridge` 工作区另有本次会话的 goal（`goal-80d14fcf-...`，用户已暂停）。两者不要混用：旧 goal 的 resume 只对那台机器有效。

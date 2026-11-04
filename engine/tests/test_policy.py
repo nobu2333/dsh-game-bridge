@@ -57,6 +57,7 @@ STATUS_KEYS = {
     "shadow_advice",
     "action_state",
     "memory_context",
+    "mechanisms",
     "death_context",
     "level_memory",
     "planner_intent",
@@ -571,3 +572,14 @@ def test_policy_exposes_memory_context(tmp_path):
     status = run_to_completion(runner)
     assert status["memory_context"] is not None
     assert status["memory_context"]["scope"] == "level"
+
+def test_edge_escape_switch_is_observable():
+    profile = dict(PROFILE)
+    profile["combat"] = dict(PROFILE.get("combat") or {})
+    profile["combat"]["edge_escape"] = False
+    runner, _, _ = build_runner(budget_ticks=140, profile=profile)
+    status = run_to_completion(runner)
+    counts = status["mechanisms"]["edge_escape"]["counts"]
+    assert status["mechanisms"]["edge_escape"]["enabled"] is False
+    assert counts["applied"] == 0
+    assert counts["evaluated"] > 0

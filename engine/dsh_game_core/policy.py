@@ -219,6 +219,9 @@ class PolicyRunner:
         self._level_memory = level_memory
         self._memory_loader = memory_loader
         self._memory_context: dict | None = None
+        from .mechanisms import MechanismRegistry, default_specs
+
+        self._mechanisms = MechanismRegistry(default_specs())
         self._memory_observe_every = 6
         self._memory_hit_t = None
         self._memory_death_done = False
@@ -468,6 +471,7 @@ class PolicyRunner:
         combat_cfg = self._profile.get("combat")
         combat_cfg = combat_cfg if isinstance(combat_cfg, dict) else {}
         self._edge_escape_enabled = bool(combat_cfg.get("edge_escape", True))
+        self._mechanisms.set_enabled("edge_escape", self._edge_escape_enabled)
         # 关卡记忆：滚动坐标 + 可选的 DangerCard 列表（由会话按 game/level 注入）。
         self._locator = None
         self._dangers = self._profile.get("danger_cards")
@@ -655,6 +659,7 @@ class PolicyRunner:
             "shadow_advice": self._shadow_candidates,
             "action_state": self._action_state(),
             "memory_context": self._memory_context,
+            "mechanisms": self._mechanisms.snapshot(),
             "death_context": self._death_context,
             "level_memory": (
                 {
@@ -1167,6 +1172,8 @@ class PolicyRunner:
                     scroll_s=float(self._scroll_s),
                     max_chars=2000,
                 )
+                self._mechanisms.record("memory_context", "triggered")
+                self._mechanisms.record("memory_context", "applied", "status_only")
         except Exception:  # noqa: BLE001
             return
 
@@ -1185,19 +1192,25 @@ class PolicyRunner:
 
     def _maybe_edge_escape(self) -> None:
         """Generic corner escape: pressed against the left edge for a while -> jump/dash out."""
+        self._mechanisms.record("edge_escape", "evaluated")
         if not self._edge_escape_enabled:
+            self._mechanisms.record("edge_escape", "noop", "disabled")
             return
         if self._scene != "gameplay":
             self._edge_since = 0.0
+            self._mechanisms.record("edge_escape", "vetoed", "not_gameplay")
             return
         now = self._clock()
         if float(self._anchor[0]) >= 0.10:
             self._edge_since = 0.0
+            self._mechanisms.record("edge_escape", "noop", "not_near_edge")
             return
         if self._edge_since <= 0.0:
             self._edge_since = now
+            self._mechanisms.record("edge_escape", "triggered")
             return
         if now - self._edge_since < 0.5 or now - self._last_edge_escape < 1.2:
+            self._mechanisms.record("edge_escape", "vetoed", "timing")
             return
         advance = self._resolve_key(str((self._profile.get("combat") or {}).get("advance") or "right"))
         if advance and advance in self._held:
@@ -1215,6 +1228,7 @@ class PolicyRunner:
         self._jump_until = now + 0.45
         self._dash_until = now + 0.25
         self._actions += 1
+        self._mechanisms.record("edge_escape", "applied")
 
     def _update_observation(self, entities: list[dict]) -> None:
         """Build the generic observation + chosen skill (diagnostic; does not change actions yet)."""
@@ -1326,6 +1340,10 @@ class PolicyRunner:
                     )
                 except Exception:  # noqa: BLE001
                     self._shadow_candidates = None
+                self._mechanisms.record("shadow_advice", "evaluated")
+                if self._shadow_candidates:
+                    self._mechanisms.record("shadow_advice", "triggered")
+                    self._mechanisms.record("shadow_advice", "noop", "read_only")
                 try:
                     from .planner import choose_intent
 
@@ -1693,35 +1711,43 @@ class PolicyRunner:
 
     def _maybe_jump(self) -> None:
         """赶路时按固定间隔按一次跳跃键（profile.combat.jump_every_ms）。"""
+        self._mechanisms.record("periodic_jump", "evaluated")
         if not self._is_advancing() or self._jump_every_ms <= 0 or not self._jump_keys:
+            self._mechanisms.record("periodic_jump", "vetoed", "precondition")
             return
         now = self._clock()
         if (
             self._last_jump_at is not None
             and (now - self._last_jump_at) * 1000.0 < self._jump_every_ms
         ):
+            self._mechanisms.record("periodic_jump", "vetoed", "cooldown")
             return
         for key in self._jump_keys:
             self._tap(key, self._dodge_press_ms)
         self._last_jump_at = now
         self._last_action_label = "jump"
         self._jump_until = now + 0.45
+        self._mechanisms.record("periodic_jump", "applied")
 
     def _maybe_dash(self) -> None:
         """赶路时按固定间隔按一次冲刺键（profile.combat.dash_every_ms）。"""
+        self._mechanisms.record("periodic_dash", "evaluated")
         if not self._is_advancing() or self._dash_every_ms <= 0 or not self._dash_keys:
+            self._mechanisms.record("periodic_dash", "vetoed", "precondition")
             return
         now = self._clock()
         if (
             self._last_dash_at is not None
             and (now - self._last_dash_at) * 1000.0 < self._dash_every_ms
         ):
+            self._mechanisms.record("periodic_dash", "vetoed", "cooldown")
             return
         for key in self._dash_keys:
             self._tap(key, self._dodge_press_ms)
         self._last_dash_at = now
         self._last_action_label = "dash"
         self._dash_until = now + 0.25
+        self._mechanisms.record("periodic_dash", "applied")
 
     def _escape(self) -> None:
         """卡住脱困：release(advance) → press(probe_keys, probe_ms) → hold(advance)。"""
