@@ -652,3 +652,15 @@ def test_option_canary_rejects_non_selected_and_cooldown():
     snapshot = runner.status()["mechanisms"]["option_canary"]
     assert snapshot["counts"]["applied"] == 1
     assert snapshot["last_reason"] == "cooldown"
+
+def test_option_canary_stop_shoot_suppresses_advance():
+    profile = dict(PROFILE)
+    profile["options"] = {"execute": True, "canary": "stop_shoot", "cooldown_ms": 0}
+    runner, _, _ = build_runner(budget_ticks=1, profile=profile)
+    runner._scene = "gameplay"
+    runner._ensure_holds()
+    runner._option_shadow = {"option": "stop_shoot", "shadow": True}
+    runner._maybe_execute_option_canary()
+    snapshot = runner.status()["mechanisms"]["option_canary"]
+    assert snapshot["counts"]["applied"] == 1
+    assert runner._advance_suppress_until > runner._clock()

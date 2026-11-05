@@ -480,6 +480,7 @@ class PolicyRunner:
         self._player_missing = 0
         self._edge_since = 0.0
         self._last_edge_escape = 0.0
+        self._advance_suppress_until = 0.0
         combat_cfg = self._profile.get("combat")
         combat_cfg = combat_cfg if isinstance(combat_cfg, dict) else {}
         self._edge_escape_enabled = bool(combat_cfg.get("edge_escape", True))
@@ -919,10 +920,13 @@ class PolicyRunner:
             engage = False
         turning = self._clock() < self._turn_until
         retreat = self._clock() < self._retreat_until
+        suppress_advance = self._clock() < self._advance_suppress_until
         for key in self._hold_keys:
             if key in self._held:
                 continue
             if (engage or turning or retreat) and key == self._advance_key:
+                continue
+            if suppress_advance and key == self._advance_key:
                 continue
             self._controller.hold(key)
             self._held.add(key)
@@ -1807,6 +1811,12 @@ class PolicyRunner:
             if advance:
                 self._controller.hold(advance)
                 self._held.add(advance)
+            self._last_action_label = selected
+        elif selected == "stop_shoot":
+            advance = self._resolve_key(str((self._profile.get("combat") or {}).get("advance") or "right"))
+            if advance and advance in self._held:
+                self._release_key(advance)
+            self._advance_suppress_until = now + 0.25
             self._last_action_label = selected
         else:
             self._mechanisms.record("option_canary", "vetoed", "unsupported_option")

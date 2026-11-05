@@ -122,3 +122,17 @@
 
 - `stop_shoot` 并不是永远选不中；之前 canary applied=0 是因为 **option_canary 执行层不支持 stop_shoot**（会被 veto unsupported_option），不是选择层。
 - 选择层高频切换（commit 为主），但 P4 两个可执行机制仍 no_gain；问题在“执行一个局部 option 不足”，不是“选项完全没被选中”。
+
+## 追加：stop_shoot 执行已补，但实测仍 invalid
+
+- 已实现 stop_shoot canary：松前进 250ms + 继续射击（`_advance_suppress_until`）。
+- `p4-canary-stop-2`：n=10，mean 2.874 / median 2.839 / max 4.038。
+- audit 仍失败：`applied=0`，全部 `not_selected`。
+- 说明：stop_shoot 在某些 shadow 样本里会被选中（8s 诊断里 51 次），但整局跑批时并不稳定进入 top1；这批不能作为行为 A/B。
+
+## P4 首批最终结论
+
+- 有效执行但 no_gain：dash_through、jump_over；
+- 未稳定选中：stop_shoot（即便已支持执行）；
+- 无任何机制达到 promotion 阈值；
+- 结论不变：单机制 canary 不足以提升，需改选择/仲裁，而不是继续加 option。

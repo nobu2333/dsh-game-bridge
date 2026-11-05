@@ -827,3 +827,10 @@
 - 实机 8s：advance 61 / jump 61 / dash 60 / stop 51；stop 不是选不中，而是 canary 不支持执行 stop_shoot。
 - 结论：P4 no_gain 不是“没选中”，而是单机制执行不足；下一步改选择/仲裁或支持 stop 执行。
 - 测试 302 passed；驱动关闭；未通关。
+
+## 2026-11-05 22:15 P4 stop 最终
+
+- 补 stop_shoot 执行（松前进 250ms），但跑批仍 not_selected；summary median 2.839。
+- P4 首批：dash/jump 有效 no_gain；stop 不稳定选中；无 promotion。
+- 测试 303 passed；驱动关闭；未通关，README 未写。
+- 下一步：改选择/仲裁，不再逐个 option 试。
