@@ -67,3 +67,11 @@
 1. 先修/验证 shadow 选项为什么从不选 `jump_over`（world_model 威胁是否为空）；
 2. 再试 `stop_shoot` 或换 trigger 条件；
 3. 每个机制仍需 3 批独立验证，不能因这批就认为 option 策略有效或无效。
+
+## 追加：jump_over 第二次（tracks 注入后）
+
+- 新增 tracks→WorldModel：`world_model.threats` 已能看到 `track-152`（side=right, ttc≈0.16）。
+- 但 `option_shadow` 实际选 `strafe_right`（reason=commit），不是 `jump_over`。
+- `p4-canary-jump-2`：audit 仍失败，`applied=0`，`vetoed=not_selected`。
+- 结论：jump_over canary 未触发的原因不在感知为空，而在选项选择/承诺/动作状态（jump_over 与周期跳竞争）；这批仍不能作为行为 A/B。
+- dash_through 的有效 no_gain 结果保留。

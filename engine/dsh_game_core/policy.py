@@ -1376,6 +1376,7 @@ class PolicyRunner:
                         hp=self._current_hp(),
                         level_memory=memory_status,
                         scroll_s=float(self._scroll_s),
+                        tracks=self._tracks,
                         ts=self._clock(),
                     )
                     self._mechanisms.record("world_model", "evaluated")

@@ -796,3 +796,11 @@
 - dash_through canary：audit 通过，mean 2.708 / median 3.174；compare baseline → no_gain（diff -0.209, CI [-1.491,0.516]）。
 - 结论：不 promotion；option_canary 保持默认关闭。下一步先查 shadow 为什么不选 jump_over（world_model 威胁为空？），再试 stop_shoot。
 - 仍未通关，README 未写；驱动已关闭。
+
+## 2026-11-05 22:00 P4 jump retest / tracks
+
+- 实机 tracks 有 threat 和 parry；WorldModel 已注入 tracks，能看到 threat。
+- 但 option_shadow 仍选 strafe_right（commit），jump_over 未选中；jump canary 第二次 audit 仍 applied=0。
+- dash canary 有效但 no_gain；不 promotion。
+- 根因方向：选项选择/承诺/动作状态，不是感知完全为空。
+- 测试 301 passed；驱动关闭；未通关。

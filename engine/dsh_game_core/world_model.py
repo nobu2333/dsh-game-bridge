@@ -85,6 +85,7 @@ def build_world_model(
     hp: int | None = None,
     level_memory: dict | None = None,
     scroll_s: float | None = None,
+    tracks: list | None = None,
     ts: float = 0.0,
 ) -> WorldModel:
     obs = observation or {}
@@ -115,6 +116,43 @@ def build_world_model(
                 confidence=round(_num(obs.get("player_confidence"), 0.0), 3),
             )
         )
+    # 跟踪器给出的对象比单个 enemy_* 更全；只取 threat，按距离/ttc 排前 3。
+    anchor_x = _num(player.get("x"), 0.5)
+    anchor_y = _num(player.get("y"), 0.5)
+    tracked: list[ThreatView] = []
+    for track in tracks or []:
+        kind = getattr(track, "kind", None) if not isinstance(track, dict) else track.get("kind")
+        if kind != "threat":
+            continue
+        tx = getattr(track, "x", None) if not isinstance(track, dict) else track.get("x")
+        ty = getattr(track, "y", None) if not isinstance(track, dict) else track.get("y")
+        speed = getattr(track, "speed", 0.0) if not isinstance(track, dict) else track.get("speed")
+        if tx is None or ty is None:
+            continue
+        dx = _num(tx) - anchor_x
+        dy = _num(ty) - anchor_y
+        distance = round((dx * dx + dy * dy) ** 0.5, 4)
+        speed = _num(speed)
+        ttc = round(distance / (speed * 60.0), 3) if speed > 0.01 else None
+        tracked.append(
+            ThreatView(
+                id=f"track-{getattr(track, 'id', '') if not isinstance(track, dict) else track.get('id', '')}",
+                type="track",
+                side="left" if dx < 0 else "right",
+                lane="left" if dx < 0 else "right",
+                ttc=ttc,
+                telegraph="incoming" if ttc is not None and ttc <= 0.6 else "none",
+                distance=distance,
+                targetable=True,
+                confidence=0.6,
+            )
+        )
+    tracked.sort(key=lambda item: (item.ttc if item.ttc is not None else 99.0, item.distance or 99.0))
+    for item in tracked[:3]:
+        if not threats or item.distance is not None and (threats[0].distance is None or item.distance < threats[0].distance):
+            threats = [item] + [threat for threat in threats if threat.id != item.id]
+        else:
+            threats.append(item)
 
     self_state = SelfState(
         hp=hp if hp is not None else obs.get("hp"),

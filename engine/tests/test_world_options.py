@@ -58,3 +58,20 @@ def test_safety_veto_left_edge():
     arbiter = UtilityArbiter(default_options())
     result = arbiter.select(world, now_ms=1000)
     assert result["option"] != "strafe_left"
+
+def test_world_model_uses_tracks_when_observation_has_no_enemy():
+    class Track:
+        id = 1
+        kind = "threat"
+        x = 0.7
+        y = 0.5
+        speed = 0.1
+
+    world = build_world_model(
+        {"player": {"x": 0.5, "y": 0.5}, "hp": 3},
+        action_state={"grounded": True},
+        tracks=[Track()],
+    )
+    assert world.threats
+    assert world.threats[0].side == "right"
+    assert world.threats[0].ttc is not None
