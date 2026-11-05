@@ -94,3 +94,16 @@
 | jump_over（旧） | 失败 | — | not_selected，无效 |
 
 没有机制达到 +0.5 屏 / CI>0；不进入第二批。
+
+## 追加：stop_shoot（第三个单机制）
+
+- `p4-canary-stop`：n=10，mean 2.766 / median 3.036 / max 3.952。
+- audit 失败：`option_canary enabled=true`、`applied=0`、全部 `vetoed=not_selected`。
+- 说明 selector 没有把 `threat_near` 判成可停火输出；这批同样不能算 stop_shoot 的行为 A/B。
+
+## P4 首批最终
+
+- 有效执行：dash_through（no_gain）、jump_over（no_gain）。
+- 未触发：stop_shoot（not_selected）。
+- 没有任何机制达到 promotion 阈值。
+- 结论：单机制 canary 不带来稳定提升；下一步必须改选择/仲裁，而不是继续逐个 option 试。

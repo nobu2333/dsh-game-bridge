@@ -812,3 +812,11 @@
 - dash canary audit 通过，median 3.174 → no_gain。
 - 两个有效机制都未达 promotion 阈值；option_canary 保持默认关闭。
 - 测试 301 passed；驱动关闭；未通关，README 未写。
+
+## 2026-11-05 22:05 P4 首批最终
+
+- stop_shoot canary 未触发（not_selected）；summary median 3.036。
+- 有效 canary：dash（median 3.174）/ jump（median 3.483，CI 跨 0），均 no_gain。
+- 无 promotion；option_canary 默认关闭。
+- 结论：单机制 canary 不足以提升；下一步改选项选择/Arbitrator，不再逐个 option 试。
+- 测试 301；驱动关闭；未通关，README 未写。
