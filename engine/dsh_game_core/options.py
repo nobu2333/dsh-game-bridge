@@ -115,6 +115,26 @@ class UtilityArbiter:
         self.active_id: str | None = None
         self.active_since = 0.0
         self.last_used: dict[str, float] = {}
+        self.stats: dict[str, dict] = {
+            option.id: {"selected": 0, "rejected": 0, "reasons": {}} for option in self.options
+        }
+
+    def _bump(self, option_id: str, key: str, reason: str = "") -> None:
+        entry = self.stats.setdefault(option_id, {"selected": 0, "rejected": 0, "reasons": {}})
+        entry[key] = int(entry.get(key) or 0) + 1
+        if reason:
+            reasons = entry.setdefault("reasons", {})
+            reasons[reason] = int(reasons.get(reason) or 0) + 1
+
+    def snapshot(self) -> dict:
+        return {
+            option_id: {
+                "selected": int(entry.get("selected") or 0),
+                "rejected": int(entry.get("rejected") or 0),
+                "reasons": dict(entry.get("reasons") or {}),
+            }
+            for option_id, entry in self.stats.items()
+        }
 
     def _available(self, option: OptionSpec, world: WorldModel, now_ms: float) -> tuple[bool, str]:
         if not self._enabled(option, world):
@@ -142,6 +162,7 @@ class UtilityArbiter:
         if self.active_id is not None:
             active = next((item for item in self.options if item.id == self.active_id), None)
             if active is not None and now - self.active_since < active.min_commit_ms:
+                self._bump(active.id, "selected", "commit")
                 return {
                     "option": active.id,
                     "scores": {active.id: score_option(active, world)},
@@ -155,6 +176,8 @@ class UtilityArbiter:
             reasons[option.id] = reason
             if ok:
                 ranked.append((score_option(option, world), option.id))
+            else:
+                self._bump(option.id, "rejected", reason)
         ranked.sort(reverse=True)
         if not ranked:
             # Still return a safe read-only fallback; caller must not execute it blindly.
@@ -177,6 +200,7 @@ class UtilityArbiter:
         self.active_id = chosen
         self.active_since = now
         self.last_used[chosen] = now
+        self._bump(chosen, "selected", reason)
         return {
             "option": chosen,
             "scores": {oid: score for score, oid in ranked},

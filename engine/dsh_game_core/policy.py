@@ -675,6 +675,7 @@ class PolicyRunner:
             "mechanisms": self._mechanisms.snapshot(),
             "world_model": self._world_model,
             "option_shadow": self._option_shadow,
+            "option_stats": self._option_arbiter.snapshot(),
             "death_context": self._death_context,
             "level_memory": (
                 {

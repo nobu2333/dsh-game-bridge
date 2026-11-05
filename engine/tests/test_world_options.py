@@ -38,7 +38,7 @@ def test_edge_flags_and_gap():
 
 def test_jump_over_preferred_for_gap():
     arbiter = UtilityArbiter(default_options())
-    result = arbiter.select(_world(gap_ahead=True), now_ms=1000)
+    result = arbiter.select(_world(player={"x": 0.02}, gap_ahead=True), now_ms=1000)
     assert result["shadow"] is True
     assert result["option"] == "jump_over"
 
@@ -75,3 +75,12 @@ def test_world_model_uses_tracks_when_observation_has_no_enemy():
     assert world.threats
     assert world.threats[0].side == "right"
     assert world.threats[0].ttc is not None
+
+def test_option_selection_stats_explain_rejections():
+    arbiter = UtilityArbiter(default_options())
+    result = arbiter.select(_world(player={"x": 0.02}, gap_ahead=True), now_ms=1000)
+    stats = arbiter.snapshot()
+    assert result["option"] == "jump_over"
+    assert stats["jump_over"]["selected"] >= 1
+    assert stats["strafe_left"]["rejected"] >= 1
+    assert stats["strafe_left"]["reasons"]

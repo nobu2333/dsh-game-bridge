@@ -820,3 +820,10 @@
 - 无 promotion；option_canary 默认关闭。
 - 结论：单机制 canary 不足以提升；下一步改选项选择/Arbitrator，不再逐个 option 试。
 - 测试 301；驱动关闭；未通关，README 未写。
+
+## 2026-11-05 22:15 option_stats
+
+- UtilityArbiter 增加 per-option selected/rejected/reasons，status.option_stats。
+- 实机 8s：advance 61 / jump 61 / dash 60 / stop 51；stop 不是选不中，而是 canary 不支持执行 stop_shoot。
+- 结论：P4 no_gain 不是“没选中”，而是单机制执行不足；下一步改选择/仲裁或支持 stop 执行。
+- 测试 302 passed；驱动关闭；未通关。

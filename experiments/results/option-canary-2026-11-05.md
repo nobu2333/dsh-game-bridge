@@ -107,3 +107,18 @@
 - 未触发：stop_shoot（not_selected）。
 - 没有任何机制达到 promotion 阈值。
 - 结论：单机制 canary 不带来稳定提升；下一步必须改选择/仲裁，而不是继续逐个 option 试。
+
+## 追加：option_stats（选择诊断）
+
+8 秒实机 shadow 统计：
+
+- advance selected 61；
+- jump_over selected 61；
+- dash_through selected 60；
+- stop_shoot selected 51；
+- strafe_right 20 / strafe_left 0。
+
+说明：
+
+- `stop_shoot` 并不是永远选不中；之前 canary applied=0 是因为 **option_canary 执行层不支持 stop_shoot**（会被 veto unsupported_option），不是选择层。
+- 选择层高频切换（commit 为主），但 P4 两个可执行机制仍 no_gain；问题在“执行一个局部 option 不足”，不是“选项完全没被选中”。

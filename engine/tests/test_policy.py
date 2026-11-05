@@ -61,6 +61,7 @@ STATUS_KEYS = {
     "mechanisms",
     "world_model",
     "option_shadow",
+    "option_stats",
     "death_context",
     "level_memory",
     "planner_intent",
