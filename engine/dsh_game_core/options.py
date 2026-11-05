@@ -38,7 +38,7 @@ def default_options() -> list[OptionSpec]:
         OptionSpec("advance", "hold advance + shoot", ("not_hurt",), "advance", 0, 250, 0.50),
         OptionSpec("strafe_left", "move left with space", ("space_left", "not_hurt"), "tap left", 150, 180, 0.30),
         OptionSpec("strafe_right", "move right with space", ("space_right", "not_hurt"), "tap right", 150, 180, 0.30),
-        OptionSpec("jump_over", "jump over threat/gap", ("grounded", "threat_or_gap"), "tap jump", 250, 350, 0.40),
+        OptionSpec("jump_over", "jump over threat/gap (executor waits for ground)", ("threat_or_gap",), "tap jump", 250, 350, 0.40),
         OptionSpec("dash_through", "dash through imminent threat", ("not_hurt", "threat_imminent"), "tap dash", 500, 180, 0.35),
         OptionSpec("stop_shoot", "stop advancing and shoot", ("threat_near",), "release advance + shoot", 0, 250, 0.40),
     ]

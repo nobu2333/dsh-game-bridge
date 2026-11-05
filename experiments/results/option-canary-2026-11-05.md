@@ -75,3 +75,22 @@
 - `p4-canary-jump-2`：audit 仍失败，`applied=0`，`vetoed=not_selected`。
 - 结论：jump_over canary 未触发的原因不在感知为空，而在选项选择/承诺/动作状态（jump_over 与周期跳竞争）；这批仍不能作为行为 A/B。
 - dash_through 的有效 no_gain 结果保留。
+
+## 追加：jump_over 第三次（允许空中选中、落地执行）
+
+- `jump_over` 去掉 `grounded` 前置，改为 canary 执行时等落地；解决 periodic_jump 占满 `jump_until` 导致永远不可选。
+- `p4-canary-jump-3`：audit 通过（canary 真的 applied），n=10：
+  - mean 2.8895 / median **3.483** / p10 1.903 / max 3.947。
+- compare baseline（median 3.3825）：
+  - diff +0.1005，95% CI [-1.3485, 0.424]，decision **no_gain**。
+- 结论：jump_over 与 dash_through 都是有效 canary，但都 no_gain；option_canary 保持默认关闭，不 promotion。
+
+## P4 首批总结
+
+| 机制 | audit | median | 结论 |
+|:--|:--|--:|:--|
+| dash_through | 通过 | 3.174 | no_gain |
+| jump_over | 通过 | 3.483 | no_gain（+0.10，CI 跨 0） |
+| jump_over（旧） | 失败 | — | not_selected，无效 |
+
+没有机制达到 +0.5 屏 / CI>0；不进入第二批。

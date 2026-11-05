@@ -804,3 +804,11 @@
 - dash canary 有效但 no_gain；不 promotion。
 - 根因方向：选项选择/承诺/动作状态，不是感知完全为空。
 - 测试 301 passed；驱动关闭；未通关。
+
+## 2026-11-05 22:10 P4 首批完成
+
+- jump_over 修复：允许空中选中，canary 落地才执行；解决 periodic_jump 占满 grounded 的问题。
+- jump canary audit 通过，median 3.483 vs baseline 3.383；diff +0.10，CI [-1.35,0.42] → no_gain。
+- dash canary audit 通过，median 3.174 → no_gain。
+- 两个有效机制都未达 promotion 阈值；option_canary 保持默认关闭。
+- 测试 301 passed；驱动关闭；未通关，README 未写。
