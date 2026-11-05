@@ -788,3 +788,11 @@
 - 测试 300 passed；未启动游戏。
 - 唯一剩余：P4 实机 10 局 A/B（baseline vs canary）与连续 3 批 promotion；必须有 Cuphead 窗口 + driver。
 - 今天用户无法提供电脑；继续离线只会重复小改动，不制造“进展”。
+
+## 2026-11-05 21:45 P4 第一批结果
+
+- baseline 10 局：mean 3.214 / median 3.383 / max 3.821。
+- jump_over canary：audit 失败（enabled 但 applied=0，全 not_selected）→ 不能算行为 A/B。
+- dash_through canary：audit 通过，mean 2.708 / median 3.174；compare baseline → no_gain（diff -0.209, CI [-1.491,0.516]）。
+- 结论：不 promotion；option_canary 保持默认关闭。下一步先查 shadow 为什么不选 jump_over（world_model 威胁为空？），再试 stop_shoot。
+- 仍未通关，README 未写；驱动已关闭。
