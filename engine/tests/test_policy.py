@@ -757,3 +757,20 @@ def test_reactive_control_triggers_dash_on_imminent_threat():
     assert mech["enabled"] is True
     assert mech["counts"]["applied"] == 1
     assert len(controller.calls) > 0
+
+def test_reactive_control_jumps_when_ttc_unknown_and_close():
+    profile = dict(PROFILE)
+    profile["combat"] = dict(PROFILE.get("combat") or {})
+    profile["combat"]["reactive_mode"] = True
+    runner, _, controller = build_runner(budget_ticks=1, profile=profile)
+    runner._scene = "gameplay"
+    runner._world_model = {
+        "space": {"gap_ahead": False},
+        "threats": [{"type": "approaching", "ttc": None, "distance": 0.15}],
+    }
+    runner._reactive_last = 0.0
+    runner._maybe_reactive_control()
+    mech = runner.status()["mechanisms"]["reactive_control"]
+    assert mech["counts"]["applied"] == 1
+    assert mech["last_reason"] == "jump_over"
+    assert len(controller.calls) > 0

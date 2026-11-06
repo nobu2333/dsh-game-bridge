@@ -368,3 +368,13 @@ experiments/<id>/
   - 由 `reactive_control` 根据 WorldModel 威胁/缺口触发：ttc<=0.35 且距离<=0.25 → dash；grounded 且 gap/威胁近距离 → jump（重跳/轻跳）；中距慢速威胁 → stop_shoot；有冷却与机制计数。
 - 测试：310 passed。
 - 尚未实机验证 reactive_mode，也没有 10 局批次；Stage 3 待电脑。
+
+## 18. Stage 3 实机结果：感知修复有效，纯反应式仍 no_gain（2026-11-06）
+
+- 实机批次（10 局/臂，75s 上限，完整 traces + 自动报告）：
+  - baseline：median 2.551，p10 1.493，stale 0.256，threat 0.993，死因 low_hp4/hit4/cornered2；
+  - reactive：median 1.936，p10 1.481，stale 0.192，threat 0.988，死因 hit3/low_hp2/cornered5；
+  - compare：**no_gain**，median -0.6145，95% CI [-1.065, 0.048]。
+- 结论：感知断路修复真的生效（stale 下降、威胁可见、轨迹可复盘），但“完全关闭周期跳”的纯反应式策略没有超过基线；p10 基本持平，cornered 死亡反而增加。
+- 已入库复盘：`experiments/results/v21-stage2-negative.md` 与自动报告；完整 traces 在本地 `tmp/experiments/traces/`。
+- 下一轮假设：Hybrid（保留低频周期跳作为保底，reactive 只在明确威胁覆盖）或先修玩家初始捕获；不再重复相同 reactive 批次。

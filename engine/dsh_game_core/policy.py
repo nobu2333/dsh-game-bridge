@@ -1908,18 +1908,21 @@ class PolicyRunner:
         if now_ms - self._reactive_last < self._reactive_cooldown_ms:
             self._mechanisms.record("reactive_control", "vetoed", "cooldown")
             return
-        ttc_value = float(ttc) if isinstance(ttc, (int, float)) else 99.0
+        has_ttc = isinstance(ttc, (int, float))
+        ttc_value = float(ttc) if has_ttc else 99.0
         distance_value = float(distance) if isinstance(distance, (int, float)) else 99.0
         can_dash = bool(self._dash_keys)
         can_jump = bool(self._jump_keys) and state.get("grounded")
-        if ttc_value <= 0.35 and distance_value <= 0.25 and can_dash:
+        close_unknown = distance_value <= 0.30 and not has_ttc
+        close_slow = distance_value <= 0.30 and has_ttc and ttc_value <= 0.8
+        if has_ttc and ttc_value <= 0.35 and distance_value <= 0.25 and can_dash:
             self._tap(self._dash_keys[0], self._dodge_press_ms)
             self._dash_until = now + 0.25
             self._last_dash_at = now
             self._last_action_label = "dash"
             self._mechanisms.record("reactive_control", "applied", "dash_through")
-        elif can_jump and (space.get("gap_ahead") or (distance_value <= 0.30 and ttc_value <= 0.8)):
-            press = 260.0 if ttc_value <= 0.5 else 140.0
+        elif can_jump and (space.get("gap_ahead") or close_unknown or close_slow):
+            press = 260.0 if (close_slow and ttc_value <= 0.5) else 140.0
             self._tap(self._jump_keys[0], press)
             self._jump_until = now + 0.45
             self._last_jump_at = now

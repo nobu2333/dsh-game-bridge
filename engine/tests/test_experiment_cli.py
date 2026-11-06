@@ -12,6 +12,7 @@ def test_metrics_from_status_death():
         "scroll_s": -5.25,
         "death_context": {"cause": "cornered", "ts": 10.0},
         "started_at": 2.0,
+        "damage_events": [{} for _ in range(7)],
         "level_memory": {"summary": {"damage": 7, "deaths": 1, "causes": {"cornered": 1}}},
     }
     metrics = metrics_from_status(status, run_id="r1")
@@ -21,6 +22,17 @@ def test_metrics_from_status_death():
     assert metrics.deaths == 1
     assert metrics.death_causes["cornered"] == 1
     assert metrics.clear is False
+
+
+def test_metrics_from_status_damage_events_are_per_run():
+    status = {
+        "scene": "death",
+        "scroll_s": -3.0,
+        "damage_events": [{"ts": 1.0}, {"ts": 2.0}],
+        "level_memory": {"summary": {"damage": 999}},
+    }
+    metrics = metrics_from_status(status, run_id="r2")
+    assert metrics.damage_taken == 2
 
 
 def test_experiment_cli_summary_and_compare(tmp_path, capsys):

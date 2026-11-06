@@ -858,3 +858,12 @@
 - Stage 1 感知修复：大跳变两拍共识、过期玩家不清空 tracks、实时 anchor 过滤、parry 纳入/贴身过滤；短测 stale 14.2%、threat 100%。
 - Stage 2 反应式模式：默认关闭 `combat.reactive_mode`；开启后禁周期盲跳/盲冲，由 reactive_control 按 ttc/距离触发 dash/jump/stop_shoot，带冷却与机制计数。
 - 测试 310 passed；未实机验证 Stage2；未 10 局批次；未通关，README 未写；用户要求暂不控制电脑。
+
+## 2026-11-06 11:59 Stage 3 首批结果
+
+- baseline 10 局：median 2.551，p10 1.493，stale 0.256，threat 0.993。
+- reactive 10 局（ttc=None 优先跳修正后）：median 1.936，p10 1.481，stale 0.192，threat 0.988。
+- compare no_gain（median -0.615，CI [-1.065,0.048]）；感知修复有效，但纯反应式没有超过周期跳基线。
+- 已生成并入库 experiments/results/v21-*.md；完整 traces 本地。
+- 下一轮：Hybrid 保底跳 或 玩家初始捕获；不再重复相同 reactive 批次。
+- 测试 312 passed；未通关，README 未写。

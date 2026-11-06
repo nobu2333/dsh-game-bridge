@@ -75,7 +75,8 @@ def metrics_from_status(
     damage_events = payload.get("damage_events")
     if not isinstance(damage_events, list):
         damage_events = (death.get("damage_events") if isinstance(death, dict) else None) or []
-    damage_count = len(damage_events) if damage_events else int(summary.get("damage") or 0)
+    # 只用本局受击事件数；LevelMemory.summary.damage 是跨局累计值，不能当单局伤害。
+    damage_count = len(damage_events)
 
     if isinstance(death, dict) and death:
         extra["death_scroll_s"] = death.get("scroll_s")

@@ -98,7 +98,12 @@ def summarize(runs: Iterable[RunMetrics], metric: str = "peak_screens") -> dict:
     clear_rate = sum(1 for run in runs_list if run.clear) / max(1, len(runs_list))
     stale_vals = [float(run.player_stale_ratio) for run in runs_list if run.player_stale_ratio is not None]
     threat_vals = [float(run.threat_active_ratio) for run in runs_list if run.threat_active_ratio is not None]
-    damage_vals = [float(run.damage_taken) for run in runs_list if run.damage_taken is not None]
+    damage_vals = []
+    for run in runs_list:
+        if isinstance(run.damage_events, list):
+            damage_vals.append(float(len(run.damage_events)))
+        elif run.damage_taken is not None:
+            damage_vals.append(float(run.damage_taken))
     causes: dict[str, int] = {}
     for run in runs_list:
         for cause, count in (run.death_causes or {}).items():
