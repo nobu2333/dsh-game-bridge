@@ -387,9 +387,17 @@ class _INPUT(ctypes.Structure):
 
 
 def send_virtual_key(vk: int, down: bool) -> None:
-    """Win32 SendInput 注入一次按键（键盘后端专用；测试可注入替身）。"""
+    """Win32 SendInput 注入一次按键（键盘后端专用；测试可注入替身）。
+
+    同时填 wVk 和 wScan：部分 SDL 游戏（SuperTux 等）只认 scan code，
+    Unity 游戏（Cuphead 等）认 virtual-key；两者都带兼容性最好。
+    """
+    try:
+        scan = int(ctypes.windll.user32.MapVirtualKeyW(vk, 0)) & 0xFFFF
+    except Exception:  # noqa: BLE001
+        scan = 0
     flags = 0 if down else _KEYEVENTF_KEYUP
-    event = _INPUT(type=1, u=_INPUTUNION(ki=_KEYBDINPUT(wVk=vk, wScan=0, dwFlags=flags, time=0, dwExtraInfo=None)))
+    event = _INPUT(type=1, u=_INPUTUNION(ki=_KEYBDINPUT(wVk=vk, wScan=scan, dwFlags=flags, time=0, dwExtraInfo=None)))
     ctypes.windll.user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(_INPUT))
 
 

@@ -1,0 +1,32 @@
+{
+  "id": "supertux",
+  "name": "SuperTux",
+  "self_pos": [
+    0.5,
+    0.7
+  ],
+  "controls": {
+    "left": "LEFT",
+    "right": "RIGHT",
+    "up": "UP",
+    "down": "DOWN",
+    "jump": "SPACE",
+    "action": "CTRL",
+    "run": "SHIFT",
+    "confirm": "ENTER",
+    "back": "ESC"
+  },
+  "player": {
+    "track": false
+  },
+  "scene": {
+    "menu_keywords": [
+      "START",
+      "OPTIONS",
+      "QUIT"
+    ],
+    "death_keywords": [
+      "GAME OVER"
+    ]
+  }
+}
