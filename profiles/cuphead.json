@@ -28,7 +28,7 @@
   },
   "player": {
     "track": true,
-    "every_n_ticks": 8,
+    "every_n_ticks": 4,
     "colors": [
       {
         "r_min": 170,

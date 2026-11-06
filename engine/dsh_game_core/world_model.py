@@ -38,6 +38,7 @@ class ThreatView:
     telegraph: str = "unknown"
     distance: float | None = None
     targetable: bool = True
+    parryable: bool = False
     confidence: float = 0.0
 
     def to_dict(self) -> dict:
@@ -116,13 +117,13 @@ def build_world_model(
                 confidence=round(_num(obs.get("player_confidence"), 0.0), 3),
             )
         )
-    # 跟踪器给出的对象比单个 enemy_* 更全；只取 threat，按距离/ttc 排前 3。
+    # 跟踪器给出的对象比单个 enemy_* 更全；threat 与接近中的 parry 都可能造成接触伤害。
     anchor_x = _num(player.get("x"), 0.5)
     anchor_y = _num(player.get("y"), 0.5)
     tracked: list[ThreatView] = []
     for track in tracks or []:
         kind = getattr(track, "kind", None) if not isinstance(track, dict) else track.get("kind")
-        if kind != "threat":
+        if kind not in ("threat", "parry"):
             continue
         tx = getattr(track, "x", None) if not isinstance(track, dict) else track.get("x")
         ty = getattr(track, "y", None) if not isinstance(track, dict) else track.get("y")
@@ -132,18 +133,22 @@ def build_world_model(
         dx = _num(tx) - anchor_x
         dy = _num(ty) - anchor_y
         distance = round((dx * dx + dy * dy) ** 0.5, 4)
+        # 贴身 parry 多半是玩家自身/枪口被颜色检测误捕；不作为外部威胁。
+        if kind == "parry" and distance < 0.06:
+            continue
         speed = _num(speed)
         ttc = round(distance / (speed * 60.0), 3) if speed > 0.01 else None
         tracked.append(
             ThreatView(
                 id=f"track-{getattr(track, 'id', '') if not isinstance(track, dict) else track.get('id', '')}",
-                type="track",
+                type="parry" if kind == "parry" else "track",
                 side="left" if dx < 0 else "right",
                 lane="left" if dx < 0 else "right",
                 ttc=ttc,
                 telegraph="incoming" if ttc is not None and ttc <= 0.6 else "none",
                 distance=distance,
                 targetable=True,
+                parryable=bool(kind == "parry"),
                 confidence=0.6,
             )
         )

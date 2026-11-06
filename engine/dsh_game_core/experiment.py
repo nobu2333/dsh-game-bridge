@@ -26,6 +26,11 @@ class RunMetrics:
     deaths: int = 1
     clear: bool = False
     hz: float | None = None
+    player_stale_ratio: float | None = None
+    threat_active_ratio: float | None = None
+    option_counts: dict = field(default_factory=dict)
+    mechanism_counts: dict = field(default_factory=dict)
+    damage_events: list = field(default_factory=list)
     death_causes: dict = field(default_factory=dict)
     git_sha: str = ""
     profile_hash: str = ""
@@ -73,13 +78,31 @@ def _values(runs: Iterable[RunMetrics], metric: str) -> list[float]:
 
 
 def summarize(runs: Iterable[RunMetrics], metric: str = "peak_screens") -> dict:
-    values = _values(runs, metric)
+    runs_list = list(runs)
+    values = _values(runs_list, metric)
     if not values:
-        return {"n": 0, "mean": None, "median": None, "p10": None, "max": None, "clear_rate": None}
+        return {
+            "n": 0,
+            "mean": None,
+            "median": None,
+            "p10": None,
+            "max": None,
+            "clear_rate": None,
+            "mean_player_stale_ratio": None,
+            "mean_threat_active_ratio": None,
+            "mean_damage_taken": None,
+            "death_causes": {},
+        }
     ordered = sorted(values)
     index = max(0, min(len(ordered) - 1, int(round(0.1 * (len(ordered) - 1)))))
-    runs_list = list(runs)
     clear_rate = sum(1 for run in runs_list if run.clear) / max(1, len(runs_list))
+    stale_vals = [float(run.player_stale_ratio) for run in runs_list if run.player_stale_ratio is not None]
+    threat_vals = [float(run.threat_active_ratio) for run in runs_list if run.threat_active_ratio is not None]
+    damage_vals = [float(run.damage_taken) for run in runs_list if run.damage_taken is not None]
+    causes: dict[str, int] = {}
+    for run in runs_list:
+        for cause, count in (run.death_causes or {}).items():
+            causes[str(cause)] = causes.get(str(cause), 0) + int(count or 0)
     return {
         "n": len(values),
         "mean": round(statistics.fmean(values), 4),
@@ -87,6 +110,10 @@ def summarize(runs: Iterable[RunMetrics], metric: str = "peak_screens") -> dict:
         "p10": round(ordered[index], 4),
         "max": round(max(values), 4),
         "clear_rate": round(clear_rate, 4),
+        "mean_player_stale_ratio": round(statistics.fmean(stale_vals), 4) if stale_vals else None,
+        "mean_threat_active_ratio": round(statistics.fmean(threat_vals), 4) if threat_vals else None,
+        "mean_damage_taken": round(statistics.fmean(damage_vals), 2) if damage_vals else None,
+        "death_causes": causes,
     }
 
 

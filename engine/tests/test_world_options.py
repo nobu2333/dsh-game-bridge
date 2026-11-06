@@ -84,3 +84,20 @@ def test_option_selection_stats_explain_rejections():
     assert stats["jump_over"]["selected"] >= 1
     assert stats["strafe_left"]["rejected"] >= 1
     assert stats["strafe_left"]["reasons"]
+
+def test_world_model_treats_nearby_parry_as_threat():
+    class Track:
+        id = 9
+        kind = "parry"
+        x = 0.6
+        y = 0.55
+        speed = 0.2
+
+    world = build_world_model(
+        {"player": {"x": 0.5, "y": 0.5}, "hp": 3},
+        action_state={"grounded": True},
+        tracks=[Track()],
+    )
+    assert world.threats
+    assert world.threats[0].type == "parry"
+    assert world.threats[0].parryable is True

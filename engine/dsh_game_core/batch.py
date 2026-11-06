@@ -11,12 +11,13 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 from .experiment import RunMetrics, append_run, summarize
-from .experiment_cli import metrics_from_status
+from .experiment_cli import metrics_from_status, render_postmortem_report
 from .mechanism_audit import audit_mechanisms, expectations_from_profile
 
 
@@ -36,6 +37,8 @@ class BatchResult:
     audit_failures: list[dict] = field(default_factory=list)
     summary: dict = field(default_factory=dict)
     out_path: str = ""
+    trace_dir: str = ""
+    report_path: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -43,6 +46,8 @@ class BatchResult:
             "audit_failures": self.audit_failures,
             "summary": self.summary,
             "out_path": self.out_path,
+            "trace_dir": self.trace_dir,
+            "report_path": self.report_path,
         }
 
 
@@ -84,25 +89,46 @@ def collect_batch(
     out_path: str | Path,
     profile: dict | None = None,
     git_sha: str = "",
+    trace_dir: str | Path | None = None,
+    report_path: str | Path | None = None,
+    baseline_runs: list[RunMetrics] | None = None,
+    hypothesis: str = "",
 ) -> BatchResult:
-    result = BatchResult(out_path=str(out_path))
     target = Path(out_path)
     target.parent.mkdir(parents=True, exist_ok=True)
+    resolved_trace_dir = Path(trace_dir) if trace_dir is not None else (target.parent / "traces" / target.stem)
+    resolved_trace_dir.mkdir(parents=True, exist_ok=True)
+    result = BatchResult(
+        out_path=str(target),
+        trace_dir=str(resolved_trace_dir),
+        report_path=str(report_path) if report_path else "",
+    )
     expectations = expectations_from_profile(profile or {})
     for index in range(max(1, int(config.runs))):
         start()
         elapsed = 0.0
         snapshot: dict = {}
+        trace_by_tick: dict[int, dict] = {}
         while elapsed < config.max_run_seconds:
             sleep(config.poll_seconds)
             elapsed += config.poll_seconds
             snapshot = status() or {}
+            payload = _policy_payload(snapshot)
+            for item in payload.get("trace_tail") or []:
+                if isinstance(item, dict) and item.get("tick") is not None:
+                    trace_by_tick[int(item["tick"])] = item
             if is_death_status(snapshot):
                 break
         run_id = f"{config.run_id_prefix}-{index + 1:02d}"
         metrics = metrics_from_status(snapshot, run_id=run_id, git_sha=git_sha)
         result.runs.append(metrics)
         append_run(target, metrics)
+        if trace_by_tick:
+            trace_file = resolved_trace_dir / f"{run_id}.jsonl"
+            ordered_ticks = sorted(trace_by_tick)
+            with trace_file.open("w", encoding="utf-8") as handle:
+                for tick in ordered_ticks:
+                    handle.write(json.dumps(trace_by_tick[tick], ensure_ascii=False) + "\n")
         audit = audit_mechanisms(snapshot, expectations) if expectations else None
         if audit is not None and not audit.ok:
             result.audit_failures.append({"run": run_id, "checks": audit.checks})
@@ -111,4 +137,16 @@ def collect_batch(
             reset()
             sleep(config.reset_seconds)
     result.summary = summarize(result.runs, config.metric)
+    if report_path:
+        rpath = Path(report_path)
+        rpath.parent.mkdir(parents=True, exist_ok=True)
+        md = render_postmortem_report(
+            config.run_id_prefix,
+            result.runs,
+            baseline_runs=baseline_runs,
+            audit_failures=result.audit_failures,
+            hypothesis=hypothesis,
+            trace_dir=resolved_trace_dir,
+        )
+        rpath.write_text(md, encoding="utf-8")
     return result

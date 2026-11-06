@@ -62,6 +62,9 @@ STATUS_KEYS = {
     "world_model",
     "option_shadow",
     "option_stats",
+    "perception_health",
+    "damage_events",
+    "trace_tail",
     "death_context",
     "level_memory",
     "planner_intent",
@@ -664,3 +667,68 @@ def test_option_canary_stop_shoot_suppresses_advance():
     snapshot = runner.status()["mechanisms"]["option_canary"]
     assert snapshot["counts"]["applied"] == 1
     assert runner._advance_suppress_until > runner._clock()
+
+def test_update_player_accepts_large_jump_with_color_score():
+    runner, _, _ = build_runner(budget_ticks=1)
+    runner._track_player = True
+    runner._player_every = 1
+    runner._ticks = 0
+    runner._player_source = lambda *args, **kwargs: {"x": 0.8, "y": 0.5, "score": 0.55}
+    runner._update_player(FRAME)
+    runner._update_player(FRAME)
+    assert runner._player_missing == 0
+    assert runner._anchor[0] > 0.5
+    assert runner._player_seen_at > 0
+
+
+def test_update_player_relaxes_search_when_missing():
+    runner, _, _ = build_runner(budget_ticks=1)
+    seen = []
+    runner._track_player = True
+    runner._player_every = 1
+    runner._ticks = 0
+    runner._player_missing = 6
+
+    def source(frame, profile, previous=None):
+        seen.append(profile.get("player", {}).get("search_radius"))
+        return None
+
+    runner._player_source = source
+    runner._update_player(FRAME)
+    assert seen and seen[0] == 1.0
+
+
+def test_entities_uses_live_anchor_for_self_area():
+    runner, _, _ = build_runner(budget_ticks=1)
+    runner._anchor = (0.62, 0.41)
+    captured = {}
+
+    def source(frame, previous, profile=None):
+        captured["self_pos"] = profile.get("self_pos")
+        return []
+
+    runner._entities_source = source
+    runner._entities(FRAME, None)
+    assert captured["self_pos"] == [0.62, 0.41]
+
+
+def test_observation_keeps_tracks_when_player_stale():
+    runner, _, _ = build_runner(budget_ticks=1)
+    runner._scene = "gameplay"
+    runner._player_seen_at = 0.0
+    runner._player_missing = 9
+    runner._anchor = (0.5, 0.5)
+
+    class Track:
+        id = 1
+        kind = "threat"
+        x = 0.7
+        y = 0.5
+        vx = -0.01
+        vy = 0.0
+        speed = 0.05
+
+    runner._tracks = [Track()]
+    runner._update_observation([])
+    observation = runner._observation or {}
+    assert observation.get("counts", {}).get("entities", 0) > 0

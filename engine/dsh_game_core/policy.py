@@ -243,6 +243,14 @@ class PolicyRunner:
         self._last_action_label = None
         self._jump_until = 0.0
         self._dash_until = 0.0
+        self._obs_ticks = 0
+        self._player_stale_ticks = 0
+        self._threat_active_ticks = 0
+        self._damage_events: list[dict] = []
+        self._trace_hit_t = None
+        self._trace_tail: deque = deque(maxlen=120)
+        self._last_trace_option = None
+        self._last_trace_action = None
         self._clock = clock if callable(clock) else time.monotonic
         self._sleep = sleep if callable(sleep) else time.sleep
         # 可注入实体检测（单测用）；默认懒加载 .state.cheap_entities。
@@ -677,6 +685,9 @@ class PolicyRunner:
             "world_model": self._world_model,
             "option_shadow": self._option_shadow,
             "option_stats": self._option_arbiter.snapshot(),
+            "perception_health": self._perception_health(),
+            "damage_events": list(self._damage_events),
+            "trace_tail": list(self._trace_tail),
             "death_context": self._death_context,
             "level_memory": (
                 {
@@ -835,6 +846,14 @@ class PolicyRunner:
                         self._last_action_label = None
                         self._death_context = None
                         self._death_context_done = False
+                        self._obs_ticks = 0
+                        self._player_stale_ticks = 0
+                        self._threat_active_ticks = 0
+                        self._damage_events = []
+                        self._trace_hit_t = None
+                        self._trace_tail.clear()
+                        self._last_trace_option = None
+                        self._last_trace_action = None
                         if self._locator is not None:
                             self._locator.reset()
                     self._prev_scene = self._scene
@@ -1147,7 +1166,102 @@ class PolicyRunner:
             "observation": self._observation,
             "situation": self._situation,
             "memory": self._memory_context,
+            "perception_health": self._perception_health(),
+            "damage_events": list(self._damage_events[-8:]),
+            "trace_tail": list(self._trace_tail)[-20:],
         }
+        self._record_trace_event(force=True, event="death")
+
+    def _perception_health(self) -> dict:
+        total = int(self._obs_ticks)
+        stale = int(self._player_stale_ticks)
+        threat = int(self._threat_active_ticks)
+        return {
+            "evaluated_ticks": total,
+            "player_stale_ticks": stale,
+            "player_stale_ratio": round(stale / total, 4) if total > 0 else 0.0,
+            "threat_active_ticks": threat,
+            "threat_active_ratio": round(threat / total, 4) if total > 0 else 0.0,
+        }
+
+    def _record_trace_event(self, *, force: bool = False, event: str = "") -> None:
+        try:
+            now = self._clock()
+            player_age_ms = (
+                round(max(0.0, now - self._player_seen_at) * 1000.0) if self._player_seen_at else None
+            )
+            world_threats = (self._world_model or {}).get("threats") if isinstance(self._world_model, dict) else []
+            threats_top2 = []
+            for item in (world_threats or [])[:2]:
+                if isinstance(item, dict):
+                    threats_top2.append(
+                        {
+                            "id": item.get("id"),
+                            "type": item.get("type"),
+                            "side": item.get("side"),
+                            "distance": item.get("distance"),
+                            "ttc": item.get("ttc"),
+                        }
+                    )
+            selected_option = (self._option_shadow or {}).get("option") if isinstance(self._option_shadow, dict) else None
+            option_reason = (self._option_shadow or {}).get("reason") if isinstance(self._option_shadow, dict) else None
+            action_state = self._action_state()
+            applied_action = action_state.get("last_action")
+            canary_snap = (self._mechanisms.snapshot().get("option_canary") or {})
+            veto_reason = canary_snap.get("last_reason") or ""
+
+            hit_t = (self._last_hit or {}).get("t") if isinstance(self._last_hit, dict) else None
+            new_hit = hit_t is not None and hit_t != self._trace_hit_t
+            if new_hit:
+                self._trace_hit_t = hit_t
+                self._damage_events.append(
+                    {
+                        "ts": round(float(now), 3),
+                        "tick": int(self._ticks),
+                        "scroll_s": round(float(self._scroll_s), 3),
+                        "hp": self._current_hp(),
+                        "anchor": [round(float(self._anchor[0]), 4), round(float(self._anchor[1]), 4)],
+                        "player_age_ms": player_age_ms,
+                        "selected_option": selected_option,
+                        "last_action": applied_action,
+                        "nearest_threat": threats_top2[0] if threats_top2 else None,
+                    }
+                )
+                if len(self._damage_events) > 32:
+                    self._damage_events = self._damage_events[-32:]
+
+            changed = (
+                force
+                or new_hit
+                or (self._ticks % 6 == 0)
+                or (selected_option != self._last_trace_option)
+                or (applied_action != self._last_trace_action)
+            )
+            if not changed:
+                return
+            self._last_trace_option = selected_option
+            self._last_trace_action = applied_action
+            tag = event or ("hit" if new_hit else "tick")
+            self._trace_tail.append(
+                {
+                    "ts": round(float(now), 3),
+                    "tick": int(self._ticks),
+                    "event": tag,
+                    "scene": self._scene,
+                    "scroll_s": round(float(self._scroll_s), 3),
+                    "hp": self._current_hp(),
+                    "anchor": [round(float(self._anchor[0]), 4), round(float(self._anchor[1]), 4)],
+                    "player_age_ms": player_age_ms,
+                    "threats_top2": threats_top2,
+                    "selected_option": selected_option,
+                    "option_reason": option_reason,
+                    "applied_action": applied_action,
+                    "grounded": bool(action_state.get("grounded")),
+                    "veto_reason": veto_reason,
+                }
+            )
+        except Exception:  # noqa: BLE001
+            return
 
     def _update_level_memory(self) -> None:
         """Record level-segment visits/damage/deaths; memory never changes actions yet."""
@@ -1267,10 +1381,9 @@ class PolicyRunner:
             temporal_input = []
             anchor_point = (float(self._anchor[0]), float(self._anchor[1]))
             player_age_ms = (max(0.0, self._clock() - self._player_seen_at) * 1000.0 if self._player_seen_at else None)
+            # 玩家坐标过期只降低置信度，不再丢弃整帧威胁轨迹；否则感知会在 2 秒后彻底失明。
             player_stale = player_age_ms is None or player_age_ms > 400 or self._player_missing > 5
             for track in getattr(self, "_tracks", [])[:8]:
-                if player_stale:
-                    break
                 # 过滤“自己打出去的子弹/特效”：速度快、正在远离玩家。
                 if track.speed > 0.35 and _approaching(track, anchor_point) < -0.05:
                     continue
@@ -1407,6 +1520,13 @@ class PolicyRunner:
             self._update_progress_guard()
             self._update_arbiter()
             self._update_learning()
+            self._obs_ticks += 1
+            if player_stale:
+                self._player_stale_ticks += 1
+            world_threats = (self._world_model or {}).get("threats") if isinstance(self._world_model, dict) else None
+            if world_threats:
+                self._threat_active_ticks += 1
+            self._record_trace_event()
         except Exception:  # noqa: BLE001
             self._observation = None
             self._intent = None
@@ -1898,8 +2018,17 @@ class PolicyRunner:
         source = self._entities_source
         if source is None:
             return []
+        profile = self._profile
+        # 用实时锚点替代静态 self_pos，剔除玩家自身与枪口火花；否则静止配置会把
+        # 玩家附近当成“空白区”，或者反过来漏掉贴身威胁。
         try:
-            found = source(frame, previous_frame, profile=self._profile)
+            if isinstance(self._profile, dict):
+                profile = dict(self._profile)
+                profile["self_pos"] = [round(float(self._anchor[0]), 4), round(float(self._anchor[1]), 4)]
+        except Exception:  # noqa: BLE001
+            profile = self._profile
+        try:
+            found = source(frame, previous_frame, profile=profile)
         except Exception as error:  # noqa: BLE001 - 检测器坏了只损失本拍信息
             self._last_error = f"entities: {type(error).__name__}: {error}"
             return []
@@ -2077,13 +2206,23 @@ class PolicyRunner:
             self._tracks = []
 
     def _update_player(self, frame: np.ndarray) -> None:
-        """定期更新角色屏幕坐标；低置信度/跳变过大时保留上一个可信锚点。"""
+        """定期更新角色屏幕坐标；连续丢失时放宽重捕获，大跳变用两拍共识校验。"""
         if not self._track_player or self._player_source is None:
             return
         if self._ticks % self._player_every != 0:
             return
+        search_radius = None
+        if self._player_missing >= 5:
+            search_radius = 1.0
         try:
-            found = self._player_source(frame, self._profile, previous=self._anchor)
+            if search_radius is not None:
+                retry_profile = dict(self._profile) if isinstance(self._profile, dict) else {}
+                retry_player = dict(retry_profile.get("player") or {}) if isinstance(retry_profile.get("player"), dict) else {}
+                retry_player["search_radius"] = search_radius
+                retry_profile["player"] = retry_player
+                found = self._player_source(frame, retry_profile, previous=self._anchor)
+            else:
+                found = self._player_source(frame, self._profile, previous=self._anchor)
         except TypeError:
             try:
                 found = self._player_source(frame, self._profile)
@@ -2097,18 +2236,14 @@ class PolicyRunner:
         x = _as_float(found.get("x"), None)
         y = _as_float(found.get("y"), None)
         score = _as_float(found.get("score"), 0.0) or 0.0
-        if x is None or y is None or score < 0.35:
+        if x is None or y is None or score < 0.20:
             self._player_missing += 1
             return
         previous_x, previous_y = self._anchor
         distance = math.hypot(x - previous_x, y - previous_y)
-        # 单帧模板可能误匹配到别的精灵：大幅度跳变需要连续两帧一致才接受。
         if distance > 0.25:
-            if score < 0.9:
-                self._player_missing += 1
-                return
             candidate = getattr(self, "_player_candidate", None)
-            if candidate is None or math.hypot(x - candidate[0], y - candidate[1]) > 0.08:
+            if candidate is None or math.hypot(x - candidate[0], y - candidate[1]) > 0.10:
                 self._player_candidate = (x, y)
                 self._player_missing += 1
                 return

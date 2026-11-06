@@ -35,3 +35,7 @@ def test_experiment_cli_summary_and_compare(tmp_path, capsys):
     assert main(["compare", str(base), str(cand), "--min-runs", "5"]) == 0
     output = json.loads(capsys.readouterr().out)
     assert output["decision"] == "promote"
+    report_file = tmp_path / "report.md"
+    assert main(["report", str(cand), "--baseline", str(base), "--label", "test-batch", "--out", str(report_file)]) == 0
+    assert report_file.is_file()
+    assert "批次复盘报告：test-batch" in report_file.read_text(encoding="utf-8")

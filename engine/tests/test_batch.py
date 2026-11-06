@@ -14,6 +14,8 @@ def _status(peak=3.5, canary_enabled=False, canary_applied=0):
                 "edge_escape": {"enabled": False, "counts": {"applied": 0}},
                 "option_canary": {"enabled": canary_enabled, "counts": {"applied": canary_applied}},
             },
+            "perception_health": {"player_stale_ratio": 0.1, "threat_active_ratio": 0.5},
+            "trace_tail": [{"tick": 6, "scroll_s": -1.2, "hp": 3, "selected_option": "advance"}],
         }
     }
 
@@ -40,6 +42,7 @@ def test_collect_batch_writes_runs_and_audits(tmp_path):
         return events.pop(0) if events else _status(2.0)
 
     out = tmp_path / "runs.jsonl"
+    report = tmp_path / "report.md"
     result = collect_batch(
         BatchConfig(runs=2, max_run_seconds=10, poll_seconds=1, reset_seconds=0),
         start=start,
@@ -49,11 +52,14 @@ def test_collect_batch_writes_runs_and_audits(tmp_path):
         sleep=lambda _: None,
         out_path=out,
         profile={"combat": {"edge_escape": False}, "options": {"execute": False}},
+        report_path=report,
     )
     assert calls == {"start": 2, "stop": 2, "reset": 1}
     assert len(result.runs) == 2
     assert result.summary["n"] == 2
     assert out.is_file()
+    assert report.is_file()
+    assert (tmp_path / "traces" / "runs" / "run-01.jsonl").is_file()
     assert result.audit_failures == []
 
 

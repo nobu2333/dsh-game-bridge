@@ -53,11 +53,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--level", default="forest-follies")
     parser.add_argument("--profile", default=str(ROOT / "profiles" / "cuphead.json"))
     parser.add_argument("--out", default=None)
+    parser.add_argument("--trace-dir", default=None)
+    parser.add_argument("--report", default=None)
+    parser.add_argument("--baseline", default=None)
+    parser.add_argument("--hypothesis", default="")
     args = parser.parse_args(argv)
+
+    from dsh_game_core.experiment import load_runs
 
     profile = json.loads(Path(args.profile).read_text(encoding="utf-8"))
     profile = apply_canary(profile, args.canary)
     out_path = Path(args.out) if args.out else ROOT / "tmp" / "experiments" / f"{args.label}.jsonl"
+    trace_dir = Path(args.trace_dir) if args.trace_dir else ROOT / "tmp" / "experiments" / "traces" / args.label
+    report_path = Path(args.report) if args.report else ROOT / "experiments" / "results" / f"{args.label}.md"
+    baseline_runs = load_runs(args.baseline) if args.baseline else None
     config = BatchConfig(
         runs=args.runs,
         max_run_seconds=args.max_seconds,
@@ -90,6 +99,10 @@ def main(argv: list[str] | None = None) -> int:
         sleep=time.sleep,
         out_path=out_path,
         profile=profile,
+        trace_dir=trace_dir,
+        report_path=report_path,
+        baseline_runs=baseline_runs,
+        hypothesis=args.hypothesis,
     )
     print(
         json.dumps(
@@ -99,6 +112,8 @@ def main(argv: list[str] | None = None) -> int:
                 "summary": result.summary,
                 "audit_failures": result.audit_failures,
                 "out": str(out_path),
+                "trace_dir": str(trace_dir),
+                "report": str(report_path),
             },
             ensure_ascii=False,
             indent=2,
