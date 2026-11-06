@@ -867,3 +867,12 @@
 - 已生成并入库 experiments/results/v21-*.md；完整 traces 本地。
 - 下一轮：Hybrid 保底跳 或 玩家初始捕获；不再重复相同 reactive 批次。
 - 测试 312 passed；未通关，README 未写。
+
+## 2026-11-06 12:10 Stage 3 最终
+
+- 三臂 10 局：baseline median 2.55 / reactive 1.94 / hybrid 2.11，均 no_gain。
+- 感知修复有效（stale 0.256→0.19，threat 0.99），但策略未超过周期盲跳基线。
+- p10 hybrid 1.72 略好，说明最差局改善、均值变差。
+- 完整 traces 与自动报告已留痕；汇总见 experiments/results/v21-stage3-final.md。
+- 下一轮假设：先修玩家初始捕获，再试 “周期跳保底 + 高置信 reactive 叠加”，而非替换。
+- 未通关，README 未写；测试待跑。

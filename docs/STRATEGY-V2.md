@@ -378,3 +378,12 @@ experiments/<id>/
 - 结论：感知断路修复真的生效（stale 下降、威胁可见、轨迹可复盘），但“完全关闭周期跳”的纯反应式策略没有超过基线；p10 基本持平，cornered 死亡反而增加。
 - 已入库复盘：`experiments/results/v21-stage2-negative.md` 与自动报告；完整 traces 在本地 `tmp/experiments/traces/`。
 - 下一轮假设：Hybrid（保留低频周期跳作为保底，reactive 只在明确威胁覆盖）或先修玩家初始捕获；不再重复相同 reactive 批次。
+
+## 19. Stage 3 最终结论（2026-11-06）
+
+- 三臂各 10 局：baseline median 2.55；reactive 1.94；hybrid 2.11；均 no_gain。
+- p10：baseline 1.49 / reactive 1.48 / hybrid 1.72；hybrid 略改善最差局但牺牲均值。
+- 感知健康度：stale 0.256→0.19，threat 0.99；感知断路确实修好了。
+- 失败原因：部分局玩家仍未初始捕获；关掉周期跳后 cornered 增加；hybrid 保底跳频率不足。
+- 完整 traces/报告已留痕；详见 `experiments/results/v21-stage3-final.md`。
+- 结论：v2.1 的过程与检测闭环成立，但当前 reactive/hybrid 策略未超过周期盲跳基线；不伪装成提升。

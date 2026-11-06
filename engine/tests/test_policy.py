@@ -774,3 +774,25 @@ def test_reactive_control_jumps_when_ttc_unknown_and_close():
     assert mech["counts"]["applied"] == 1
     assert mech["last_reason"] == "jump_over"
     assert len(controller.calls) > 0
+
+def test_reactive_fallback_jump_only_when_no_threats():
+    profile = dict(PROFILE)
+    profile["combat"] = dict(PROFILE.get("combat") or {})
+    profile["combat"]["reactive_mode"] = True
+    profile["combat"]["reactive_fallback_jump"] = True
+    profile["combat"]["jump_every_ms"] = 100
+    runner, _, _ = build_runner(budget_ticks=1, profile=profile)
+    runner._scene = "gameplay"
+    runner._held.add(runner._advance_key)
+    runner._world_model = {"threats": []}
+    runner._last_jump_at = None
+    runner._maybe_jump()
+    no_threat = runner.status()["mechanisms"]["periodic_jump"]["counts"]["applied"]
+    assert no_threat >= 1
+
+    runner._world_model = {"threats": [{"ttc": 0.5, "distance": 0.2}]}
+    runner._last_jump_at = None
+    before = runner.status()["mechanisms"]["periodic_jump"]["counts"]["applied"]
+    runner._maybe_jump()
+    after = runner.status()["mechanisms"]["periodic_jump"]["counts"]["applied"]
+    assert after == before

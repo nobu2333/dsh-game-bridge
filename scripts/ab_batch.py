@@ -50,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reset-seconds", type=float, default=6.0)
     parser.add_argument("--canary", default=None)
     parser.add_argument("--reactive", action="store_true")
+    parser.add_argument("--reactive-fallback-jump", action="store_true")
     parser.add_argument("--game", default="cuphead")
     parser.add_argument("--level", default="forest-follies")
     parser.add_argument("--profile", default=str(ROOT / "profiles" / "cuphead.json"))
@@ -67,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.reactive:
         combat = dict(profile.get("combat") or {}) if isinstance(profile.get("combat"), dict) else {}
         combat["reactive_mode"] = True
+        if args.reactive_fallback_jump:
+            combat["reactive_fallback_jump"] = True
         profile["combat"] = combat
     out_path = Path(args.out) if args.out else ROOT / "tmp" / "experiments" / f"{args.label}.jsonl"
     trace_dir = Path(args.trace_dir) if args.trace_dir else ROOT / "tmp" / "experiments" / "traces" / args.label

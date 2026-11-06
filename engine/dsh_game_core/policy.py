@@ -237,6 +237,7 @@ class PolicyRunner:
         self._reactive_mode = bool((self._profile.get("combat") or {}).get("reactive_mode", False))
         self._reactive_last = 0.0
         self._reactive_cooldown_ms = int((self._profile.get("combat") or {}).get("reactive_cooldown_ms") or 450)
+        self._reactive_fallback_jump = bool((self._profile.get("combat") or {}).get("reactive_fallback_jump", False))
         self._mechanisms.set_enabled("reactive_control", self._reactive_mode)
         self._memory_observe_every = 6
         self._memory_hit_t = None
@@ -2012,8 +2013,10 @@ class PolicyRunner:
         """赶路时按固定间隔按一次跳跃键（profile.combat.jump_every_ms）。"""
         self._mechanisms.record("periodic_jump", "evaluated")
         if self._reactive_mode:
-            self._mechanisms.record("periodic_jump", "vetoed", "reactive_mode")
-            return
+            threats = (self._world_model or {}).get("threats") if isinstance(self._world_model, dict) else []
+            if not (self._reactive_fallback_jump and not threats):
+                self._mechanisms.record("periodic_jump", "vetoed", "reactive_mode")
+                return
         if not self._is_advancing() or self._jump_every_ms <= 0 or not self._jump_keys:
             self._mechanisms.record("periodic_jump", "vetoed", "precondition")
             return
