@@ -876,3 +876,12 @@
 - 完整 traces 与自动报告已留痕；汇总见 experiments/results/v21-stage3-final.md。
 - 下一轮假设：先修玩家初始捕获，再试 “周期跳保底 + 高置信 reactive 叠加”，而非替换。
 - 未通关，README 未写；测试待跑。
+
+## 2026-11-06 20:50 B 轨 SuperTux 烟测
+
+- attach/抓屏/OCR、鼠标、键盘（需 AppActivate）均验证；修复 SendInput wScan；新增 profiles/supertux.json。
+- 用户手动进 gameplay；policy 31.8Hz，actions17，attach→首次动作 3.1s。
+- `game_id=supertux` LevelMemory 加载/隔离验证（frosted-fields vs other-level），Cuphead memory 未更新时间戳。
+- 生成 18 条 trace + 自动报告；最终报告 `experiments/results/b-supertux-smoke-2026-11-06.md`。
+- Caveat：完整冷启动含人工过剧情，3.1s 是 attach→首个动作；Supertux gameplay 被 OCR 误判为 loading/dialogue，peak_screens=0；player.track=false。
+- 未通关；README 未写。
