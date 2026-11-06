@@ -9,10 +9,20 @@
 experiments/
   README.md
   specs/<name>.json          # 提交：实验设计
-  results/<name>.md          # 提交：结论摘要（可选）
-  <name>/runs.jsonl          # 本地：每局 RunMetrics（忽略）
-  <name>/frames/             # 本地：关键帧（忽略）
+  results/<name>.md          # 提交：批次复盘报告（假设、感知健康度、A/B 统计、失败局时间线剖析）
+tmp/experiments/<batch_id>/  # 本地完整留痕（不入库）
+  runs.jsonl                 # 每局 RunMetrics + 感知健康度 + 掉血事件 + 死亡快照
+  traces/<run_id>.jsonl      # 每局 5-10Hz / 事件驱动决策轨迹（死前 3s 回放）
+  frames/                    # 可选关键帧缩略图
 ```
+
+## 全量留痕与复盘闭环（2026-11-06 新增硬性要求）
+
+可以接受新策略暂时无法通关，但**每次测试过程必须完整记录、可复盘、可循环优化**：
+
+1. **过程轨迹（`traces/<run_id>.jsonl`）**：记录 `ts, scroll_s, hp, anchor, player_age_ms, threats_top2, selected_option, applied_action, veto_reason`，确保任何一次受击/死亡都能还原“当时看到了什么、为什么选这个动作”；
+2. **单局健康度与归因（`runs.jsonl`）**：记录 `player_stale_ratio`、`threat_active_ratio`、`option_counts`、`damage_events`、`death_context`；
+3. **入库复盘报告（`experiments/results/<batch_id>.md`）**：每次跑批结束后生成结构化复盘报告并提交 Git，指导下一轮迭代。
 
 ## Spec 字段
 

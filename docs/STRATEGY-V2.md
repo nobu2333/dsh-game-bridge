@@ -295,3 +295,66 @@ experiments/<id>/
 - `status.started_at` 已暴露，`metrics_from_status` 可计算 duration；
 - canary 边界测试：选中项不匹配 → vetoed；冷却内再次触发 → applied 不增加、last_reason=cooldown；
 - 测试：300 passed。
+
+## 16. 2026-11-06 深度复盘：4 大代码级断路与策略 v2.1（全量留痕与循环迭代）
+
+### 16.1 为什么 P4 首批 Canary 全部 `no_gain`？（4 个代码级根因）
+
+通过对 P4 首批实机日志（`experiments/results/option-canary-2026-11-05.md`）与引擎源码的交叉审查，定位到阻断策略生效的 4 个根本原因：
+
+1. **玩家追踪“永久锁死”导致感知在 2 秒后彻底失明（`player_stale` 断路）**
+   - `profiles/cuphead.json` 使用颜色追踪，固定 `color_score = 0.55`；
+   - `policy.py:_update_player` 在位移 `distance > 0.25`（一次冲刺或大跳）时要求 `score >= 0.9` 才接受更新；由于颜色追踪永远是 `0.55`，一旦发生较大位移，`_anchor` 就永久锁死（实测 `player_age_ms = 16387ms`）；
+   - `policy.py:_update_observation` 在 `player_age_ms > 400` 时判定 `player_stale = True` 并直接 `break` 清空所有 `_tracks`，导致 `observation` 在开局 2 秒后永远是 `entities: 0, enemies: 0`。
+2. **87% 的运动威胁被误标为 `parry` 并在 `WorldModel` 中被丢弃**
+   - `state.py:_detect_parry` 的紫红阈值过宽，森林关的紫蘑菇、飞花甚至角色局部被标为 `kind="parry"`（实机 8 个轨迹中 7 个为 `parry`）；
+   - `world_model.py` 只消费 `kind == "threat"`，忽略了未弹反时同样造成接触伤害的 `parry` 运动体。
+3. **底层周期盲跳（`jump_every_ms=420`）把物理状态占满，架空上层决策**
+   - 每 420ms 强制跳跃（按住 260ms，跳跃窗口 450ms）+ 每 800ms 强制冲刺，使角色几乎 100% 处于半空或硬直；
+   - 上层 `UtilityArbiter` / `Canary` 即使选出动作，也因角色不在可响应状态而失效或沦为噪声。
+4. **`scroll_s` 开环积分漂移，导致绝对坐标记忆失准**
+   - 被怪物阻挡或贴左边缘时，画面未推进但 `scroll_s` 仍累加或受前景运动干扰，导致跨局 `s:-5` 热点无法对齐同一地形。
+
+### 16.2 策略 v2.1 迭代路线（三阶段闭环）
+
+1. **Stage 1：感知通路修复与健康度自检（Perception Health Gate）**
+   - 修复 `_update_player`：去掉对颜色模式不可能达标的 `score < 0.9` 硬门槛，改为连续 2 拍候选位置一致（`< 0.10`）即接受重定位，且连续丢失 `>= 5` 拍时放宽全屏搜索；
+   - 修复 `_update_observation`：`player_stale` 仅作为置信度降级标记，**不再清空 `_tracks`**，始终基于当前最优 `_anchor` 计算相对威胁；
+   - 修复 `_drop_self_area` 与 `WorldModel`：使用实时 `_anchor` 剔除自身区域；将接近玩家的 `parry` 运动体一并纳入 `WorldModel.threats`（标记 `parryable=True`）；
+   - **量化门禁**：实机运行 10 秒，`player_stale_ratio < 20%`，有怪时 `world_model.threats` 非空率显著提升。
+2. **Stage 2：反应式基线（Reactive Baseline）替代周期盲跳**
+   - 新增可切换的反应式控制模式（`combat.reactive_mode=true`，关闭无脑 `jump_every_ms` 周期盲跳）；
+   - 平常保持地面前进+射击（`grounded=True`），仅在三类明确态势下触发动作：
+     - **同高度近身威胁 / 地形缺口** → `jump_over`（按威胁距离区分短按小跳与长按大跳）；
+     - **中距离迎面慢速威胁 / 上方下落威胁** → `stop_shoot`（短暂松开前进 200–350ms 清怪，避免迎头撞击）；
+     - **高危迫近（`ttc <= 0.35s`）或空中越障** → `dash_through`；
+   - **量化门禁**：动作触发 100% 可归因到当时的 `world_model` 威胁或地形事件。
+3. **Stage 3：基于相对态势的受击/死亡归因与循环迭代**
+   - 不依赖漂移的绝对 `scroll_s`，而是记录受击/死亡前 0.5 秒的**局部相对几何剪影**（威胁相对方位 $\Delta x, \Delta y$、速度、当时执行的 Option），用于迭代效用打分权重。
+
+### 16.3 全量测试过程记录与复盘规范（Run Trace & Post-mortem Protocol）
+
+> 核心要求：**可以接受新方案依然无法通关，但每一次实机测试过程必须完整留痕，保证随时可复盘、可归因、可循环优化。**
+
+每次执行批次测试（`ab_batch.py`）必须自动生成并保留三类结构化产物：
+
+1. **单局汇总账本（`tmp/experiments/<batch_id>/runs.jsonl`）**
+   - 除 `peak_screens / duration_s / damage_taken / deaths / clear / hz` 外，新增感知与决策健康度指标：
+     - `player_stale_ratio`：整局玩家位置过期的帧占比；
+     - `threat_active_ratio`：检测到有效威胁的帧占比；
+     - `option_counts`：本局各 Option 被选中/执行的次数分布；
+     - `mechanism_counts`：各机制 `evaluated / triggered / applied / vetoed` 最终快照；
+     - `damage_events`：每次掉血时的 `(ts, scroll_s, anchor, active_option, nearest_threat)` 列表；
+     - `death_context`：死亡瞬间的完整态势快照。
+2. **高频关键事件时间线（`tmp/experiments/<batch_id>/traces/<run_id>.jsonl`）**
+   - 以 5–10Hz 抽样或事件触发（Option 切换、触发动作、掉血、玩家丢失、死亡）记录轻量轨迹：
+     `{ts, tick, scroll_s, hp, anchor, player_age_ms, threats_top2, selected_option, applied_action, veto_reason}`；
+   - 作用：复盘任意一局为什么死在 2.8 屏时，无需看视频即可按时间线回放“死前 3 秒看到了什么、选了什么、为什么没跳或跳早了”。
+3. **批次复盘报告（`experiments/results/<batch_id>.md`，入库跟踪）**
+   - 每个批次跑完后自动/半自动汇总成 Markdown 报告并提交 Git，必须包含：
+     - **实验假设与改动点**（对应哪个 Git commit）；
+     - **感知健康度表**（`player_stale_ratio`、`threat_active_ratio` 是否达标）；
+     - **机制审计结果**（`mechanism_audit` 是否全过）；
+     - **与基线的量化对比**（`median / mean / p10 / max`、bootstrap CI、受击频率、死因分布）；
+     - **典型失败局时间线剖析**（从 `traces` 提取死前 2 秒的感知与动作序列，定位下一次迭代的具体问题）。
+

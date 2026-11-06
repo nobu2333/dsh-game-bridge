@@ -21,7 +21,7 @@
 | 发布 | ✅ 2026-10-29 | npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`；发布版安装+自举+M1/M3 实测通过 |
 | 0.0.2 本地打包 | ✅ 2026-10-30 | wheel/sdist/tarball 构建校验；桌面 profile 安装 0.0.2（引擎缓存 0.0.2）；`game_selftest` 报 0.0.2；**未发布** |
 | 通用玩法基线 | ✅ 单测通过（真实对局已跑，未通关） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_intent`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 45/45、`pytest engine/tests` 303/303；集成 11/11；memory 已实现（记录/上下文/shadow 只读），API provider 未实现；真实对局最高 11.15 单局，仍未通关 |
-| 策略 v2 / 检测 | 🚧 P4 首批 no_gain | `docs/STRATEGY-V2.md`；`mechanisms.py`、`experiment.py`、WorldModel、Option shadow、default-off canary 已完成；P4 jump_over 未触发、dash_through no_gain；option_canary 默认关闭 |
+| 策略 v2 / 检测 | 🚧 转型 v2.1（修复感知断路 + 反应式 + 全量留痕） | P4 首批定位出 4 个代码级断路（玩家追踪 `score<0.9` 锁死、`player_stale` 清空威胁、`parry` 漏检、周期盲跳占满状态）；详见 `docs/STRATEGY-V2.md` §16，下一步落地全量轨迹留痕 + 感知修复 + 反应式基线 |
 | 市场收录 | ⏳ 待提交 | 仓库已 public，按 MARKETPLACE 提交 |
 
 工具面（14 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
