@@ -851,3 +851,10 @@
 - P4 首批：dash/jump 有效 no_gain；stop 不稳定选中；无 promotion。
 - 测试 303 passed；驱动关闭；未通关，README 未写。
 - 下一步：改选择/仲裁，不再逐个 option 试。
+
+## 2026-11-06 11:20 Stage 0/1/2 离线完成
+
+- Stage 0 留痕/复盘：perception_health、damage_events、trace_tail、traces 落盘、Markdown 报告。
+- Stage 1 感知修复：大跳变两拍共识、过期玩家不清空 tracks、实时 anchor 过滤、parry 纳入/贴身过滤；短测 stale 14.2%、threat 100%。
+- Stage 2 反应式模式：默认关闭 `combat.reactive_mode`；开启后禁周期盲跳/盲冲，由 reactive_control 按 ttc/距离触发 dash/jump/stop_shoot，带冷却与机制计数。
+- 测试 310 passed；未实机验证 Stage2；未 10 局批次；未通关，README 未写；用户要求暂不控制电脑。

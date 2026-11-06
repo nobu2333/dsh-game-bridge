@@ -234,6 +234,10 @@ class PolicyRunner:
         self._option_canary_cooldown_ms = int(options_cfg.get("cooldown_ms") or 600)
         self._option_last_applied = 0.0
         self._mechanisms.set_enabled("option_canary", self._option_execute and bool(self._option_canary))
+        self._reactive_mode = bool((self._profile.get("combat") or {}).get("reactive_mode", False))
+        self._reactive_last = 0.0
+        self._reactive_cooldown_ms = int((self._profile.get("combat") or {}).get("reactive_cooldown_ms") or 450)
+        self._mechanisms.set_enabled("reactive_control", self._reactive_mode)
         self._memory_observe_every = 6
         self._memory_hit_t = None
         self._memory_death_done = False
@@ -899,6 +903,7 @@ class PolicyRunner:
                         self._sleep(delay)
                     continue
                 self._execute_active_intent()
+                self._maybe_reactive_control()
                 self._maybe_execute_option_canary()
                 self._maybe_engage(entities)
                 self._maybe_turn_shoot()
@@ -1879,6 +1884,60 @@ class PolicyRunner:
                 self._last_dodge_at = now
                 return
 
+    def _maybe_reactive_control(self) -> None:
+        """Reactive mode: no periodic blind jump/dash; react only to world-model threats/gaps."""
+        self._mechanisms.record("reactive_control", "evaluated")
+        if not self._reactive_mode:
+            self._mechanisms.record("reactive_control", "noop", "disabled")
+            return
+        if self._scene != "gameplay":
+            self._mechanisms.record("reactive_control", "vetoed", "not_gameplay")
+            return
+        state = self._action_state()
+        if state.get("hurt") or state.get("dashing"):
+            self._mechanisms.record("reactive_control", "vetoed", "state")
+            return
+        world = self._world_model or {}
+        threats = world.get("threats") or []
+        space = world.get("space") or {}
+        primary = threats[0] if threats else {}
+        ttc = primary.get("ttc")
+        distance = primary.get("distance")
+        now = self._clock()
+        now_ms = now * 1000.0
+        if now_ms - self._reactive_last < self._reactive_cooldown_ms:
+            self._mechanisms.record("reactive_control", "vetoed", "cooldown")
+            return
+        ttc_value = float(ttc) if isinstance(ttc, (int, float)) else 99.0
+        distance_value = float(distance) if isinstance(distance, (int, float)) else 99.0
+        can_dash = bool(self._dash_keys)
+        can_jump = bool(self._jump_keys) and state.get("grounded")
+        if ttc_value <= 0.35 and distance_value <= 0.25 and can_dash:
+            self._tap(self._dash_keys[0], self._dodge_press_ms)
+            self._dash_until = now + 0.25
+            self._last_dash_at = now
+            self._last_action_label = "dash"
+            self._mechanisms.record("reactive_control", "applied", "dash_through")
+        elif can_jump and (space.get("gap_ahead") or (distance_value <= 0.30 and ttc_value <= 0.8)):
+            press = 260.0 if ttc_value <= 0.5 else 140.0
+            self._tap(self._jump_keys[0], press)
+            self._jump_until = now + 0.45
+            self._last_jump_at = now
+            self._last_action_label = "jump"
+            self._mechanisms.record("reactive_control", "applied", "jump_over")
+        elif distance_value <= 0.45 and primary.get("type") in ("track", "approaching"):
+            advance = self._advance_key
+            if advance and advance in self._held:
+                self._release_key(advance)
+            self._advance_suppress_until = now + 0.25
+            self._last_action_label = "stop_shoot"
+            self._mechanisms.record("reactive_control", "applied", "stop_shoot")
+        else:
+            self._mechanisms.record("reactive_control", "noop", "no_actionable_threat")
+            return
+        self._reactive_last = now_ms
+        self._actions += 1
+
     def _maybe_execute_option_canary(self) -> None:
         """Default-off P3 canary: execute at most one selected option."""
         self._mechanisms.record("option_canary", "evaluated")
@@ -1949,6 +2008,9 @@ class PolicyRunner:
     def _maybe_jump(self) -> None:
         """赶路时按固定间隔按一次跳跃键（profile.combat.jump_every_ms）。"""
         self._mechanisms.record("periodic_jump", "evaluated")
+        if self._reactive_mode:
+            self._mechanisms.record("periodic_jump", "vetoed", "reactive_mode")
+            return
         if not self._is_advancing() or self._jump_every_ms <= 0 or not self._jump_keys:
             self._mechanisms.record("periodic_jump", "vetoed", "precondition")
             return
@@ -1969,6 +2031,9 @@ class PolicyRunner:
     def _maybe_dash(self) -> None:
         """赶路时按固定间隔按一次冲刺键（profile.combat.dash_every_ms）。"""
         self._mechanisms.record("periodic_dash", "evaluated")
+        if self._reactive_mode:
+            self._mechanisms.record("periodic_dash", "vetoed", "reactive_mode")
+            return
         if not self._is_advancing() or self._dash_every_ms <= 0 or not self._dash_keys:
             self._mechanisms.record("periodic_dash", "vetoed", "precondition")
             return

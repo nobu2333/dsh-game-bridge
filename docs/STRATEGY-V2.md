@@ -358,3 +358,13 @@ experiments/<id>/
      - **与基线的量化对比**（`median / mean / p10 / max`、bootstrap CI、受击频率、死因分布）；
      - **典型失败局时间线剖析**（从 `traces` 提取死前 2 秒的感知与动作序列，定位下一次迭代的具体问题）。
 
+
+## 17. Stage 0/1/2 实现进度（2026-11-06）
+
+- Stage 0：`perception_health`、`damage_events`、`trace_tail`、per-run `traces/<run_id>.jsonl`、自动 Markdown 复盘报告已完成。
+- Stage 1：玩家大跳变不再锁死；`player_stale` 不再清空威胁；`_entities` 使用实时 anchor；WorldModel 纳入 parry 并过滤贴身误检。实机 10s 短测：`player_stale_ratio=0.142`（<0.20），`threat_active_ratio=1.0`。
+- Stage 2：新增默认关闭的 `combat.reactive_mode`：
+  - 开启后 `periodic_jump`/`periodic_dash` 全部 veto（no blind jump）；
+  - 由 `reactive_control` 根据 WorldModel 威胁/缺口触发：ttc<=0.35 且距离<=0.25 → dash；grounded 且 gap/威胁近距离 → jump（重跳/轻跳）；中距慢速威胁 → stop_shoot；有冷却与机制计数。
+- 测试：310 passed。
+- 尚未实机验证 reactive_mode，也没有 10 局批次；Stage 3 待电脑。

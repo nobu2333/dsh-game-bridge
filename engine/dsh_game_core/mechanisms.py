@@ -176,4 +176,13 @@ def default_specs() -> list[MechanismSpec]:
             effect="one jump/dash/strafe action",
             owner_test="tests/test_policy.py",
         ),
+        MechanismSpec(
+            id="reactive_control",
+            description="reactive control replaces periodic blind jump/dash (default off)",
+            enabled=False,
+            expected_trigger="world_model has a close/imminent threat or gap",
+            preconditions=("reactive_mode", "not_hurt", "cooldown"),
+            effect="one jump/dash or short stop",
+            owner_test="tests/test_policy.py",
+        ),
     ]

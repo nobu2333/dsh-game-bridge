@@ -732,3 +732,28 @@ def test_observation_keeps_tracks_when_player_stale():
     runner._update_observation([])
     observation = runner._observation or {}
     assert observation.get("counts", {}).get("entities", 0) > 0
+
+def test_reactive_mode_default_off():
+    runner, _, _ = build_runner(budget_ticks=30)
+    status = run_to_completion(runner)
+    mech = status["mechanisms"]["reactive_control"]
+    assert mech["enabled"] is False
+    assert mech["counts"]["applied"] == 0
+
+
+def test_reactive_control_triggers_dash_on_imminent_threat():
+    profile = dict(PROFILE)
+    profile["combat"] = dict(PROFILE.get("combat") or {})
+    profile["combat"]["reactive_mode"] = True
+    runner, _, controller = build_runner(budget_ticks=1, profile=profile)
+    runner._scene = "gameplay"
+    runner._world_model = {
+        "space": {"gap_ahead": False},
+        "threats": [{"type": "track", "ttc": 0.2, "distance": 0.2}],
+    }
+    runner._reactive_last = 0.0
+    runner._maybe_reactive_control()
+    mech = runner.status()["mechanisms"]["reactive_control"]
+    assert mech["enabled"] is True
+    assert mech["counts"]["applied"] == 1
+    assert len(controller.calls) > 0
