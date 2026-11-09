@@ -21,19 +21,7 @@
     }
   },
   "hud": {},
-  "recipes": [
-    {
-      "id": "new_game",
-      "intent": "Start a fresh 2048 board",
-      "steps": [
-        {"press": "N"},
-        {"wait_ms": 300}
-      ],
-      "verify": {
-        "ocr_contains": "SCORE"
-      }
-    }
-  ],
+  "recipes": [],
   "evidence": [
     "experiments/games/packs/web.2048.t1.md"
   ],
