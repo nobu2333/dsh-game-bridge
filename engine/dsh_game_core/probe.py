@@ -1,0 +1,155 @@
+"""Generic onboarding probes: measure what a key press changes on screen.
+
+No game names, no coordinates, no engine branches. The caller supplies frames
+and key names; this module returns frame-difference evidence and a GamePack
+draft that can be reviewed before it becomes a real pack.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Any, Mapping
+
+import numpy as np
+
+
+def _gray(frame: Any) -> np.ndarray | None:
+    try:
+        import cv2
+
+        if not isinstance(frame, np.ndarray) or frame.ndim != 3 or frame.size == 0:
+            return None
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    except Exception:  # noqa: BLE001 - probes must never crash the caller
+        return None
+
+
+def frame_change(
+    before: Any,
+    after: Any,
+    *,
+    threshold: int = 18,
+    min_pixels: int = 12,
+) -> dict:
+    """Return a normalized frame-difference report.
+
+    ``ratio`` is the fraction of pixels whose absolute gray difference exceeds
+    ``threshold``; ``bbox``/``center`` use normalized screen coordinates. Shape
+    mismatches are reported as ``valid=False`` rather than raising.
+    """
+    first = _gray(before)
+    second = _gray(after)
+    if first is None or second is None or first.shape != second.shape:
+        return {"valid": False, "changed": False, "pixels": 0, "ratio": 0.0, "bbox": None, "center": None}
+    try:
+        import cv2
+
+        diff = cv2.absdiff(first, second)
+        mask = (diff >= max(0, int(threshold))).astype(np.uint8)
+        pixels = int(cv2.countNonZero(mask))
+        height, width = mask.shape[:2]
+        ratio = round(pixels / float(max(1, height * width)), 4)
+        if pixels < max(0, int(min_pixels)):
+            return {
+                "valid": True,
+                "changed": False,
+                "pixels": pixels,
+                "ratio": ratio,
+                "bbox": None,
+                "center": None,
+            }
+        ys, xs = np.nonzero(mask)
+        x0, x1 = int(xs.min()), int(xs.max())
+        y0, y1 = int(ys.min()), int(ys.max())
+        return {
+            "valid": True,
+            "changed": True,
+            "pixels": pixels,
+            "ratio": ratio,
+            "bbox": [
+                round(x0 / float(width), 4),
+                round(y0 / float(height), 4),
+                round((x1 - x0 + 1) / float(width), 4),
+                round((y1 - y0 + 1) / float(height), 4),
+            ],
+            "center": [
+                round((x0 + x1 + 1) / 2.0 / width, 4),
+                round((y0 + y1 + 1) / 2.0 / height, 4),
+            ],
+        }
+    except Exception:  # noqa: BLE001
+        return {"valid": False, "changed": False, "pixels": 0, "ratio": 0.0, "bbox": None, "center": None}
+
+
+def summarize_effects(records: list[Mapping[str, Any]]) -> list[dict]:
+    """Rank probe keys by their frame-change ratio (strongest first)."""
+    summary: list[dict] = []
+    for record in records:
+        if not isinstance(record, Mapping):
+            continue
+        change = record.get("change") or {}
+        summary.append(
+            {
+                "key": str(record.get("key") or ""),
+                "changed": bool(change.get("changed")),
+                "ratio": float(change.get("ratio") or 0.0),
+                "center": change.get("center"),
+            }
+        )
+    summary.sort(key=lambda item: (-item["ratio"], item["key"]))
+    return summary
+
+
+def _slug(value: str) -> str:
+    text = re.sub(r"[^a-z0-9]+", "-", str(value or "").lower()).strip("-")
+    return text[:40] or "unknown"
+
+
+def pack_draft(
+    window: Mapping[str, Any],
+    records: list[Mapping[str, Any]],
+    *,
+    ocr_texts: list[str] | None = None,
+    game_id: str | None = None,
+) -> dict:
+    """Build a reviewable schema-v1 pack draft from probe evidence.
+
+    The draft only claims screen + UI observation; it deliberately does not
+    guess semantic controls. The next step (menu/keymap inference) can fill
+    controls/recipes after reviewing the evidence.
+    """
+    from .gamepack import validate_pack
+
+    title = str(window.get("title") or "unknown").strip()
+    slug = _slug(title)
+    if slug == "unknown":
+        slug = _slug(str(window.get("process") or ""))
+    identifier = game_id or f"probe.{slug}"
+    status = summarize_effects(records)
+    pack = {
+        "schema": 1,
+        "id": identifier,
+        "title": title,
+        "platform": "pc",
+        "process": window.get("process"),
+        "trust": {"anti_cheat": "none"},
+        "capabilities": {
+            "observe.screen": {"level": 0},
+            "observe.ui": {"level": 1},
+        },
+        "controls": {},
+        "hud": {},
+        "recipes": [],
+        "evidence": [],
+        "probe": {
+            "window": {
+                "title": title,
+                "process": window.get("process"),
+                "width": window.get("width"),
+                "height": window.get("height"),
+            },
+            "ocr_texts": [str(text) for text in (ocr_texts or [])][:40],
+            "key_effects": status,
+        },
+    }
+    return validate_pack(pack)

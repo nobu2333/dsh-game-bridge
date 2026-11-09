@@ -179,8 +179,9 @@
 
 - `engine/dsh_game_core/gamepack.py`：schema v0 校验、anti-cheat fail-closed、capability level、recipe 唯一性、`profile_from_pack` 适配（单测 `engine/tests/test_gamepack.py`）。
 - `GameSession.attach/policy_start` 接受 `pack`（路径或内联对象），`status` 暴露 pack 摘要；`game_attach` / `game_policy` 工具面也已支持 `pack`。
+- `engine/dsh_game_core/probe.py` + `scripts/probe_game.py`：按键脉冲→帧差证据→pack 草稿（不猜语义 controls），用于自动 onboarding 的第一层。
 - `experiments/games/matrix.json`：首批游戏矩阵与 T1/T2 目标。
-- 下一步：自动 onboarding 探针、键位/HUD 自动生成 pack、3 款 T1 验收。
+- 下一步：菜单/键位语义推断、HUD 探针、3 款 T1 验收。
 
 ## 5. 自动 onboarding（不靠人示范）
 
