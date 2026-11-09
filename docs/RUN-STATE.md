@@ -1,7 +1,18 @@
 # RUN STATE（仓库内续跑笔记；本地路径用占位符）
 
 > 作用：上下文被压缩/会话中断后，先读这份文件恢复状态。
-> 最后更新：2026-11-06 10:45（顶部为当前判断；下面是按时间追加的续跑记录）
+> 最后更新：2026-11-09 21:20（顶部为当前判断；下面是按时间追加的续跑记录）
+
+## 2026-11-09 方向调整：通用插件 v3（Cuphead 降级为 depth regression）
+
+> 结论：**Cuphead 的 10/7 不再作为项目总 KPI。** 目标改为“通用接入 + 跨类型覆盖”：用 GamePack + 自动探针 + 分层感知 + 本地原语，在零人工示范下先做到 3 款不同游戏 T1、2 款 T2。
+
+- 新方案文档：[GENERAL-PLUGIN-V3.md](GENERAL-PLUGIN-V3.md)。
+- T1 = attach/抓屏/菜单/键位/首个有效动作；T2 = 连续 5 分钟有意义游玩；T3/T4 才是单游戏深度。
+- 先做类型：2D 平台/动作、益智点击、模拟器/俯视（可选）；反作弊/在线竞技排除。
+- Cuphead 保留为 regression，不再跑参数扫描；旧 11.15/4.1 数据只作历史证据。
+- 已起步：GamePack schema v0 校验器（`engine/dsh_game_core/gamepack.py` + 6 个单测）、首批游戏矩阵（`experiments/games/matrix.json`）。
+- 下一步：GamePack 接入 attach/策略启动、自动 onboarding 探针、3 款 T1 验收。
 
 ## 2026-11-06 深度复盘与策略 v2.1（修复感知断路 + 反应式策略 + 全量过程留痕）
 
@@ -44,6 +55,8 @@
 5. **B 轨未完成：** Brotato 启动入口点错误，Overcooked 只有菜单/双人过场；需要可用的 Windows 单机游戏。
 6. **仍未通关；README 不能写「已通关」。**
 
+> 2026-11-09：A 轨冻结为 regression；通用插件 v3 的方向见顶部与 [GENERAL-PLUGIN-V3.md](GENERAL-PLUGIN-V3.md)。
+
 ## Goal（另一台 DSH 主机，不是当前会话）
 
 - id: `goal-283c1ac6-f742-4469-b1ae-5b4968ae946b`
@@ -61,9 +74,9 @@
 - P2：game_review 工具化、参数 preset、可选攻略、副本游戏矩阵、通关稳定性；
 - 最终验收：Cuphead Forest Follies 从大地图 10 局≥7 通关 + 可复现 A/B 证据；引擎无游戏专用代码。
 
-## 当前进度（2026-11-03）
+## 当前进度（2026-11-09）
 
-- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **273**、插件 **45**、集成 11/11（本地实测）。
+- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **326**、插件 **45**、集成 11/11（本地实测）。
 - 目标未变：Forest Follies 从大地图 10 局 ≥7 通关；**仍未通关**。
 - 实机 best：7.339 屏（旧）/ 6.812 屏（玩家修复后）/ 11.15 屏（今日离群）；20–30 局平均约 4.1–4.2。
 - 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。

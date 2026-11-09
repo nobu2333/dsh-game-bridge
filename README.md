@@ -2,13 +2,14 @@
 
 **给 DeepSeek Harness 装上眼睛和手：让 DSH 看得懂游戏、也能替你玩。**
 
-[English](README.en.md) · [状态模型](docs/STATE.md) · [现状与交班](docs/STATUS.md) · [策略 v2](docs/STRATEGY-V2.md)
+[English](README.en.md) · [状态模型](docs/STATE.md) · [现状与交班](docs/STATUS.md) · [策略 v2](docs/STRATEGY-V2.md) · [通用插件 v3](docs/GENERAL-PLUGIN-V3.md)
 
 > 状态：**0.0.1 已发布**（npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`）；
 > **0.0.2 已本地打包并安装验证（未发布）**：引擎自举、桌面 profile 安装、真实抓屏/OCR、前台/遮挡诊断。
 > 已实测：从 registry 的 tarball 安装 → 引擎自举（PyPI）→ 真实抓屏/OCR → 20 Hz 闭环。
 > **通用玩法基线**（WorldState 视觉状态 + 60 Hz 状态策略 + 本地档案层）已落地；
 > memory / API provider：memory 已实现（LevelMemory / GuideStore / 按关懒加载 / shadow 只读 / 机制计数）；API provider 仍是设计位（详见 [docs/STATE.md](docs/STATE.md) 与 [docs/STRATEGY-V2.md](docs/STRATEGY-V2.md)）。
+> **方向（2026-11-09）**：转向通用插件 v3（GamePack + 自动探针 + 分层感知），Cuphead 10/7 降级为 depth regression；见 [docs/GENERAL-PLUGIN-V3.md](docs/GENERAL-PLUGIN-V3.md)。
 > **默认 dry-run 后端（只记录、不碰设备）**；真实注入已实机验证（2026-10-29：手柄 A + XInput 回读、键盘 W + `AsyncKeyState` 回读）；仅 Windows。
 
 ## 这是什么
@@ -262,7 +263,7 @@ python -m dsh_game_core selftest --capture   # 依赖 / 显示器 / OCR / 前台
 | M1 ✅ | 真实抓屏/OCR + 引擎自举 | 隔离 harness 里拿到真实屏幕帧 + OCR 文本；uv 自举可跑 |
 | M2 ✅ | 安全闸 + 输出通道 + 单步 act | 两道安全闸单测钉死；attach → act 端到端通过；真实后端需审批 |
 | M3 ✅（dry-run 已验证） | 20 Hz 本地闭环 | 闭环 ~20 Hz、逐拍安全复检、stop 立即松手 |
-| M4 ✅（单测通过） | 通用玩法基线：WorldState + 60 Hz 策略 + 档案层 | 引擎 state/policy 单测、插件工具与档案库测试通过（`npm test` 45/45、`pytest` 273/273）；集成 11/11；Cuphead 样例 profile 可跑 dry-run；真实对局已跑（最高 11.15 单局，仍未通关）；memory 已实现（记录/上下文/shadow 只读），API provider 未实现 |
+| M4 ✅（单测通过） | 通用玩法基线：WorldState + 60 Hz 策略 + 档案层 | 引擎 state/policy 单测、插件工具与档案库测试通过（`npm test` 45/45、`pytest` 326/326）；集成 11/11；Cuphead 样例 profile 可跑 dry-run；真实对局已跑（最高 11.15 单局，仍未通关）；memory 已实现（记录/上下文/shadow 只读），API provider 未实现 |
 | 发布 ✅ | npm + PyPI + 插件市场 | 0.0.1 已发布，发布产物安装/M1/M3 实测通过；市场收录待提交 |
 
 ## 已知限制（v1）

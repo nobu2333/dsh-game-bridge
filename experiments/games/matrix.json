@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "updated": "2026-11-09",
+  "target": {
+    "t1": 3,
+    "t2": 2,
+    "t1_definition": "attach + capture + menu/keymap + first effective action within 5 minutes, no human demonstration",
+    "t2_definition": "5 minutes of meaningful play (progress/interaction/survival), not menu idle"
+  },
+  "selection": {
+    "primary_t1": ["pc.cuphead", "pc.supertux", "pc.blockblast"],
+    "t2_candidates": ["pc.cuphead", "pc.blockblast"],
+    "optional": ["nes.battlecity"],
+    "excluded": [
+      {"id": "pc.overwatch", "reason": "online / anti-cheat"},
+      {"id": "pc.honkai-star-rail", "reason": "online / anti-cheat"},
+      {"id": "pc.wuthering-waves", "reason": "online / anti-cheat"},
+      {"id": "pc.brotato", "reason": "entry-point launch failure; not usable yet"}
+    ]
+  },
+  "games": [
+    {
+      "id": "pc.cuphead",
+      "title": "Cuphead",
+      "type": "2d_action_platformer",
+      "platform": "pc",
+      "process_hint": "Cuphead.exe",
+      "input": ["keyboard"],
+      "target": "T2_regression",
+      "status": "t1_pass",
+      "notes": "Depth regression only; historical best 11.15 is an outlier, 20-30 run average ~4.1; do not resume parameter tuning."
+    },
+    {
+      "id": "pc.supertux",
+      "title": "SuperTux",
+      "type": "2d_platformer",
+      "platform": "pc",
+      "process_hint": null,
+      "input": ["keyboard"],
+      "target": "T1_then_T2",
+      "status": "t1_partial",
+      "notes": "Existing profile and smoke reports; gameplay was misclassified as loading/dialogue; player.track=false in that run."
+    },
+    {
+      "id": "pc.blockblast",
+      "title": "Block Blast",
+      "type": "puzzle_click",
+      "platform": "pc/webgl",
+      "process_hint": null,
+      "input": ["mouse", "touch"],
+      "target": "T1_then_T2",
+      "status": "candidate",
+      "notes": "Local Unity project and WebGL build exist; use as the mouse/click onboarding case. Prefer windowed browser or native build."
+    },
+    {
+      "id": "nes.battlecity",
+      "title": "Battle City (NES)",
+      "type": "emulator_topdown",
+      "platform": "nes",
+      "process_hint": "retroarch.exe",
+      "input": ["keyboard"],
+      "target": "T1_optional",
+      "status": "candidate",
+      "notes": "Optional emulator case; verify RetroArch availability and a legal local ROM before use. L2 structured state is possible later."
+    }
+  ]
+}
