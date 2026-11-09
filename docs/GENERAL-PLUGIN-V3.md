@@ -177,9 +177,10 @@
 
 ### 4.2 初步实现
 
-- `engine/dsh_game_core/gamepack.py`：schema v0 校验、anti-cheat fail-closed、capability level、recipe 唯一性（单测 `engine/tests/test_gamepack.py`）。
+- `engine/dsh_game_core/gamepack.py`：schema v0 校验、anti-cheat fail-closed、capability level、recipe 唯一性、`profile_from_pack` 适配（单测 `engine/tests/test_gamepack.py`）。
+- `GameSession.attach/policy_start` 接受 `pack`（路径或内联对象），`status` 暴露 pack 摘要；`game_attach` / `game_policy` 工具面也已支持 `pack`。
 - `experiments/games/matrix.json`：首批游戏矩阵与 T1/T2 目标。
-- 下一步：把 pack 接入 attach/策略启动，并让 keymap/HUD 从 pack 读取。
+- 下一步：自动 onboarding 探针、键位/HUD 自动生成 pack、3 款 T1 验收。
 
 ## 5. 自动 onboarding（不靠人示范）
 

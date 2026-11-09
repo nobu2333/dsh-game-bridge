@@ -2,7 +2,13 @@ import json
 
 import pytest
 
-from dsh_game_core.gamepack import GamePackError, capability_level, load_pack, validate_pack
+from dsh_game_core.gamepack import (
+    GamePackError,
+    capability_level,
+    load_pack,
+    profile_from_pack,
+    validate_pack,
+)
 
 
 def _pack(**overrides):
@@ -68,3 +74,27 @@ def test_empty_t0_pack_and_capability_level_helper():
     assert pack["capabilities"] == {}
     assert capability_level(pack, "observe.screen") == 0
     assert capability_level(pack, "control.keyboard") == 0
+
+
+def test_profile_from_pack_maps_generic_fields():
+    pack = validate_pack(
+        {
+            **_pack(),
+            "controls": {"confirm": ["ENTER"], "move": {"right": "D"}},
+            "hud": {"hp": {"box": [0.0, 0.8, 0.2, 0.1], "prefix": "HP"}},
+            "profile": {"combat": {"advance": "RIGHT"}},
+        }
+    )
+    profile = profile_from_pack(pack)
+    assert profile["id"] == "pc.example"
+    assert profile["pack_id"] == "pc.example"
+    assert profile["pack_controls"]["move"]["right"] == "D"
+    assert profile["hud"]["hp"]["prefix"] == "HP"
+    assert profile["combat"]["advance"] == "RIGHT"
+    assert profile["pack_capabilities"]["observe.screen"]["level"] == 0
+
+
+def test_profile_from_pack_rejects_non_object_profile():
+    pack = validate_pack({**_pack(), "profile": "bad"})
+    with pytest.raises(GamePackError):
+        profile_from_pack(pack)

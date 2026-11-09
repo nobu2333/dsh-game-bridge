@@ -187,6 +187,38 @@ def test_policy_start_status_and_stop(monkeypatch):
     assert session.policy_stop()["stopped"] is False
 
 
+def test_gamepack_attach_and_policy_profile(monkeypatch):
+    import dsh_game_core.policy as policy_module
+
+    FakePolicy.instances.clear()
+    monkeypatch.setattr(policy_module, "PolicyRunner", FakePolicy)
+    pack = {
+        "schema": 1,
+        "id": "pc.test",
+        "title": "Test",
+        "process": "game.exe",
+        "trust": {"anti_cheat": "none"},
+        "capabilities": {"observe.screen": {"level": 0}},
+        "controls": {"confirm": ["ENTER"]},
+        "hud": {"hp": {"box": [0.0, 0.8, 0.2, 0.1], "prefix": "HP"}},
+        "recipes": [],
+        "profile": {"combat": {"advance": "RIGHT"}},
+    }
+    session, _fg = _make_session()
+    attached = session.attach({"pack": pack})
+    assert attached["pack"]["id"] == "pc.test"
+    assert session.status()["pack"]["id"] == "pc.test"
+
+    started = session.policy_start({"pack": pack, "knowledge": False, "scene_watch": False})
+    assert started["pack"]["id"] == "pc.test"
+    profile = FakePolicy.instances[-1].kwargs["profile"]
+    assert profile["id"] == "pc.test"
+    assert profile["pack_controls"]["confirm"] == ["ENTER"]
+    assert profile["hud"]["hp"]["prefix"] == "HP"
+    assert profile["combat"]["advance"] == "RIGHT"
+    session.policy_stop()
+
+
 def test_policy_requires_attach():
     session, _state = _make_session()
     with pytest.raises(EngineError) as error:

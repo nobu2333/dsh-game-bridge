@@ -11,7 +11,7 @@
 - T1 = attach/抓屏/菜单/键位/首个有效动作；T2 = 连续 5 分钟有意义游玩；T3/T4 才是单游戏深度。
 - 先做类型：2D 平台/动作、益智点击、模拟器/俯视（可选）；反作弊/在线竞技排除。
 - Cuphead 保留为 regression，不再跑参数扫描；旧 11.15/4.1 数据只作历史证据。
-- 已起步：GamePack schema v0 校验器（`engine/dsh_game_core/gamepack.py` + 6 个单测）、首批游戏矩阵（`experiments/games/matrix.json`）。
+- 已起步：GamePack schema v0 校验器（`engine/dsh_game_core/gamepack.py` + 8 个单测）、Session/插件 `pack` 接线、首批游戏矩阵（`experiments/games/matrix.json`）。
 - 下一步：GamePack 接入 attach/策略启动、自动 onboarding 探针、3 款 T1 验收。
 
 ## 2026-11-06 深度复盘与策略 v2.1（修复感知断路 + 反应式策略 + 全量过程留痕）
@@ -76,7 +76,7 @@
 
 ## 当前进度（2026-11-09）
 
-- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **326**、插件 **45**、集成 11/11（本地实测）。
+- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **329**、插件 **45**、集成 11/11（本地实测）。
 - 目标未变：Forest Follies 从大地图 10 局 ≥7 通关；**仍未通关**。
 - 实机 best：7.339 屏（旧）/ 6.812 屏（玩家修复后）/ 11.15 屏（今日离群）；20–30 局平均约 4.1–4.2。
 - 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。

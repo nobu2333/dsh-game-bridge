@@ -85,6 +85,8 @@ class GameSession:
         self._pending_hp: int | None = None
         # 本条命的死亡是否已建卡；回到 gameplay 才清零，防止死亡画面闪烁重复建卡。
         self._death_carded = False
+        # Optional GamePack: data-only contract for generic game onboarding.
+        self._pack: dict | None = None
 
     # ── 窗口 ──────────────────────────────────────────────────────────
     def _resolve_window(self, match: str) -> dict | None:
@@ -232,9 +234,44 @@ class GameSession:
                 )
         return self._controller
 
+    def _pack_summary(self) -> dict | None:
+        pack = self._pack
+        if not isinstance(pack, dict):
+            return None
+        return {
+            "id": pack.get("id"),
+            "title": pack.get("title"),
+            "level": pack.get("level"),
+            "capabilities": dict(pack.get("capabilities") or {}),
+            "trust": dict(pack.get("trust") or {}),
+        }
+
+    def _load_pack(self, params: dict) -> dict | None:
+        """Load an optional GamePack from a path or an inline dict; fail closed."""
+        raw = params.get("pack")
+        if raw is None:
+            return self._pack
+        try:
+            from .gamepack import GamePackError, load_pack, validate_pack
+
+            if isinstance(raw, str):
+                loaded = load_pack(raw)
+            elif isinstance(raw, dict):
+                loaded = validate_pack(raw)
+            else:
+                raise GamePackError("pack must be a path or object")
+        except Exception as error:  # noqa: BLE001 - convert to a stable engine error
+            raise EngineError("INVALID_PACK", f"GamePack 无效：{error}") from error
+        self._pack = loaded
+        return loaded
+
     def attach(self, params: dict | None = None) -> dict:
         params = params or {}
+        pack = self._load_pack(params)
         match = str(params.get("window") or "").strip()
+        if not match and isinstance(pack, dict):
+            # Window resolution is title-based; prefer the pack title over the exe name.
+            match = str(pack.get("title") or pack.get("process") or "").strip()
         if match and match.lower() != "unspecified":
             window = self._resolve_window(match)
             if window is None:
@@ -289,6 +326,7 @@ class GameSession:
             "safety": safety,
             "control": control,
             "foreground": foreground,
+            "pack": self._pack_summary(),
         }
 
     def act(self, params: dict | None = None) -> dict:
@@ -984,6 +1022,7 @@ class GameSession:
             "audit": {"path": self.audit.path, "tail": self.audit.tail(5)},
             "control": self.backend_status(),
             "foreground": self._foreground(),
+            "pack": self._pack_summary(),
             "policy": self._policy.status() if self._policy is not None else None,
         }
 
@@ -1109,14 +1148,25 @@ class GameSession:
         params = params or {}
         if self.attached is None:
             raise EngineError("NOT_ATTACHED", "还没有 attach 任何窗口：先调 game_attach，再调 game_policy")
+        pack = self._load_pack(params)
         profile = params.get("profile")
         profile = dict(profile) if isinstance(profile, dict) else {}
+        if pack is not None:
+            try:
+                from .gamepack import profile_from_pack
+
+                packed = profile_from_pack(pack)
+                profile = {**packed, **profile} if profile else packed
+            except Exception as error:  # noqa: BLE001 - pack/profile mismatch is actionable
+                raise EngineError("INVALID_PACK", f"无法从 GamePack 生成 profile：{error}") from error
         if "intent_enabled" in params:
             instant = profile.get("instant_play")
             instant = dict(instant) if isinstance(instant, dict) else {}
             instant["intent_enabled"] = bool(params.get("intent_enabled"))
             profile["instant_play"] = instant
-        self._record_game = str(params.get("game") or profile.get("id") or "unknown")[:48]
+        self._record_game = str(
+            params.get("game") or (pack or {}).get("id") or profile.get("id") or "unknown"
+        )[:48]
         self._record_level = str(params.get("level") or "level")[:48]
         self._record_knowledge = bool(params.get("knowledge", True))
         self._last_hp = None
@@ -1189,7 +1239,7 @@ class GameSession:
         if params.get("scene_watch", True):
             self._start_scene_watcher(profile)
         self.audit.write({"event": "policy_start", "profile": (profile or {}).get("id")})
-        return {"policy": started, "attached": self.attached, "backend": self.backend}
+        return {"policy": started, "attached": self.attached, "backend": self.backend, "pack": self._pack_summary()}
 
     def submit_intent(self, params: dict | None = None) -> dict:
         """External low-frequency model intent into the running policy arbiter."""

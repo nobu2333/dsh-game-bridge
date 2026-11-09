@@ -137,3 +137,27 @@ def capability_level(pack: Mapping[str, Any], name: str) -> int:
         return _level(spec.get("level", 0), f"pack.capabilities.{name}")
     except GamePackError:
         return 0
+
+
+def profile_from_pack(pack: Mapping[str, Any]) -> dict:
+    """Build a PolicyRunner profile from a validated pack.
+
+    The pack stays the source of game data; this adapter only moves generic
+    fields into the existing profile shape. A pack may carry a ``profile``
+    object for policy-specific defaults (still data, never engine branches).
+    """
+    nested = pack.get("profile") or {}
+    if not isinstance(nested, Mapping):
+        raise GamePackError("pack.profile must be an object")
+    profile = dict(nested)
+    profile["id"] = str(profile.get("id") or pack.get("id") or "unknown")
+    profile["pack_id"] = str(pack.get("id") or "")
+    if pack.get("hud") is not None:
+        hud = profile.get("hud")
+        hud = dict(hud) if isinstance(hud, Mapping) else {}
+        hud.update(dict(_mapping(pack.get("hud"), "pack.hud")))
+        profile["hud"] = hud
+    if pack.get("controls") is not None:
+        profile["pack_controls"] = dict(_mapping(pack.get("controls"), "pack.controls"))
+    profile["pack_capabilities"] = dict(_mapping(pack.get("capabilities", {}), "pack.capabilities"))
+    return profile
