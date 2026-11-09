@@ -18,6 +18,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "engine"))
 
+from dsh_game_core.autoplay import evaluate_session  # noqa: E402
 from dsh_game_core.gamepack import load_pack  # noqa: E402
 from dsh_game_core.session import GameSession  # noqa: E402
 from dsh_game_core.windows import force_foreground, foreground_window, window_rect  # noqa: E402
@@ -44,6 +45,7 @@ def main() -> int:
     restart_click = restart.get("click")
     restart_next = restart_every if restart_every > 0 else 0.0
     restarts = 0
+    stop_phrases = [str(item) for item in (autoplay.get("stop_phrases") or [])]
     out = Path(args.out) if args.out else REPO / "tmp" / f"{pack['id']}.play.json"
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -126,12 +128,20 @@ def main() -> int:
         session.close()
 
     elapsed = round(time.monotonic() - started, 2)
+    validity = evaluate_session(
+        requested_s=args.duration,
+        elapsed_s=elapsed,
+        samples=samples,
+        stop_phrases=stop_phrases,
+    )
     report = {
         "pack": pack["id"],
         "title": pack.get("title"),
         "duration_s": elapsed,
         "actions": actions,
         "restarts": restarts,
+        "valid": validity["valid"],
+        "invalid_reason": None if validity["valid"] else validity["reason"],
         "hz": round(actions / elapsed, 2) if elapsed else 0.0,
         "keys": keys,
         "interval_ms": interval_ms,

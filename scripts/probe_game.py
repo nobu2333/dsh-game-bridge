@@ -24,7 +24,7 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "engine"))
 
-from dsh_game_core.probe import frame_change, pack_draft  # noqa: E402
+from dsh_game_core.probe import frame_change, menu_transition, pack_draft  # noqa: E402
 from dsh_game_core.session import GameSession  # noqa: E402
 from dsh_game_core.windows import focus_window, foreground_window, window_rect  # noqa: E402
 
@@ -111,10 +111,18 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 - report per-key failure, keep probing
             error = str(exc)
         time.sleep(max(50, args.settle_ms) / 1000.0)
-        after = session.snapshot(ocr=False)
+        after = session.snapshot(ocr=True)
         second = _decode(after)
+        after_texts = [str(line.get("text") or "") for line in (after.get("ocr") or [])]
+        transition = menu_transition(ocr_texts, after_texts)
         change = frame_change(first if first is not None else before_frame, second)
-        record = {"key": key, "change": change}
+        record = {
+            "key": key,
+            "change": change,
+            "ocr_after": after_texts[:20],
+            "menu_transition": transition,
+            "ocr_changed": bool(transition.get("changed")),
+        }
         if error:
             record["error"] = error
         records.append(record)

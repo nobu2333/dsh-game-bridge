@@ -18,7 +18,7 @@ from typing import Protocol
 
 # 键盘后端支持的按键（模型传这些名字；大小写不敏感）。
 VK_CODES: dict[str, int] = {
-    # 字母（A–Z）：VK 码与 ASCII 一致。覆盖 Cuphead 等游戏的默认键位
+    # 字母（A–Z）：VK 码与 ASCII 一致。覆盖多数横版/动作游戏的默认键位。
     # （跳跃 Z、射击 X、锁定 C、大招 V、冲刺 Shift…），也方便按游戏键位表自由组合。
     **{chr(code): code for code in range(ord("A"), ord("Z") + 1)},
     "SPACE": 0x20,
@@ -395,7 +395,7 @@ def send_virtual_key(vk: int, down: bool) -> None:
     """Win32 SendInput 注入一次按键（键盘后端专用；测试可注入替身）。
 
     同时填 wVk 和 wScan：部分 SDL 游戏（SuperTux 等）只认 scan code，
-    Unity 游戏（Cuphead 等）认 virtual-key；两者都带兼容性最好。
+    部分 Unity 游戏认 virtual-key；两者都带兼容性最好。
     """
     try:
         scan = int(ctypes.windll.user32.MapVirtualKeyW(vk, 0)) & 0xFFFF

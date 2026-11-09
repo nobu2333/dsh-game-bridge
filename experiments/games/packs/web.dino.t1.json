@@ -33,7 +33,8 @@
   ],
   "autoplay": {
     "keys": ["SPACE"],
-    "interval_ms": 800
+    "interval_ms": 800,
+    "stop_phrases": ["GAMEOVER", "广告"]
   },
   "evidence": [
     "experiments/games/packs/web.dino.t1.md"

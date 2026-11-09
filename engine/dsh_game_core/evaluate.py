@@ -236,8 +236,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-root", default=os.environ.get("DSH_GAME_BRIDGE_DATA_DIR") or os.path.join(
         os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "dsh-game-bridge"
     ))
-    parser.add_argument("--game", default="cuphead")
-    parser.add_argument("--level", default="forest-follies")
+    parser.add_argument("--game", required=True)
+    parser.add_argument("--level", required=True)
     args = parser.parse_args(argv)
     episodes = summarize_episodes(os.path.join(args.data_root, "episodes"), game=args.game, level=args.level)
     card_list = load_cards(os.path.join(args.data_root, "knowledge"), args.game, args.level)

@@ -186,7 +186,9 @@
 - Dinosaur Game（在线）达到 T1：OCR `Press Space... 00000`，SPACE 后分数 `00029`；pack 见 `experiments/games/packs/web.dino.t1.*`。**T1 3/3**。
 - T2 **2/2**：本地 T-Rex runner 301.55s autoplay、237 actions、0 errors、score `HI 00053 -> HI 00089`；2048 302.14s、340 actions、5 次 pack-defined New Game restart、多棋盘得分推进。死亡/重开允许，不是单命通关。
 - 本阶段验收：T1 3/3、T2 2/2；引擎零游戏分支；测试/证据/文档已入库。Cuphead 10/7 未做，也不作为本 goal 条件。
-- 下一步：稳定性/证据整理、把菜单/键位推断从建议升级为可验证，再扩更多游戏。
+- P0 收口已完成：`evaluate/review` 的 `--game/--level` 必填、核心无游戏名测试、`autoplay.py` T2 有效性检查。
+- P1 切片：探针记录按键后 OCR + `menu_transition`，`infer_controls` 给出 `verified_confirm`；完整自动 controls 填充留给下一会话。
+- 交接说明：[HANDOFF.md](HANDOFF.md)。
 
 ## 5. 自动 onboarding（不靠人示范）
 

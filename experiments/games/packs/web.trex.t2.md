@@ -16,6 +16,17 @@
 python scripts/play_pack.py --pack experiments/games/packs/web.trex.t1.json --duration 300
 ```
 
+## 有效性检查
+
+`play_pack.py` 在本次报告生成后增加了通用 `evaluate_session`（时长 + stop phrase）。
+T-Rex pack **没有**设置 `stop_phrases`（GAMEOVER 是允许的死亡/重开），按当前检查器：
+
+- duration 301.55s ≥ 300s；
+- 没有配置 stop phrase；
+- 因此 valid。
+
+报告本身生成时还没有 `valid` 字段；这是事后复核，不是重新跑了一遍。
+
 ## 边界
 
 - T2 只要求 5 分钟有意义游玩，不要求单命通关；

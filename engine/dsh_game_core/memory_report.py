@@ -2,7 +2,7 @@
 
 用法：
   python -m dsh_game_core.memory_report --root <memory-root>
-  python -m dsh_game_core.memory_report --root <memory-root> --game cuphead --level forest-follies
+  python -m dsh_game_core.memory_report --root <memory-root> --game <game> --level <level>
 不启动游戏，不读屏幕。
 """
 

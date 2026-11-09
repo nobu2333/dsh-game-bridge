@@ -1,7 +1,7 @@
 # RUN STATE（仓库内续跑笔记；本地路径用占位符）
 
 > 作用：上下文被压缩/会话中断后，先读这份文件恢复状态。
-> 最后更新：2026-11-09 21:20（顶部为当前判断；下面是按时间追加的续跑记录）
+> 最后更新：2026-11-10 00:15（顶部为当前判断；下面是按时间追加的续跑记录）
 
 ## 2026-11-09 方向调整：通用插件 v3（Cuphead 降级为 depth regression）
 
@@ -13,6 +13,14 @@
 - Cuphead 保留为 regression，不再跑参数扫描；旧 11.15/4.1 数据只作历史证据。
 - 已起步：GamePack schema v0 校验器（`engine/dsh_game_core/gamepack.py` + 8 个单测）、Session/插件 `pack` 接线、自动探针 `probe.py`/`scripts/probe_game.py`（4 个单测 + dry-run smoke）、首批游戏矩阵（`experiments/games/matrix.json`）。
 - 下一步：GamePack 接入 attach/策略启动、自动 onboarding 探针、3 款 T1 验收。
+
+### 2026-11-10 00:15 P0/P1 收口 + 交接
+
+- P0 完成：`evaluate/review` 的 `--game/--level` 改为必填；核心模块无游戏名（新增 `test_no_game_names.py`）；新增 `autoplay.py` T2 有效性检查（时长 + stop phrase）。
+- P1 切片：探针记录按键后 OCR + `menu_transition`，`infer_controls` 增加 `verified_confirm`；完整 controls 自动填充留给下一会话。
+- T1 3/3、T2 2/2（T2 允许死亡/重开，2048 多棋盘 reset）；测试：引擎 **343**、插件 **45**。
+- 交接文档：[HANDOFF.md](HANDOFF.md)。当前 goal 已 complete，没有 active goal。
+- 下一步：完成 P1 自动 controls 填充、严格化 T2、扩到 5+ T1 / 3 T2。
 
 ### 2026-11-09 21:55 live probe attempt
 
@@ -136,7 +144,7 @@
 
 ## 当前进度（2026-11-09）
 
-- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **338**、插件 **45**、集成 11/11（本地实测）。
+- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **343**、插件 **45**、集成 11/11（本地实测）。
 - 目标未变：Forest Follies 从大地图 10 局 ≥7 通关；**仍未通关**。
 - 实机 best：7.339 屏（旧）/ 6.812 屏（玩家修复后）/ 11.15 屏（今日离群）；20–30 局平均约 4.1–4.2。
 - 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。

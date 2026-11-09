@@ -94,6 +94,7 @@ def summarize_effects(records: list[Mapping[str, Any]]) -> list[dict]:
                 "changed": bool(change.get("changed")),
                 "ratio": float(change.get("ratio") or 0.0),
                 "center": change.get("center"),
+                "ocr_changed": bool(record.get("ocr_changed")),
             }
         )
     summary.sort(key=lambda item: (-item["ratio"], item["key"]))
@@ -131,6 +132,19 @@ def menu_options(ocr_texts: list[str] | None) -> dict:
     return found
 
 
+def menu_transition(before: list[str] | None, after: list[str] | None) -> dict:
+    """Report menu-word changes between two OCR snapshots (evidence, not proof)."""
+    before_words = set(menu_options(before))
+    after_words = set(menu_options(after))
+    return {
+        "before": sorted(before_words),
+        "after": sorted(after_words),
+        "added": sorted(after_words - before_words),
+        "removed": sorted(before_words - after_words),
+        "changed": before_words != after_words,
+    }
+
+
 def infer_controls(
     records: list[Mapping[str, Any]],
     *,
@@ -146,6 +160,11 @@ def infer_controls(
     changed = {item["key"]: item for item in effects if item["changed"]}
     suggestions: dict[str, list[str]] = {
         "confirm": [key for key in confirm_keys if key in changed],
+        "verified_confirm": [
+            item["key"]
+            for item in effects
+            if item["key"] in confirm_keys and item["changed"] and item["ocr_changed"]
+        ],
         "cancel": [key for key in cancel_keys if key in changed],
         "move": {},
     }

@@ -16,6 +16,17 @@
 python scripts/play_pack.py --pack experiments/games/packs/web.2048.t1.json --duration 300
 ```
 
+## 有效性检查
+
+`play_pack.py` 在本次报告生成后增加了通用 `evaluate_session`（时长 + stop phrase）。
+2048 pack 没有设置 `stop_phrases`；按当前检查器：
+
+- duration 302.14s ≥ 300s；
+- 没有 stop phrase；
+- 因此 valid。
+
+报告本身生成时还没有 `valid` 字段；这是事后复核，不是重新跑了一遍。
+
 ## 边界
 
 - 这是“5 分钟多棋盘游玩”，不是“单棋盘连续 5 分钟”；

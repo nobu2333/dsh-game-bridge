@@ -1,6 +1,13 @@
 import numpy as np
 
-from dsh_game_core.probe import frame_change, infer_controls, menu_options, pack_draft, summarize_effects
+from dsh_game_core.probe import (
+    frame_change,
+    infer_controls,
+    menu_options,
+    menu_transition,
+    pack_draft,
+    summarize_effects,
+)
 
 
 def _square(frame, x, y, size=12, value=255):
@@ -66,3 +73,19 @@ def test_menu_and_control_suggestions_are_evidence_only():
     assert suggestions["cancel"] == ["ESC"]
     assert suggestions["move"] == {"down": ["DOWN"]}
     assert suggestions["ranked"][0]["key"] == "ENTER"
+
+
+def test_menu_transition_and_verified_confirm():
+    before = ["PRESS START", "OPTIONS"]
+    after = ["START", "OPTIONS", "CONTINUE"]
+    transition = menu_transition(before, after)
+    assert transition["added"] == ["CONTINUE"]
+    assert transition["removed"] == []
+    assert transition["changed"] is True
+    records = [
+        {"key": "ENTER", "change": {"changed": True, "ratio": 0.3}, "ocr_changed": True},
+        {"key": "Z", "change": {"changed": True, "ratio": 0.2}, "ocr_changed": False},
+    ]
+    suggestions = infer_controls(records)
+    assert suggestions["confirm"] == ["ENTER", "Z"]
+    assert suggestions["verified_confirm"] == ["ENTER"]
