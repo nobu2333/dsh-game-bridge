@@ -47,7 +47,8 @@
     "min_pixels": 20,
     "color_score": 0.55,
     "match_threshold": 0.65,
-    "search_radius": 0.25
+    "search_radius": 0.25,
+    "tracker": "template"
   },
   "scene": {
     "menu_keywords": [

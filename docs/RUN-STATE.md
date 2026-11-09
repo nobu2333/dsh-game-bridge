@@ -892,3 +892,11 @@
 - 默认仍颜色追踪，未改实机行为；status.player_tracker 可见。
 - 合成图单测 5 项；全量 318 passed；未启动游戏。
 - 下一步（有电脑）：Cuphead 配置 tracker=template，20 局检查 stale<20%、不再 stale=1.0。
+
+## 2026-11-09 PlayerTracker 实机验证
+
+- tracker off 20 局：stale 36.6%，median 1.53；
+- tracker on 两批各 20 局：stale 3.6%/3.5%，最大 5.9%/6.9%，无 stale>0.9，首帧 age 9ms；
+- 性能：on#1 median 2.47（vs off promote，+0.946，CI low 0.043）；on#2 median 2.41（vs off no_gain，CI low -0.221）；
+- 结论：追踪修复确定，推进提升不稳定；profile 已切到 tracker=template；
+- 未通关，README 未写；报告 experiments/results/ptracker-validation-2026-11-09.md。
