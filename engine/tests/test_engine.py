@@ -47,6 +47,18 @@ def test_snapshot_can_skip_ocr():
     assert result["width"] == 800
 
 
+def test_frame_source_overrides_capturer():
+    engine = GameEngine(capturer=FakeCapturer(), ocr=FakeOcr(), max_width=800)
+    frame = np.zeros((40, 60, 3), np.uint8)
+    engine.set_frame_source(lambda: frame)
+    result = engine.snapshot(ocr=False)
+    assert result["width"] == 60
+    assert result["height"] == 40
+    assert engine.grab_raw().shape == (40, 60, 3)
+    engine.set_frame_source(None)
+    assert engine.snapshot(ocr=False)["width"] == 800
+
+
 def test_ocr_reads_text_drawn_with_opencv():
     """真实 OCR 冒烟：不依赖屏幕，只验证模型能读出渲染出来的字。"""
     import cv2

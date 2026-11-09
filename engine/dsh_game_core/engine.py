@@ -33,9 +33,24 @@ class GameEngine:
         self._capturer_factory = capturer_factory
         self._ocr = ocr
         self._max_width = max_width
+        self._frame_source = None
         self._last_gray = None
         self._last_grab_at = None
         self._output_cache: dict[tuple[int, int, bool], int] = {}
+
+    def set_frame_source(self, source) -> None:
+        """Install an optional frame provider (e.g. window-level capture).
+
+        The provider returns a BGR ndarray; when set, monitor/capturer lookup is
+        bypassed. Session installs this for capture_mode="window".
+        """
+        self._frame_source = source if callable(source) else None
+
+    def _grab_frame(self, monitor: dict | None = None) -> np.ndarray:
+        if self._frame_source is not None:
+            return self._frame_source()
+        output_idx = self._resolve_output(monitor)
+        return self._capturer_for(output_idx).grab()
 
     def _ensure_ocr(self) -> None:
         if self._ocr is None:
@@ -84,8 +99,7 @@ class GameEngine:
     ) -> dict:
         import cv2
 
-        output_idx = self._resolve_output(monitor)
-        frame = self._capturer_for(output_idx).grab()
+        frame = self._grab_frame(monitor)
         if not isinstance(frame, np.ndarray) or frame.ndim != 3:
             raise EngineError("BAD_FRAME", f"抓到的不是三通道图像：{type(frame)}")
 
@@ -152,8 +166,7 @@ class GameEngine:
         `region` 语义与 snapshot 一致（相对该显示器的像素坐标，越界自动裁到帧内），
         坏帧 / 非法 region 抛 EngineError，由 stdio 层翻译成 {"ok": false}。
         """
-        output_idx = self._resolve_output(monitor)
-        frame = self._capturer_for(output_idx).grab()
+        frame = self._grab_frame(monitor)
         if not isinstance(frame, np.ndarray) or frame.ndim != 3 or frame.size == 0:
             raise EngineError("BAD_FRAME", f"抓到的不是三通道图像：{type(frame)}")
 
@@ -179,8 +192,7 @@ class GameEngine:
         """
         import cv2
 
-        output_idx = self._resolve_output(monitor)
-        frame = self._capturer_for(output_idx).grab()
+        frame = self._grab_frame(monitor)
         if not isinstance(frame, np.ndarray) or frame.ndim != 3:
             raise EngineError("BAD_FRAME", f"抓到的不是三通道图像：{type(frame)}")
 
@@ -233,7 +245,7 @@ class GameEngine:
         放在 attach 阶段做，避免它吃掉闭环第一个窗口；失败不影响 attach。
         """
         try:
-            self._capturer_for(self._resolve_output(monitor)).grab()
+            self._grab_frame(monitor)
         except Exception:  # noqa: BLE001 - 预热失败留给真正的 snapshot 报错
             pass
 

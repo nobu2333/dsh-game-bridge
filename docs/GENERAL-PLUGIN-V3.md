@@ -180,8 +180,9 @@
 - `engine/dsh_game_core/gamepack.py`：schema v0 校验、anti-cheat fail-closed、capability level、recipe 唯一性、`profile_from_pack` 适配（单测 `engine/tests/test_gamepack.py`）。
 - `GameSession.attach/policy_start` 接受 `pack`（路径或内联对象），`status` 暴露 pack 摘要；`game_attach` / `game_policy` 工具面也已支持 `pack`。
 - `engine/dsh_game_core/probe.py` + `scripts/probe_game.py`：按键脉冲→帧差证据→pack 草稿（不猜语义 controls），用于自动 onboarding 的第一层。
+- `window_capture.py` + `GameSession(capture_mode="window")`：PrintWindow 窗口级抓屏 fallback；Cuphead T1 已用此路径验证（`experiments/games/packs/pc.cuphead.t1.*`）。
 - `experiments/games/matrix.json`：首批游戏矩阵与 T1/T2 目标。
-- 下一步：菜单/键位语义推断、HUD 探针、3 款 T1 验收。
+- 下一步：Block Blast / SuperTux 的 T1、菜单/键位语义推断、HUD 探针。
 
 ## 5. 自动 onboarding（不靠人示范）
 
@@ -254,7 +255,7 @@ Cuphead 可以占一个 T2 名额，但不再做 10/7 的深度调参。
 ## 9. 风险与停止规则
 
 - 游戏不可用/反作弊 → 换游戏，不硬啃；
-- **窗口抓屏/前台**：当前是全屏 grab + 窗口矩形裁剪；若窗口被遮挡/在虚拟桌面/合成层不可见，会拍到 DSH 或桌面。T1 前必须先验证窗口级抓屏（PrintWindow/WGC）或可靠前台激活；
+- **窗口抓屏/前台**：全屏 grab + 窗口矩形裁剪在遮挡/虚拟桌面/合成层会拍错；`PrintWindow` fallback 已加入并验证 Cuphead，但不是所有硬件加速窗口都支持（可能黑帧）。T1 前必须检查 `window_state`/帧方差，失败则换 WGC 或修前台。
 - auto-onboarding 5 分钟做不到 → 先降级 T1 定义，不伪造；
 - 某游戏 2 周无 T1 → 标记 blocked，换下一款；
 - 不新增机制除非有测试 + 证据；

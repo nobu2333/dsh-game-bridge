@@ -28,7 +28,8 @@
       "input": ["keyboard"],
       "target": "T2_regression",
       "status": "t1_pass",
-      "notes": "Depth regression only; historical best 11.15 is an outlier, 20-30 run average ~4.1; do not resume parameter tuning."
+      "pack": "experiments/games/packs/pc.cuphead.t1.json",
+      "notes": "Depth regression only; T1 validated via window capture + probe (Press Any Button -> START/OPTIONS/DLC/EXIT). Historical best 11.15 is an outlier, 20-30 run average ~4.1; do not resume parameter tuning."
     },
     {
       "id": "pc.supertux",

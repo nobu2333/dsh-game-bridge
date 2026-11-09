@@ -26,7 +26,7 @@ sys.path.insert(0, str(REPO / "engine"))
 
 from dsh_game_core.probe import frame_change, pack_draft  # noqa: E402
 from dsh_game_core.session import GameSession  # noqa: E402
-from dsh_game_core.windows import focus_window, window_rect  # noqa: E402
+from dsh_game_core.windows import focus_window, foreground_window, window_rect  # noqa: E402
 
 
 def _decode(snapshot: dict) -> np.ndarray | None:
@@ -42,13 +42,24 @@ def _decode(snapshot: dict) -> np.ndarray | None:
 
 
 def _activate(hwnd: int) -> None:
-    """Focus a real window; a harmless centre click also takes foreground."""
+    """Focus a real window; click only if focus did not take (some windows are
+    foreground-visible but the compositor routes the click elsewhere)."""
     if not hwnd:
         return
     user32 = ctypes.windll.user32
     try:
         user32.ShowWindow(hwnd, 9)
         user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0043)
+    except Exception:  # noqa: BLE001
+        pass
+    focus_window(hwnd)
+    time.sleep(0.5)
+    try:
+        if int((foreground_window() or {}).get("hwnd") or 0) == int(hwnd):
+            return
+    except Exception:  # noqa: BLE001
+        pass
+    try:
         rect = window_rect(hwnd)
         if rect:
             left, top, right, bottom = rect
@@ -59,7 +70,7 @@ def _activate(hwnd: int) -> None:
     except Exception:  # noqa: BLE001
         pass
     focus_window(hwnd)
-    time.sleep(0.6)
+    time.sleep(0.5)
 
 
 def main() -> int:
@@ -71,13 +82,17 @@ def main() -> int:
     parser.add_argument("--tap-ms", type=int, default=120)
     parser.add_argument("--settle-ms", type=int, default=250)
     parser.add_argument("--dry-run", action="store_true", help="record actions only; no real input")
+    parser.add_argument("--window-capture", action="store_true", help="use PrintWindow instead of full-screen crop")
     args = parser.parse_args()
 
     keys = [item.strip().upper() for item in args.keys.split(",") if item.strip()]
     out = Path(args.out) if args.out else REPO / "tmp" / "probe-report.json"
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    session = GameSession(control_backend="dry-run" if args.dry_run else "keyboard")
+    session = GameSession(
+        control_backend="dry-run" if args.dry_run else "keyboard",
+        capture_mode="window" if args.window_capture else None,
+    )
     attached = session.attach({"window": args.window})
     hwnd = (attached.get("attached") or {}).get("hwnd")
     if not args.dry_run:

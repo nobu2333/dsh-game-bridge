@@ -22,6 +22,14 @@
 - 已关闭 Cuphead；**没有宣称 T1**。下一步先修窗口级抓屏（PrintWindow/WGC）或前台/虚拟桌面问题，再跑 live probe。
 - 测试：引擎 334、插件 45。
 
+### 2026-11-09 22:00 窗口抓屏 + Cuphead T1
+
+- 新增 `window_capture.py`：`PrintWindow(PW_RENDERFULLCONTENT)` + 窗口状态诊断（visible/iconic/cloaked/foreground/rect）；`GameEngine` 支持注入 frame source；`GameSession(capture_mode="window")` 走窗口级抓屏；探针支持 `--window-capture`。
+- 实机 Cuphead：全屏裁剪仍拍不到（DSH 遮挡/合成），但窗口抓屏成功；OCR `Press Any Button`；`ENTER` 帧差 0.8144，随后 OCR `START / OPTIONS / DLC / EXIT`；方向键/确认/取消均有帧差。
+- **Cuphead 达到 T1（1/3）**：attach、窗口抓屏、菜单、键位建议、首个有效动作都有证据；pack 见 `experiments/games/packs/pc.cuphead.t1.json`。
+- 仍未达到 T2；Cuphead 已关闭，不恢复 10/7 调参。
+- 测试：引擎 337、插件 45（Cuphead 已关闭，不恢复 10/7 调参）。
+
 ## 2026-11-06 深度复盘与策略 v2.1（修复感知断路 + 反应式策略 + 全量过程留痕）
 
 > 结论：P4 首批单机制 Canary（`dash_through` / `jump_over` / `stop_shoot`）全部 `no_gain` 的根本原因已定位——不是顶层理论问题，而是**底层感知到执行之间存在 4 个代码级断路**，导致上层策略在开局 2 秒后形同失明，且角色被 420ms 周期盲跳完全占满物理状态。
@@ -84,7 +92,7 @@
 
 ## 当前进度（2026-11-09）
 
-- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **334**、插件 **45**、集成 11/11（本地实测）。
+- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **337**、插件 **45**、集成 11/11（本地实测）。
 - 目标未变：Forest Follies 从大地图 10 局 ≥7 通关；**仍未通关**。
 - 实机 best：7.339 屏（旧）/ 6.812 屏（玩家修复后）/ 11.15 屏（今日离群）；20–30 局平均约 4.1–4.2。
 - 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。

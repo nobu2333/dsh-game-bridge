@@ -50,10 +50,12 @@ class GameSession:
         window_monitor_source=None,
         foreground_source=None,
         occlusion_source=None,
+        capture_mode: str | None = None,
     ):
         self.engine = engine or GameEngine()
         self.gate = gate or SafetyGate()
         self.backend = control_backend or os.environ.get("DSH_GAME_BRIDGE_CONTROL", "dry-run")
+        self._capture_mode = str(capture_mode or os.environ.get("DSH_GAME_BRIDGE_CAPTURE", "screen")).lower()
         self.audit = audit or AuditLog(os.environ.get("DSH_GAME_BRIDGE_AUDIT_LOG") or None)
         self._window_resolver = window_resolver
         self._window_rect_source = window_rect_source
@@ -294,6 +296,18 @@ class GameSession:
         else:
             # 不指定窗口时退回整屏（仍是有用的兜底，但模型应优先 attach 具体窗口）。
             self.attached = {"window": "unspecified", "attached_at_ms": int(time.time() * 1000)}
+        # Optional window-level capture for windows full-screen grab misses.
+        setter = getattr(self.engine, "set_frame_source", None)
+        hwnd = (self.attached or {}).get("hwnd")
+        if self._capture_mode == "window" and hwnd and callable(setter):
+            try:
+                from .window_capture import capture_window
+
+                setter(lambda hwnd=int(hwnd): capture_window(hwnd))
+            except Exception:  # noqa: BLE001 - fall back to the screen path
+                setter(None)
+        elif callable(setter):
+            setter(None)
         # 真实后端：attach 时做一次就绪预检（会创建虚拟手柄），失败 fail-fast，
         # 不把「attach 成功、第一次 act 才炸」的问题留给模型。
         control = self.backend_status(probe=True)
@@ -1068,6 +1082,9 @@ class GameSession:
 
     def _capture_geometry(self) -> tuple[dict | None, dict | None]:
         """返回 (region, monitor)：attach 窗口在屏幕/显示器上的裁剪区。"""
+        if self._capture_mode == "window":
+            # Window-level capture already returns a cropped frame.
+            return None, None
         region = None
         monitor = None
         attached = self.attached or {}

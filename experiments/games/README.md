@@ -22,7 +22,7 @@
 
 ## 当前选择
 
-- **T1 主目标**：Cuphead（回归）、SuperTux、Block Blast（鼠标/点击）
+- **T1 主目标**：Cuphead（✅ 已用窗口抓屏 + 自动探针验证）、SuperTux、Block Blast（鼠标/点击）
 - **T2 候选**：Cuphead、Block Blast
 - **可选**：NES Battle City via RetroArch（需要先确认模拟器与合法 ROM）
 - **排除**：Overwatch、Honkai: Star Rail、Wuthering Waves（在线/反作弊）；Brotato 暂不可用

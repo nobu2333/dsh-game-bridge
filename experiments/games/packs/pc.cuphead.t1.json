@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "id": "pc.cuphead",
+  "title": "Cuphead",
+  "platform": "pc",
+  "process": "Cuphead.exe",
+  "trust": {
+    "anti_cheat": "none"
+  },
+  "capabilities": {
+    "observe.screen": {"level": 0},
+    "observe.ui": {"level": 1},
+    "control.keyboard": {"level": 1}
+  },
+  "controls": {
+    "confirm": ["ENTER", "Z"],
+    "cancel": ["ESC"],
+    "move": {
+      "up": ["UP"],
+      "down": ["DOWN"],
+      "left": ["LEFT"],
+      "right": ["RIGHT"]
+    }
+  },
+  "hud": {},
+  "recipes": [
+    {
+      "id": "start_from_title",
+      "intent": "Leave Press Any Button and reach the main menu",
+      "steps": [
+        {"press": "ENTER"},
+        {"wait_ms": 800}
+      ],
+      "verify": {
+        "ocr_contains": "START"
+      }
+    }
+  ],
+  "evidence": [
+    "experiments/games/packs/pc.cuphead.t1.md"
+  ],
+  "level": 1
+}
