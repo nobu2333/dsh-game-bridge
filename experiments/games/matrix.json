@@ -8,9 +8,9 @@
     "t2_definition": "5 minutes of meaningful play (progress/interaction/survival), not menu idle"
   },
   "selection": {
-    "primary_t1": ["pc.cuphead", "pc.supertux", "pc.blockblast"],
-    "t2_candidates": ["pc.cuphead", "pc.blockblast"],
-    "optional": ["nes.battlecity"],
+    "primary_t1": ["pc.cuphead", "web.2048", "pc.supertux"],
+    "t2_candidates": ["pc.cuphead", "web.2048"],
+    "optional": ["nes.battlecity", "pc.blockblast"],
     "excluded": [
       {"id": "pc.overwatch", "reason": "online / anti-cheat"},
       {"id": "pc.honkai-star-rail", "reason": "online / anti-cheat"},
@@ -52,6 +52,18 @@
       "target": "T1_then_T2",
       "status": "blocked_build",
       "notes": "Local Unity WeChat-mini-game WebGL export: window capture + OCR read 经典模式/关卡模式, force_foreground works, but clicking classic mode throws getGameDataMonitor JS error. Not a standard browser build; no T1 claim."
+    },
+    {
+      "id": "web.2048",
+      "title": "2048",
+      "type": "web_puzzle",
+      "platform": "web",
+      "process_hint": "chrome.exe",
+      "input": ["keyboard"],
+      "target": "T1_then_T2",
+      "status": "t1_pass",
+      "pack": "experiments/games/packs/web.2048.t1.json",
+      "notes": "Local MIT 2048 served over HTTP; window capture + OCR SCORE/BEST/New Game; arrow keys produce board changes. T1 only; no T2 strategy yet."
     },
     {
       "id": "nes.battlecity",

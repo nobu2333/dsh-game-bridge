@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "id": "web.2048",
+  "title": "2048",
+  "platform": "web",
+  "process": "chrome.exe",
+  "trust": {
+    "anti_cheat": "none"
+  },
+  "capabilities": {
+    "observe.screen": {"level": 0},
+    "observe.ui": {"level": 1},
+    "control.keyboard": {"level": 1}
+  },
+  "controls": {
+    "move": {
+      "up": ["UP"],
+      "down": ["DOWN"],
+      "left": ["LEFT"],
+      "right": ["RIGHT"]
+    }
+  },
+  "hud": {},
+  "recipes": [
+    {
+      "id": "new_game",
+      "intent": "Start a fresh 2048 board",
+      "steps": [
+        {"press": "N"},
+        {"wait_ms": 300}
+      ],
+      "verify": {
+        "ocr_contains": "SCORE"
+      }
+    }
+  ],
+  "evidence": [
+    "experiments/games/packs/web.2048.t1.md"
+  ],
+  "level": 1
+}
