@@ -47,6 +47,14 @@
 - 仍未 T2；2048 策略/连续 5 分钟未验证。Chrome/server 已关闭。
 - 测试：引擎 338、插件 45。
 
+### 2026-11-09 22:45 Dino T1（3/3）+ T2 无效
+
+- Chrome Dino 在线版：窗口抓屏 + force_foreground 成功；OCR `Press Space... 00000`；发送 SPACE 后分数 `00000 -> 00029`。
+- **Dinosaur Game 达到 T1（3/3）**；pack 见 `experiments/games/packs/web.dino.t1.json`。
+- 尝试 300s autoplay（SPACE/800ms）：OCR 显示 `GAMEOVER` 与页面广告遮罩，动作很可能没有持续作用在游戏上；**T2 无效，不声称**。
+- 当前：T1 3/3，T2 0/2。下一步 T2 用无广告的本地目标，优先 2048。
+- 测试：引擎 338、插件 45。
+
 ## 2026-11-06 深度复盘与策略 v2.1（修复感知断路 + 反应式策略 + 全量过程留痕）
 
 > 结论：P4 首批单机制 Canary（`dash_through` / `jump_over` / `stop_shoot`）全部 `no_gain` 的根本原因已定位——不是顶层理论问题，而是**底层感知到执行之间存在 4 个代码级断路**，导致上层策略在开局 2 秒后形同失明，且角色被 420ms 周期盲跳完全占满物理状态。

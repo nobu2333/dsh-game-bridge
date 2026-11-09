@@ -182,9 +182,11 @@
 - `engine/dsh_game_core/probe.py` + `scripts/probe_game.py`：按键脉冲→帧差证据→pack 草稿（不猜语义 controls），用于自动 onboarding 的第一层。
 - `window_capture.py` + `GameSession(capture_mode="window")`：PrintWindow 窗口级抓屏 fallback；Cuphead T1 已用此路径验证（`experiments/games/packs/pc.cuphead.t1.*`）。
 - 鼠标通道：`SendInputController.click` / `GameSession.act({x,y})` / `game_act(x,y,mouse_button)`；`force_foreground` 已能把 Chrome app 抢到前台。Block Blast 的窗口抓屏/菜单 OCR 已通，但其微信小游戏 WebGL 构建点击报 `getGameDataMonitor`，**不是可玩构建**，不算 T1。
-- 2048（本地开源 MIT，浏览器）达到 T1：窗口抓屏 + OCR SCORE/BEST/New Game + 方向键首个有效动作；pack 见 `experiments/games/packs/web.2048.t1.*`。**T1 2/3**。
+- 2048（本地开源 MIT，浏览器）达到 T1：窗口抓屏 + OCR SCORE/BEST/New Game + 方向键首个有效动作；pack 见 `experiments/games/packs/web.2048.t1.*`。
+- Dinosaur Game（在线）达到 T1：OCR `Press Space... 00000`，SPACE 后分数 `00029`；pack 见 `experiments/games/packs/web.dino.t1.*`。**T1 3/3**。
+- T2 尚未达成：Dino 300s autoplay 被页面广告/GAMEOVER 干扰，无效；2048 尚未跑满 5 分钟。
 - `experiments/games/matrix.json`：首批游戏矩阵与 T1/T2 目标。
-- 下一步：第三款 T1、T2、菜单/键位语义推断。
+- 下一步：2048 T2、第二款 T2、菜单/键位语义推断。
 
 ## 5. 自动 onboarding（不靠人示范）
 

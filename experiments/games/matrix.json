@@ -8,9 +8,9 @@
     "t2_definition": "5 minutes of meaningful play (progress/interaction/survival), not menu idle"
   },
   "selection": {
-    "primary_t1": ["pc.cuphead", "web.2048", "pc.supertux"],
-    "t2_candidates": ["pc.cuphead", "web.2048"],
-    "optional": ["nes.battlecity", "pc.blockblast"],
+    "primary_t1": ["pc.cuphead", "web.2048", "web.dino"],
+    "t2_candidates": ["web.2048", "pc.cuphead"],
+    "optional": ["nes.battlecity", "pc.supertux", "pc.blockblast"],
     "excluded": [
       {"id": "pc.overwatch", "reason": "online / anti-cheat"},
       {"id": "pc.honkai-star-rail", "reason": "online / anti-cheat"},
@@ -64,6 +64,18 @@
       "status": "t1_pass",
       "pack": "experiments/games/packs/web.2048.t1.json",
       "notes": "Local MIT 2048 served over HTTP; window capture + OCR SCORE/BEST/New Game; arrow keys produce board changes. T1 only; no T2 strategy yet."
+    },
+    {
+      "id": "web.dino",
+      "title": "Dinosaur Game",
+      "type": "web_runner",
+      "platform": "web",
+      "process_hint": "chrome.exe",
+      "input": ["keyboard"],
+      "target": "T1_then_T2",
+      "status": "t1_pass",
+      "pack": "experiments/games/packs/web.dino.t1.json",
+      "notes": "Window capture + OCR Press Space/00000; SPACE changed score to 00029. T1 only: the 5-minute autoplay was interrupted by an ad overlay/GAMEOVER, so no T2 claim."
     },
     {
       "id": "nes.battlecity",

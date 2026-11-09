@@ -22,9 +22,9 @@
 
 ## 当前选择
 
-- **T1 主目标（2/3）**：Cuphead ✅、2048 ✅、SuperTux（二进制缺失）
-- **T2 候选**：Cuphead、2048
-- **可选**：NES Battle City via RetroArch（需要先确认模拟器与合法 ROM）；Block Blast（构建不可玩）
+- **T1 主目标（3/3）**：Cuphead ✅、2048 ✅、Dinosaur Game ✅
+- **T2 候选**：2048、Cuphead
+- **可选**：NES Battle City via RetroArch（需要先确认模拟器与合法 ROM）；SuperTux（二进制缺失）；Block Blast（构建不可玩）
 - **排除**：Overwatch、Honkai: Star Rail、Wuthering Waves（在线/反作弊）；Brotato 暂不可用
 
 具体状态见 [matrix.json](matrix.json)。新游戏先在此登记，再生成 pack 草稿。

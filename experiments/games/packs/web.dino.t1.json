@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "id": "web.dino",
+  "title": "Dinosaur Game",
+  "platform": "web",
+  "process": "chrome.exe",
+  "trust": {
+    "anti_cheat": "none"
+  },
+  "capabilities": {
+    "observe.screen": {"level": 0},
+    "observe.ui": {"level": 1},
+    "control.keyboard": {"level": 1}
+  },
+  "controls": {
+    "confirm": ["SPACE", "UP"],
+    "jump": ["SPACE", "UP"],
+    "duck": ["DOWN"]
+  },
+  "hud": {},
+  "recipes": [
+    {
+      "id": "start_run",
+      "intent": "Start the Dino run from the ready screen",
+      "steps": [
+        {"press": "SPACE"},
+        {"wait_ms": 500}
+      ],
+      "verify": {
+        "ocr_contains": "000"
+      }
+    }
+  ],
+  "autoplay": {
+    "keys": ["SPACE"],
+    "interval_ms": 800
+  },
+  "evidence": [
+    "experiments/games/packs/web.dino.t1.md"
+  ],
+  "level": 1
+}
