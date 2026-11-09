@@ -281,6 +281,68 @@ def resolve_window(match: str) -> dict | None:
     return find_window(list_windows(), match)
 
 
+def force_foreground(hwnd: int, *, settle_s: float = 0.35) -> bool:
+    """Best-effort foreground handoff for windows that refuse SetForegroundWindow.
+
+    Uses the documented AttachThreadInput route plus the Alt-key unlock. This is
+    still OS-mediated focus change, not input injection; callers must re-check
+    the foreground before sending real input.
+    """
+    if not IS_WINDOWS or not hwnd:
+        return False
+    try:
+        import ctypes
+        import time
+
+        user32 = _user32()
+        kernel32 = ctypes.windll.kernel32
+        hwnd = int(hwnd)
+        foreground = int(user32.GetForegroundWindow() or 0)
+        if foreground == hwnd:
+            return True
+        try:
+            user32.AllowSetForegroundWindow(-1)  # ASFW_ANY
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            user32.LockSetForegroundWindow(0)  # LSFW_UNLOCK
+        except Exception:  # noqa: BLE001
+            pass
+        user32.ShowWindow(hwnd, 9)
+        user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0043)  # TOPMOST | SHOW
+        # Attach all relevant input queues to this thread.
+        current = int(kernel32.GetCurrentThreadId())
+        foreground_thread = int(user32.GetWindowThreadProcessId(foreground, None) or 0)
+        target_thread = int(user32.GetWindowThreadProcessId(hwnd, None) or 0)
+        attached: list[int] = []
+        for tid in (foreground_thread, target_thread):
+            if tid and tid != current:
+                try:
+                    if user32.AttachThreadInput(tid, current, True):
+                        attached.append(tid)
+                except Exception:  # noqa: BLE001
+                    pass
+        try:
+            user32.BringWindowToTop(hwnd)
+            user32.SetActiveWindow(hwnd)
+            user32.SetForegroundWindow(hwnd)
+            # Alt tap is the classic foreground-lock unlock.
+            user32.keybd_event(0x12, 0, 0, 0)
+            user32.keybd_event(0x12, 0, 2, 0)
+            user32.SwitchToThisWindow(hwnd, True)
+            user32.SetForegroundWindow(hwnd)
+        finally:
+            for tid in attached:
+                try:
+                    user32.AttachThreadInput(tid, current, False)
+                except Exception:  # noqa: BLE001
+                    pass
+        time.sleep(max(0.0, settle_s))
+        return int(user32.GetForegroundWindow() or 0) == hwnd
+    except Exception:  # noqa: BLE001 - focus failure is reported by the caller
+        return False
+
+
 def focus_window(hwnd: int) -> bool:
     """尽力把目标窗口调到前台（只改变窗口激活状态，不注入输入）。
 
@@ -292,16 +354,9 @@ def focus_window(hwnd: int) -> bool:
     try:
         user32 = _user32()
         user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        if user32.SetForegroundWindow(hwnd):
+        if user32.SetForegroundWindow(hwnd) and int(user32.GetForegroundWindow() or 0) == int(hwnd):
             return True
-        foreground = user32.GetForegroundWindow()
-        foreground_thread = user32.GetWindowThreadProcessId(foreground, None)
-        target_thread = user32.GetWindowThreadProcessId(hwnd, None)
-        user32.AttachThreadInput(foreground_thread, target_thread, True)
-        try:
-            return bool(user32.SetForegroundWindow(hwnd))
-        finally:
-            user32.AttachThreadInput(foreground_thread, target_thread, False)
+        return force_foreground(int(hwnd))
     except Exception:  # noqa: BLE001 - 聚焦失败由调用方降级处理
         return False
 

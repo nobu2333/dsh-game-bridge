@@ -34,8 +34,9 @@
 - 用 `scripts/serve_webgl.py` 起本地 Unity WebGL（正确 Brotli header），Chrome app 窗口 `Unity WebGL Player | BlockBlastPuzzle`。
 - 窗口级抓屏成功；OCR 读到 `经典模式 / 关卡模式`，视觉上确认主菜单。
 - 新增通用鼠标能力：`SendInputController.click`、`GameSession.act({x,y})`、`game_act` 的 x/y/mouse_button。
-- 但真实点击被前台约束卡住：DSH/Chrome 前台无法切到 app 窗口；`PostMessage` 合成点击也不被 Unity/Chrome 接受。已关闭 Chrome/server。
-- **Block Blast 仍不是 T1**（只有 attach/抓屏/菜单 OCR，没有首个有效动作）；下一步需要非前台输入或更可靠的窗口激活。
+- 修复前台：`windows.force_foreground`（AttachThreadInput + Alt unlock）实测能把 Chrome app 切到前台；随后鼠标点击到达页面。
+- 但点击 `经典模式` 触发 Unity JS 错误：`Cannot read properties of undefined (reading 'getGameDataMonitor')`，这是 **微信小游戏 WebGL 导出**，不是标准浏览器构建。已关闭 Chrome/server。
+- **Block Blast 仍不是 T1**：抓屏/菜单 OCR/前台/点击都通了，但游戏构建本身不可玩；换构建或换游戏。
 - 测试：引擎 338、插件 45。
 
 ## 2026-11-06 深度复盘与策略 v2.1（修复感知断路 + 反应式策略 + 全量过程留痕）

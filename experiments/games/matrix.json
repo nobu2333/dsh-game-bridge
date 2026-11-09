@@ -50,8 +50,8 @@
       "process_hint": null,
       "input": ["mouse", "touch"],
       "target": "T1_then_T2",
-      "status": "t0_capture_ok",
-      "notes": "Local Unity WebGL build served; window capture + OCR read 经典模式/关卡模式. Real mouse click was blocked by the DSH/Chrome foreground constraint; no T1 claim yet."
+      "status": "blocked_build",
+      "notes": "Local Unity WeChat-mini-game WebGL export: window capture + OCR read 经典模式/关卡模式, force_foreground works, but clicking classic mode throws getGameDataMonitor JS error. Not a standard browser build; no T1 claim."
     },
     {
       "id": "nes.battlecity",
