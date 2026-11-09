@@ -100,6 +100,65 @@ def summarize_effects(records: list[Mapping[str, Any]]) -> list[dict]:
     return summary
 
 
+CONFIRM_KEYS = ("ENTER", "Z", "SPACE", "X", "A")
+CANCEL_KEYS = ("ESC", "BACKSPACE")
+MOVE_KEYS = {"up": ("UP", "W"), "down": ("DOWN", "S"), "left": ("LEFT", "A"), "right": ("RIGHT", "D")}
+MENU_WORDS = (
+    "START",
+    "CONTINUE",
+    "PLAY",
+    "NEW GAME",
+    "LOAD",
+    "OPTIONS",
+    "SETTINGS",
+    "EXIT",
+    "QUIT",
+    "RESUME",
+    "RETRY",
+)
+
+
+def menu_options(ocr_texts: list[str] | None) -> dict:
+    """Extract generic menu words from OCR; never assumes a specific game."""
+    found: dict[str, list[str]] = {}
+    for raw in ocr_texts or []:
+        text = str(raw or "").strip().upper()
+        if not text:
+            continue
+        for word in MENU_WORDS:
+            if word in text:
+                found.setdefault(word, []).append(text[:60])
+    return found
+
+
+def infer_controls(
+    records: list[Mapping[str, Any]],
+    *,
+    confirm_keys: tuple[str, ...] = CONFIRM_KEYS,
+    cancel_keys: tuple[str, ...] = CANCEL_KEYS,
+) -> dict:
+    """Produce *suggestions* from key-effect evidence, not hard claims.
+
+    A frame change proves the key did something; it does not prove the semantic
+    role. Consumers should review these suggestions or verify the next state.
+    """
+    effects = summarize_effects(records)
+    changed = {item["key"]: item for item in effects if item["changed"]}
+    suggestions: dict[str, list[str]] = {
+        "confirm": [key for key in confirm_keys if key in changed],
+        "cancel": [key for key in cancel_keys if key in changed],
+        "move": {},
+    }
+    move: dict[str, list[str]] = {}
+    for direction, keys in MOVE_KEYS.items():
+        hits = [key for key in keys if key in changed]
+        if hits:
+            move[direction] = hits
+    suggestions["move"] = move
+    suggestions["ranked"] = effects
+    return suggestions
+
+
 def _slug(value: str) -> str:
     text = re.sub(r"[^a-z0-9]+", "-", str(value or "").lower()).strip("-")
     return text[:40] or "unknown"
@@ -126,6 +185,7 @@ def pack_draft(
         slug = _slug(str(window.get("process") or ""))
     identifier = game_id or f"probe.{slug}"
     status = summarize_effects(records)
+    suggestions = infer_controls(records)
     pack = {
         "schema": 1,
         "id": identifier,
@@ -149,7 +209,9 @@ def pack_draft(
                 "height": window.get("height"),
             },
             "ocr_texts": [str(text) for text in (ocr_texts or [])][:40],
+            "menu": menu_options(ocr_texts),
             "key_effects": status,
+            "suggested_controls": suggestions,
         },
     }
     return validate_pack(pack)

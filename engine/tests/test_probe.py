@@ -1,6 +1,6 @@
 import numpy as np
 
-from dsh_game_core.probe import frame_change, pack_draft, summarize_effects
+from dsh_game_core.probe import frame_change, infer_controls, menu_options, pack_draft, summarize_effects
 
 
 def _square(frame, x, y, size=12, value=255):
@@ -48,3 +48,21 @@ def test_pack_draft_is_valid_and_does_not_guess_controls():
     assert pack["capabilities"]["observe.ui"]["level"] == 1
     assert pack["probe"]["key_effects"][0]["key"] == "ENTER"
     assert pack["probe"]["ocr_texts"] == ["START", "OPTIONS"]
+    assert pack["probe"]["menu"]["START"] == ["START"]
+    assert pack["probe"]["suggested_controls"]["confirm"] == ["ENTER"]
+
+
+def test_menu_and_control_suggestions_are_evidence_only():
+    texts = ["PRESS START", "OPTIONS", "QUIT GAME"]
+    assert set(menu_options(texts)) == {"START", "OPTIONS", "QUIT"}
+    records = [
+        {"key": "ENTER", "change": {"changed": True, "ratio": 0.3}},
+        {"key": "DOWN", "change": {"changed": True, "ratio": 0.01}},
+        {"key": "ESC", "change": {"changed": True, "ratio": 0.2}},
+        {"key": "SPACE", "change": {"changed": False, "ratio": 0.0}},
+    ]
+    suggestions = infer_controls(records)
+    assert suggestions["confirm"] == ["ENTER"]
+    assert suggestions["cancel"] == ["ESC"]
+    assert suggestions["move"] == {"down": ["DOWN"]}
+    assert suggestions["ranked"][0]["key"] == "ENTER"
