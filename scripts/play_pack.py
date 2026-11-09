@@ -20,7 +20,7 @@ sys.path.insert(0, str(REPO / "engine"))
 
 from dsh_game_core.gamepack import load_pack  # noqa: E402
 from dsh_game_core.session import GameSession  # noqa: E402
-from dsh_game_core.windows import force_foreground, foreground_window  # noqa: E402
+from dsh_game_core.windows import force_foreground, foreground_window, window_rect  # noqa: E402
 
 
 def main() -> int:
@@ -39,6 +39,11 @@ def main() -> int:
     if not keys:
         raise SystemExit("pack.autoplay.keys is required")
     interval_ms = max(40, int(autoplay.get("interval_ms") or 800))
+    restart = dict(autoplay.get("restart") or {})
+    restart_every = max(0.0, float(restart.get("every_s") or 0.0))
+    restart_click = restart.get("click")
+    restart_next = restart_every if restart_every > 0 else 0.0
+    restarts = 0
     out = Path(args.out) if args.out else REPO / "tmp" / f"{pack['id']}.play.json"
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -73,6 +78,25 @@ def main() -> int:
                     )
                 except Exception as error:  # noqa: BLE001
                     errors.append(f"sample: {type(error).__name__}: {error}")
+            if (
+                restart_every > 0
+                and now - started >= restart_next
+                and isinstance(restart_click, (list, tuple))
+                and len(restart_click) >= 2
+            ):
+                restart_next += restart_every
+                if hwnd and not args.dry_run:
+                    try:
+                        rect = window_rect(hwnd)
+                        if rect:
+                            left, top, right, bottom = rect
+                            x = left + int(float(restart_click[0]) * (right - left))
+                            y = top + int(float(restart_click[1]) * (bottom - top))
+                            force_foreground(hwnd)
+                            session.act({"x": x, "y": y, "mouse_button": "LEFT"})
+                            restarts += 1
+                    except Exception as error:  # noqa: BLE001
+                        errors.append(f"restart: {type(error).__name__}: {error}")
             key = keys[index % len(keys)]
             index += 1
             if hwnd and not args.dry_run:
@@ -107,6 +131,7 @@ def main() -> int:
         "title": pack.get("title"),
         "duration_s": elapsed,
         "actions": actions,
+        "restarts": restarts,
         "hz": round(actions / elapsed, 2) if elapsed else 0.0,
         "keys": keys,
         "interval_ms": interval_ms,

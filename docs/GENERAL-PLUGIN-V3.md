@@ -184,9 +184,9 @@
 - 鼠标通道：`SendInputController.click` / `GameSession.act({x,y})` / `game_act(x,y,mouse_button)`；`force_foreground` 已能把 Chrome app 抢到前台。Block Blast 的窗口抓屏/菜单 OCR 已通，但其微信小游戏 WebGL 构建点击报 `getGameDataMonitor`，**不是可玩构建**，不算 T1。
 - 2048（本地开源 MIT，浏览器）达到 T1：窗口抓屏 + OCR SCORE/BEST/New Game + 方向键首个有效动作；pack 见 `experiments/games/packs/web.2048.t1.*`。
 - Dinosaur Game（在线）达到 T1：OCR `Press Space... 00000`，SPACE 后分数 `00029`；pack 见 `experiments/games/packs/web.dino.t1.*`。**T1 3/3**。
-- T2 尚未达成：Dino 300s autoplay 被页面广告/GAMEOVER 干扰，无效；2048 尚未跑满 5 分钟。
-- `experiments/games/matrix.json`：首批游戏矩阵与 T1/T2 目标。
-- 下一步：2048 T2、第二款 T2、菜单/键位语义推断。
+- T2 **2/2**：本地 T-Rex runner 301.55s autoplay、237 actions、0 errors、score `HI 00053 -> HI 00089`；2048 302.14s、340 actions、5 次 pack-defined New Game restart、多棋盘得分推进。死亡/重开允许，不是单命通关。
+- 本阶段验收：T1 3/3、T2 2/2；引擎零游戏分支；测试/证据/文档已入库。Cuphead 10/7 未做，也不作为本 goal 条件。
+- 下一步：稳定性/证据整理、把菜单/键位推断从建议升级为可验证，再扩更多游戏。
 
 ## 5. 自动 onboarding（不靠人示范）
 

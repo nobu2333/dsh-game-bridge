@@ -23,7 +23,7 @@
 ## 当前选择
 
 - **T1 主目标（3/3）**：Cuphead ✅、2048 ✅、Dinosaur Game ✅
-- **T2 候选**：2048、Cuphead
+- **T2（2/2）**：T-Rex ✅（301.55s autoplay，score 53→89）；2048 ✅（302.14s，340 actions，5 次 pack restart，多棋盘有得分推进）
 - **可选**：NES Battle City via RetroArch（需要先确认模拟器与合法 ROM）；SuperTux（二进制缺失）；Block Blast（构建不可玩）
 - **排除**：Overwatch、Honkai: Star Rail、Wuthering Waves（在线/反作弊）；Brotato 暂不可用
 

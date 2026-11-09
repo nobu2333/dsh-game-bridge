@@ -9,7 +9,7 @@
   },
   "selection": {
     "primary_t1": ["pc.cuphead", "web.2048", "web.dino"],
-    "t2_candidates": ["web.2048", "pc.cuphead"],
+    "t2_candidates": ["web.trex", "web.2048"],
     "optional": ["nes.battlecity", "pc.supertux", "pc.blockblast"],
     "excluded": [
       {"id": "pc.overwatch", "reason": "online / anti-cheat"},
@@ -61,9 +61,9 @@
       "process_hint": "chrome.exe",
       "input": ["keyboard"],
       "target": "T1_then_T2",
-      "status": "t1_pass",
+      "status": "t2_pass",
       "pack": "experiments/games/packs/web.2048.t1.json",
-      "notes": "Local MIT 2048 served over HTTP; window capture + OCR SCORE/BEST/New Game; arrow keys produce board changes. T1 only; no T2 strategy yet."
+      "notes": "Local MIT 2048 served over HTTP; T1 via SCORE/BEST/New Game + arrow keys. T2 via 302.14s autoplay, 340 actions, 5 pack-defined New Game restarts, scores progressed on multiple boards; not a single-board 5-minute claim."
     },
     {
       "id": "web.dino",
@@ -76,6 +76,18 @@
       "status": "t1_pass",
       "pack": "experiments/games/packs/web.dino.t1.json",
       "notes": "Window capture + OCR Press Space/00000; SPACE changed score to 00029. T1 only: the 5-minute autoplay was interrupted by an ad overlay/GAMEOVER, so no T2 claim."
+    },
+    {
+      "id": "web.trex",
+      "title": "t.rex extracted",
+      "type": "web_runner",
+      "platform": "web",
+      "process_hint": "chrome.exe",
+      "input": ["keyboard"],
+      "target": "T2",
+      "status": "t2_pass",
+      "pack": "experiments/games/packs/web.trex.t1.json",
+      "notes": "Local open-source T-Rex runner. T1 via probe (00000 + SPACE/UP/DOWN); T2 via 301.55s autoplay, 237 actions, score HI 00053 -> HI 00089, no errors. Deaths/restarts allowed; not a single-life clear."
     },
     {
       "id": "nes.battlecity",

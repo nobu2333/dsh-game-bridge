@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "web.trex",
+  "title": "t.rex extracted",
+  "platform": "web",
+  "process": "chrome.exe",
+  "trust": {
+    "anti_cheat": "none"
+  },
+  "capabilities": {
+    "observe.screen": {"level": 0},
+    "observe.ui": {"level": 1},
+    "control.keyboard": {"level": 1}
+  },
+  "controls": {
+    "confirm": ["SPACE", "UP"],
+    "jump": ["SPACE", "UP"]
+  },
+  "hud": {},
+  "recipes": [],
+  "autoplay": {
+    "keys": ["SPACE"],
+    "interval_ms": 800
+  },
+  "evidence": [
+    "experiments/games/packs/web.trex.t1.md",
+    "experiments/games/packs/web.trex.t2.md"
+  ],
+  "level": 1
+}

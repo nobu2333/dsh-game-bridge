@@ -55,6 +55,25 @@
 - 当前：T1 3/3，T2 0/2。下一步 T2 用无广告的本地目标，优先 2048。
 - 测试：引擎 338、插件 45。
 
+### 2026-11-09 23:00 本地 T-Rex T2（1/2）
+
+- 本地开源 T-Rex runner（`wayou/t-rex-runner`，仅 tmp）：
+  - 301.55 秒、237 actions、0 errors；
+  - OCR 分数 `HI 00053 -> HI 00089`；
+  - 有 GAMEOVER 后继续输入（runner 死亡/重开），不是菜单空转。
+- **T2 1/2**：T-Rex 达到 5 分钟有意义游玩（按 goal 定义，不要求单命通关）。
+- 证据：`experiments/games/packs/web.trex.t2.md`。
+- 下一步：2048 T2，补满 2/2。
+
+### 2026-11-09 23:15 2048 T2（2/2）与 goal 验收
+
+- 2048 302.14s、340 actions、5 次 pack-defined New Game restart、0 errors；多个棋盘有得分推进（最高 2200，重置后 24–620 等）。
+- **T2 2/2**：T-Rex + 2048（多棋盘/死亡重开语义，不是单棋盘连续 5 分钟）。
+- **T1 3/3**：Cuphead / 2048 / Dino；证据在 `experiments/games/packs/`。
+- 引擎零游戏分支；GamePack/窗口抓屏/force_foreground/鼠标/自动探针/autoplay 均为通用层。
+- 测试：引擎 338、插件 45。
+- 结论：按 v3 的 T1/T2 定义，goal 验收条件已满足；Cuphead 10/7 未做，也不作为本 goal 条件。
+
 ## 2026-11-06 深度复盘与策略 v2.1（修复感知断路 + 反应式策略 + 全量过程留痕）
 
 > 结论：P4 首批单机制 Canary（`dash_through` / `jump_over` / `stop_shoot`）全部 `no_gain` 的根本原因已定位——不是顶层理论问题，而是**底层感知到执行之间存在 4 个代码级断路**，导致上层策略在开局 2 秒后形同失明，且角色被 420ms 周期盲跳完全占满物理状态。

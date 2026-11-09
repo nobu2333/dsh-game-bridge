@@ -22,8 +22,17 @@
   },
   "hud": {},
   "recipes": [],
+  "autoplay": {
+    "keys": ["DOWN", "LEFT", "DOWN", "LEFT", "RIGHT", "UP"],
+    "interval_ms": 500,
+    "restart": {
+      "every_s": 55,
+      "click": [0.686, 0.452]
+    }
+  },
   "evidence": [
-    "experiments/games/packs/web.2048.t1.md"
+    "experiments/games/packs/web.2048.t1.md",
+    "experiments/games/packs/web.2048.t2.md"
   ],
   "level": 1
 }
