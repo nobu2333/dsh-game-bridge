@@ -62,6 +62,7 @@ STATUS_KEYS = {
     "world_model",
     "option_shadow",
     "option_stats",
+    "player_tracker",
     "perception_health",
     "damage_events",
     "trace_tail",
@@ -796,3 +797,24 @@ def test_reactive_fallback_jump_only_when_no_threats():
     runner._maybe_jump()
     after = runner.status()["mechanisms"]["periodic_jump"]["counts"]["applied"]
     assert after == before
+
+def test_policy_uses_template_player_tracker():
+    import numpy as np
+
+    profile = dict(PROFILE)
+    profile["player"] = {
+        "track": True,
+        "every_n_ticks": 1,
+        "tracker": "template",
+        "colors": [{"r_min": 150, "g_max": 90, "b_max": 90}],
+        "min_pixels": 20,
+    }
+    runner, _, _ = build_runner(budget_ticks=1, profile=profile)
+    runner._ticks = 0
+    runner._player_source = None
+    frame = np.zeros((240, 320, 3), dtype=np.uint8)
+    frame[180:210, 50:68] = (0, 0, 220)
+    runner._update_player(frame)
+    assert runner._player_tracker is not None
+    assert abs(runner._anchor[0] - (50 + 9) / 320) < 0.06
+    assert runner._player_missing == 0

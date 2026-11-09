@@ -491,6 +491,15 @@ class PolicyRunner:
         self._player_score = 0.0
         self._player_seen_at = 0.0
         self._player_missing = 0
+        self._player_tracker = None
+        tracker_mode = str(player_cfg.get("tracker") or "")
+        if tracker_mode == "template":
+            try:
+                from .player_tracker import PlayerTracker
+
+                self._player_tracker = PlayerTracker(self._profile)
+            except Exception:  # noqa: BLE001
+                self._player_tracker = None
         self._edge_since = 0.0
         self._last_edge_escape = 0.0
         self._advance_suppress_until = 0.0
@@ -690,6 +699,7 @@ class PolicyRunner:
             "world_model": self._world_model,
             "option_shadow": self._option_shadow,
             "option_stats": self._option_arbiter.snapshot(),
+            "player_tracker": self._player_tracker.status() if self._player_tracker is not None else None,
             "perception_health": self._perception_health(),
             "damage_events": list(self._damage_events),
             "trace_tail": list(self._trace_tail),
@@ -838,6 +848,8 @@ class PolicyRunner:
                         self._player_score = 0.0
                         self._player_seen_at = 0.0
                         self._player_missing = 0
+                        if self._player_tracker is not None:
+                            self._player_tracker.reset(self._initial_anchor)
                         self._temporal = None
                         self._temporal_state = None
                         self._situation = None
@@ -2278,6 +2290,24 @@ class PolicyRunner:
 
     def _update_player(self, frame: np.ndarray) -> None:
         """定期更新角色屏幕坐标；连续丢失时放宽重捕获，大跳变用两拍共识校验。"""
+        if self._player_tracker is not None:
+            if self._ticks % self._player_every != 0:
+                return
+            result = self._player_tracker.update(
+                frame,
+                action_state=self._action_state(),
+                now=self._clock(),
+                dt=float(self._period),
+            )
+            if not isinstance(result, dict) or result.get("stale"):
+                self._player_missing += 1
+                return
+            self._anchor = (float(result.get("x") or 0.5), float(result.get("y") or 0.7))
+            self._player_score = round(float(result.get("score") or 0.0), 3)
+            self._player_seen_at = self._clock()
+            self._player_missing = 0
+            self._player_candidate = None
+            return
         if not self._track_player or self._player_source is None:
             return
         if self._ticks % self._player_every != 0:

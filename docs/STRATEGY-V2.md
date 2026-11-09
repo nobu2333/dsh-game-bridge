@@ -387,3 +387,15 @@ experiments/<id>/
 - 失败原因：部分局玩家仍未初始捕获；关掉周期跳后 cornered 增加；hybrid 保底跳频率不足。
 - 完整 traces/报告已留痕；详见 `experiments/results/v21-stage3-final.md`。
 - 结论：v2.1 的过程与检测闭环成立，但当前 reactive/hybrid 策略未超过周期盲跳基线；不伪装成提升。
+
+## 20. PlayerTracker：稳定“自己是谁/在哪”（2026-11-09）
+
+- 新增 `player_tracker.py`：自动模板 + 预测 ROI + 丢失全屏重捕获；
+  - bootstrap：用 profile `player.colors` 找候选，选靠近出生点/合理面积，裁剪运行时模板；
+  - update：速度预测 + ROI 模板匹配（多尺度）+ 颜色/几何融合；
+  - 丢失：2–3 拍放宽、≥5 拍全屏低分辨率重捕获、两帧一致性；
+  - 模板最多 6 个，运行时裁剪，不入库；
+- `Profile.player.tracker="template"` 时 PolicyRunner 使用它；默认仍是原颜色追踪，未改线上行为；
+- `status.player_tracker` 暴露 source/score/missing/stale/templates；
+- 合成图单测覆盖：bootstrap、移动跟踪、遮挡后重捕获、近候选优先、status；
+- 测试 318 passed；未实机。

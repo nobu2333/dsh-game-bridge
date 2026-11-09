@@ -885,3 +885,10 @@
 - 生成 18 条 trace + 自动报告；最终报告 `experiments/results/b-supertux-smoke-2026-11-06.md`。
 - Caveat：完整冷启动含人工过剧情，3.1s 是 attach→首个动作；Supertux gameplay 被 OCR 误判为 loading/dialogue，peak_screens=0；player.track=false。
 - 未通关；README 未写。
+
+## 2026-11-09 PlayerTracker 代码
+
+- 新增 player_tracker.py：自动模板 + 预测 ROI + 全屏重捕获；profile.player.tracker="template" 可选接入。
+- 默认仍颜色追踪，未改实机行为；status.player_tracker 可见。
+- 合成图单测 5 项；全量 318 passed；未启动游戏。
+- 下一步（有电脑）：Cuphead 配置 tracker=template，20 局检查 stale<20%、不再 stale=1.0。
