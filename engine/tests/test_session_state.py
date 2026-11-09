@@ -161,6 +161,17 @@ def test_state_tolerates_bad_profile_and_missing_foreground():
     assert state["scene"] in ("gameplay", "unknown", "dialogue")
 
 
+def test_act_mouse_click_dry_run():
+    session, _fg = _make_session()
+    session.attach({"window": "Game"})
+    result = session.act({"x": 100, "y": 50, "mouse_button": "LEFT"})
+    assert result["action"]["mouse_click"] is True
+    assert result["action"]["x"] == 100
+    assert result["action"]["y"] == 50
+    assert result["action"]["dry_run"] is True
+    assert session.history[-1]["mouse_click"] is True
+
+
 def test_policy_start_status_and_stop(monkeypatch):
     import dsh_game_core.policy as policy_module
 

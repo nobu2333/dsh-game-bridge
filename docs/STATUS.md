@@ -20,7 +20,7 @@
 | M3 20 Hz 闭环 | ✅（dry-run 已验证） | 实测 21.3 Hz；逐拍安全复检；stop 一拍内松手；真实后端已接线 |
 | 发布 | ✅ 2026-10-29 | npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`；发布版安装+自举+M1/M3 实测通过 |
 | 0.0.2 本地打包 | ✅ 2026-10-30 | wheel/sdist/tarball 构建校验；桌面 profile 安装 0.0.2（引擎缓存 0.0.2）；`game_selftest` 报 0.0.2；**未发布** |
-| 通用玩法基线 | ✅ 单测通过（真实对局已跑，未通关） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_intent`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 45/45、`pytest engine/tests` 337/337；集成 11/11；memory 已实现（记录/上下文/shadow 只读），API provider 未实现；真实对局最高 11.15 单局，仍未通关 |
+| 通用玩法基线 | ✅ 单测通过（真实对局已跑，未通关） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_intent`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 45/45、`pytest engine/tests` 338/338；集成 11/11；memory 已实现（记录/上下文/shadow 只读），API provider 未实现；真实对局最高 11.15 单局，仍未通关 |
 | 策略 v2 / 检测 | 🚧 转型 v2.1（修复感知断路 + 反应式 + 全量留痕） | P4 首批定位出 4 个代码级断路（玩家追踪 `score<0.9` 锁死、`player_stale` 清空威胁、`parry` 漏检、周期盲跳占满状态）；详见 `docs/STRATEGY-V2.md` §16，下一步落地全量轨迹留痕 + 感知修复 + 反应式基线 |
 | 通用插件 v3 | 🚧 方案启动（GamePack + 自动探针 + 分层感知） | 目标从“Cuphead 深度”转为“跨类型覆盖”：3 款游戏 T1、2 款 T2，不靠人示范；Cuphead 降级为 depth regression；详见 [GENERAL-PLUGIN-V3.md](GENERAL-PLUGIN-V3.md) |
 | 市场收录 | ⏳ 待提交 | 仓库已 public，按 MARKETPLACE 提交 |
@@ -44,7 +44,7 @@ pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm t
 另外几条已实测：
 - **打包产物真实安装**：`npm pack` → `dsh plugin add <tarball>` → M1/M3 集成 PASS；
 - **真实引擎自举**：本地 wheel + 阿里云镜像，19.9 秒装完，缓存内 Python 直接起引擎。
-- **当前单测**（2026-11-09）：`npm test` 45/45、`pytest engine/tests` 337/337；
+- **当前单测**（2026-11-09）：`npm test` 45/45、`pytest engine/tests` 338/338；
   全量集成 11/11 已跑；真实对局已跑，仍未通关。
 
 ## 安全边界（已实现，不是口号）

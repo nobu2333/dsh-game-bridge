@@ -50,8 +50,8 @@
       "process_hint": null,
       "input": ["mouse", "touch"],
       "target": "T1_then_T2",
-      "status": "candidate",
-      "notes": "Local Unity project and WebGL build exist; use as the mouse/click onboarding case. Prefer windowed browser or native build."
+      "status": "t0_capture_ok",
+      "notes": "Local Unity WebGL build served; window capture + OCR read 经典模式/关卡模式. Real mouse click was blocked by the DSH/Chrome foreground constraint; no T1 claim yet."
     },
     {
       "id": "nes.battlecity",

@@ -181,8 +181,9 @@
 - `GameSession.attach/policy_start` 接受 `pack`（路径或内联对象），`status` 暴露 pack 摘要；`game_attach` / `game_policy` 工具面也已支持 `pack`。
 - `engine/dsh_game_core/probe.py` + `scripts/probe_game.py`：按键脉冲→帧差证据→pack 草稿（不猜语义 controls），用于自动 onboarding 的第一层。
 - `window_capture.py` + `GameSession(capture_mode="window")`：PrintWindow 窗口级抓屏 fallback；Cuphead T1 已用此路径验证（`experiments/games/packs/pc.cuphead.t1.*`）。
+- 鼠标通道：`SendInputController.click` / `GameSession.act({x,y})` / `game_act(x,y,mouse_button)`；Block Blast 的窗口抓屏/菜单 OCR 已通，但真实点击被前台约束卡住，未算 T1。
 - `experiments/games/matrix.json`：首批游戏矩阵与 T1/T2 目标。
-- 下一步：Block Blast / SuperTux 的 T1、菜单/键位语义推断、HUD 探针。
+- 下一步：非前台输入/窗口激活、Block Blast T1、第三款 T1、T2。
 
 ## 5. 自动 onboarding（不靠人示范）
 
@@ -256,6 +257,7 @@ Cuphead 可以占一个 T2 名额，但不再做 10/7 的深度调参。
 
 - 游戏不可用/反作弊 → 换游戏，不硬啃；
 - **窗口抓屏/前台**：全屏 grab + 窗口矩形裁剪在遮挡/虚拟桌面/合成层会拍错；`PrintWindow` fallback 已加入并验证 Cuphead，但不是所有硬件加速窗口都支持（可能黑帧）。T1 前必须检查 `window_state`/帧方差，失败则换 WGC 或修前台。
+- **输入前台约束**：真实键盘/鼠标只送前台；Chrome/Unity app 窗口可能抢不到前台，`PostMessage` 也不被接受。需要非前台输入后端或可靠的窗口激活策略，否则 T1 的“首个有效动作”过不了。
 - auto-onboarding 5 分钟做不到 → 先降级 T1 定义，不伪造；
 - 某游戏 2 周无 T1 → 标记 blocked，换下一款；
 - 不新增机制除非有测试 + 证据；

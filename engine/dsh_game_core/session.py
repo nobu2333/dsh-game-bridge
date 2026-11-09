@@ -362,6 +362,38 @@ class GameSession:
         if self._foreground_required() and delivery["checked"] and not delivery["foreground"]:
             self.audit.write({"event": "act_blocked", "reasons": ["foreground mismatch"], "foreground": foreground})
             raise EngineError("FOREGROUND_MISMATCH", self._foreground_message(foreground))
+        if params.get("x") is not None and params.get("y") is not None:
+            try:
+                x = int(params["x"])
+                y = int(params["y"])
+            except (TypeError, ValueError) as error:
+                raise EngineError("BAD_MOUSE", f"x/y 不是整数：{params.get('x')!r},{params.get('y')!r}") from error
+            controller = self._controller_instance()
+            click = getattr(controller, "click", None)
+            if not callable(click):
+                raise EngineError("BACKEND_UNSUPPORTED", f"后端 {self.backend} 不支持鼠标点击")
+            mouse_button = str(params.get("mouse_button") or params.get("button") or "LEFT").upper()
+            action = click(x, y, button=mouse_button)
+            entry = {**action, "at_ms": int(time.time() * 1000)}
+            self.history.append(entry)
+            self.audit.write(
+                {
+                    "event": "mouse_click",
+                    "x": x,
+                    "y": y,
+                    "button": mouse_button,
+                    "backend": action.get("backend"),
+                    "dry_run": action.get("dry_run"),
+                    "delivery": delivery,
+                }
+            )
+            return {
+                "action": action,
+                "safety": report.to_dict(),
+                "attached": self.attached,
+                "actions_total": len(self.history),
+                "delivery": delivery,
+            }
         action = self._controller_instance().press(button, duration)
         entry = {**action, "at_ms": int(time.time() * 1000)}
         self.history.append(entry)

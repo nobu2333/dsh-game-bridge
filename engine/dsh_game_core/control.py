@@ -199,6 +199,11 @@ class DryRunController:
     def release_all(self) -> None:
         self.actions.append({"backend": self.backend, "release_all": True, "dry_run": True})
 
+    def click(self, x: int, y: int, button: str = "LEFT") -> dict:
+        action = {"backend": self.backend, "mouse_click": True, "x": int(x), "y": int(y), "button": str(button).upper(), "duration_ms": 0, "dry_run": True}
+        self.actions.append(action)
+        return action
+
 
 class VGamepadController:
     """Xbox 360 虚拟手柄（ViGEmBus）。只有用户显式选择时才加载。
@@ -401,6 +406,23 @@ def send_virtual_key(vk: int, down: bool) -> None:
     ctypes.windll.user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(_INPUT))
 
 
+_MOUSE_DOWN = {"LEFT": 0x0002, "RIGHT": 0x0008, "MIDDLE": 0x0020}
+_MOUSE_UP = {"LEFT": 0x0004, "RIGHT": 0x0010, "MIDDLE": 0x0040}
+
+
+def send_mouse_click(x: int, y: int, button: str = "LEFT", hold_ms: int = 40) -> None:
+    """Move the cursor and click; generic mouse support for click/touch games."""
+    name = str(button or "LEFT").upper()
+    if name not in _MOUSE_DOWN:
+        raise ValueError(f"unknown mouse button: {button}")
+    user32 = ctypes.windll.user32
+    user32.SetCursorPos(int(x), int(y))
+    time.sleep(0.02)
+    user32.mouse_event(_MOUSE_DOWN[name], 0, 0, 0, 0)
+    time.sleep(max(10, min(int(hold_ms), 500)) / 1000.0)
+    user32.mouse_event(_MOUSE_UP[name], 0, 0, 0, 0)
+
+
 class SendInputController:
     """键盘后端（SendInput）。只有用户显式选择 `keyboard` 并批准后才加载。
 
@@ -410,8 +432,9 @@ class SendInputController:
 
     backend = "keyboard"
 
-    def __init__(self, inject=None):
+    def __init__(self, inject=None, mouse_inject=None):
         self._inject = inject or send_virtual_key
+        self._mouse_inject = mouse_inject or send_mouse_click
         self._held: set[str] = set()
 
     @staticmethod
@@ -456,3 +479,16 @@ class SendInputController:
             except Exception:  # noqa: BLE001 - 收尾失败不掩盖主流程
                 pass
         self._held.clear()
+
+    def click(self, x: int, y: int, button: str = "LEFT") -> dict:
+        name = str(button or "LEFT").upper()
+        self._mouse_inject(int(x), int(y), button=name)
+        return {
+            "backend": self.backend,
+            "mouse_click": True,
+            "x": int(x),
+            "y": int(y),
+            "button": name,
+            "duration_ms": 0,
+            "dry_run": False,
+        }

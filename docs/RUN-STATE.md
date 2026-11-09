@@ -28,7 +28,15 @@
 - 实机 Cuphead：全屏裁剪仍拍不到（DSH 遮挡/合成），但窗口抓屏成功；OCR `Press Any Button`；`ENTER` 帧差 0.8144，随后 OCR `START / OPTIONS / DLC / EXIT`；方向键/确认/取消均有帧差。
 - **Cuphead 达到 T1（1/3）**：attach、窗口抓屏、菜单、键位建议、首个有效动作都有证据；pack 见 `experiments/games/packs/pc.cuphead.t1.json`。
 - 仍未达到 T2；Cuphead 已关闭，不恢复 10/7 调参。
-- 测试：引擎 337、插件 45（Cuphead 已关闭，不恢复 10/7 调参）。
+
+### 2026-11-09 22:20 Block Blast T1 attempt
+
+- 用 `scripts/serve_webgl.py` 起本地 Unity WebGL（正确 Brotli header），Chrome app 窗口 `Unity WebGL Player | BlockBlastPuzzle`。
+- 窗口级抓屏成功；OCR 读到 `经典模式 / 关卡模式`，视觉上确认主菜单。
+- 新增通用鼠标能力：`SendInputController.click`、`GameSession.act({x,y})`、`game_act` 的 x/y/mouse_button。
+- 但真实点击被前台约束卡住：DSH/Chrome 前台无法切到 app 窗口；`PostMessage` 合成点击也不被 Unity/Chrome 接受。已关闭 Chrome/server。
+- **Block Blast 仍不是 T1**（只有 attach/抓屏/菜单 OCR，没有首个有效动作）；下一步需要非前台输入或更可靠的窗口激活。
+- 测试：引擎 338、插件 45。
 
 ## 2026-11-06 深度复盘与策略 v2.1（修复感知断路 + 反应式策略 + 全量过程留痕）
 
@@ -92,7 +100,7 @@
 
 ## 当前进度（2026-11-09）
 
-- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **337**、插件 **45**、集成 11/11（本地实测）。
+- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **338**、插件 **45**、集成 11/11（本地实测）。
 - 目标未变：Forest Follies 从大地图 10 局 ≥7 通关；**仍未通关**。
 - 实机 best：7.339 屏（旧）/ 6.812 屏（玩家修复后）/ 11.15 屏（今日离群）；20–30 局平均约 4.1–4.2。
 - 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。
