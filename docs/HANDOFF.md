@@ -1,8 +1,9 @@
 # 交接（HANDOFF）
 
-> 生成：2026-11-10 00:15；更新：2026-11-11 00:25
+> 生成：2026-11-10 00:15；更新：2026-11-11 00:40（今日收工）
 > 当前 goal：**complete**（`goal-3030a123-...`，revision 2）；没有 active goal。
 > 新会话先读本文，再读 [GENERAL-PLUGIN-V3.md](GENERAL-PLUGIN-V3.md)、[RUN-STATE.md](RUN-STATE.md)、[STATUS.md](STATUS.md)。
+> 收工 HEAD：`b268f62`；从 `docs/RUN-STATE.md` 顶部继续。
 
 ## 一句话状态
 
@@ -38,10 +39,13 @@
 
 ## 下一会话建议（P1/P2）
 
-1. **T1-auto 泛化**：用同一套 `auto_onboard.py` 跑第二款不同类型游戏（平台/益智/动作），记录 interventions=0。
-2. **strict T2**：选一个不依赖 restart 的目标，跑单局/单棋盘连续 5 分钟；修 `play_pack` 的分数停滞检测。
-3. **扩覆盖**：5+ 不同 T1（策略/回合/3D/模拟器），3 款 T2；优先本地合法游戏。
-4. **产品化**：GamePack schema v1、集成测试、0.0.2 发布、marketplace 文档。
+1. **T1-auto 第二款：2048**  
+   本地已有 MIT 2048；用 `auto_onboard.py` 跑，目标 `origin=auto`、`interventions=0`、`time_to_control < 5 分钟`。不要手写 pack。
+2. **strict T2：2048 单局无 reset**  
+   先试 2048 单棋盘连续 5 分钟；如果 game over，换 **Minetest creative**（免费开源、无失败态）或 **Stardew Valley**（如果本机有）。
+3. **coverage**：`game_key` 去重已完成；下一轮保持 `t1_total`（不同游戏）与 `t1_packs` 分开。
+4. **扩覆盖**：5+ 不同 T1（策略/回合/3D/模拟器），3 款 T2；优先本地合法游戏。
+5. **产品化**：GamePack schema v1、集成测试、0.0.2 发布、marketplace 文档。
 
 ## 常用命令
 

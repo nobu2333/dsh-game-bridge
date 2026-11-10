@@ -294,3 +294,10 @@ Cuphead 可以占一个 T2 名额，但不再做 10/7 的深度调参。
 - pack：`experiments/games/packs/web.dino.auto.t1.json`（`origin=auto`）；
 - coverage：`t1_auto=1`，`auto_target_met=true`；
 - 边界：游戏窗口由人手动启动；广告层/canvas 焦点由 onboarding 自动处理；不代表应用启动全自动。
+
+## 13. 下一轮
+
+- 2048 的 T1-auto；
+- strict T2：先试 2048 单局/单棋盘连续 5 分钟；失败则换 Minetest creative 或 Stardew Valley；
+- 保持 `t1_total`（不同游戏）与 `t1_packs` 分开；
+- 再做第二款 T1-auto 与更多游戏覆盖。
