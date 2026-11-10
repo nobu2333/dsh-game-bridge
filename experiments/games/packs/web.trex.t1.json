@@ -8,23 +8,39 @@
     "anti_cheat": "none"
   },
   "capabilities": {
-    "observe.screen": {"level": 0},
-    "observe.ui": {"level": 1},
-    "control.keyboard": {"level": 1}
+    "observe.screen": {
+      "level": 0
+    },
+    "observe.ui": {
+      "level": 1
+    },
+    "control.keyboard": {
+      "level": 1
+    }
   },
   "controls": {
-    "confirm": ["SPACE", "UP"],
-    "jump": ["SPACE", "UP"]
+    "confirm": [
+      "SPACE",
+      "UP"
+    ],
+    "jump": [
+      "SPACE",
+      "UP"
+    ]
   },
   "hud": {},
   "recipes": [],
   "autoplay": {
-    "keys": ["SPACE"],
+    "keys": [
+      "SPACE"
+    ],
     "interval_ms": 800
   },
   "evidence": [
     "experiments/games/packs/web.trex.t1.md",
     "experiments/games/packs/web.trex.t2.md"
   ],
-  "level": 1
+  "level": 1,
+  "origin": "assisted",
+  "interventions": 1
 }

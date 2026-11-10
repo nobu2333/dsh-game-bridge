@@ -28,3 +28,14 @@
 - **排除**：Overwatch、Honkai: Star Rail、Wuthering Waves（在线/反作弊）；Brotato 暂不可用
 
 具体状态见 [matrix.json](matrix.json)。新游戏先在此登记，再生成 pack 草稿。
+
+## 来源与严格 T2（2026-11-10）
+
+- 每个 pack 增加 `origin`（auto / assisted / human）、`interventions`、可选 `probe`。
+- **T1 必须区分来源**：人工/探针辅助的 pack 不能算作“自动 onboarding 成功”。
+- 当前矩阵：T1 4（全部 assisted）、T2 2，但 **T1-auto = 0**；严格 T2（不允许重开/死亡刷时长）尚未满足。
+- `python -m dsh_game_core.coverage --matrix experiments/games/matrix.json --packs <paths>` 输出：
+  - t1_total / t1_auto / t1_assisted / t1_human；
+  - t2_total / strict_t2；
+  - interventions / missing_evidence / target_met / auto_target_met。
+- 下一款游戏必须优先证明 **T1-auto**：零人工键位/pack，5 分钟内自动生成并验证。

@@ -27,12 +27,17 @@ def evaluate_session(
     samples: list[Mapping[str, Any]],
     stop_phrases: list[str] | tuple[str, ...] | None = None,
     tolerance_s: float = 2.0,
+    actions: int | None = None,
+    min_actions: int = 0,
+    resets: int | None = None,
+    max_resets: int | None = None,
+    progressed: bool | None = None,
 ) -> dict:
     """Decide whether a bounded play session is valid evidence.
 
-    Invalid reasons: too short, or a stop phrase (game over/ad/menu) appeared in
-    any sample. A long session with no stop phrase is valid even if the game
-    involved deaths/restarts; the caller must still document that semantics.
+    Invalid reasons: too short, stop phrase, too few actions, too many resets,
+    or explicit no-progress. Resets are allowed by default (some games restart);
+    a caller that wants strict single-run T2 passes ``max_resets``.
     """
     requested = max(0.0, float(requested_s))
     elapsed = max(0.0, float(elapsed_s))
@@ -43,4 +48,15 @@ def evaluate_session(
         hit = ocr_contains(sample, phrases)
         if hit:
             return {"valid": False, "reason": f"stop_phrase:{hit}"}
-    return {"valid": True, "reason": "ok"}
+    if actions is not None and int(actions) < int(min_actions):
+        return {"valid": False, "reason": f"too_few_actions:{actions}<{min_actions}"}
+    if resets is not None and max_resets is not None and int(resets) > int(max_resets):
+        return {"valid": False, "reason": f"too_many_resets:{resets}>{max_resets}"}
+    if progressed is False:
+        return {"valid": False, "reason": "no_progress"}
+    result = {"valid": True, "reason": "ok"}
+    if actions is not None:
+        result["actions"] = int(actions)
+    if resets is not None:
+        result["resets"] = int(resets)
+    return result

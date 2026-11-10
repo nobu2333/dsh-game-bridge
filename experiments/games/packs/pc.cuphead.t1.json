@@ -8,18 +8,37 @@
     "anti_cheat": "none"
   },
   "capabilities": {
-    "observe.screen": {"level": 0},
-    "observe.ui": {"level": 1},
-    "control.keyboard": {"level": 1}
+    "observe.screen": {
+      "level": 0
+    },
+    "observe.ui": {
+      "level": 1
+    },
+    "control.keyboard": {
+      "level": 1
+    }
   },
   "controls": {
-    "confirm": ["ENTER", "Z"],
-    "cancel": ["ESC"],
+    "confirm": [
+      "ENTER",
+      "Z"
+    ],
+    "cancel": [
+      "ESC"
+    ],
     "move": {
-      "up": ["UP"],
-      "down": ["DOWN"],
-      "left": ["LEFT"],
-      "right": ["RIGHT"]
+      "up": [
+        "UP"
+      ],
+      "down": [
+        "DOWN"
+      ],
+      "left": [
+        "LEFT"
+      ],
+      "right": [
+        "RIGHT"
+      ]
     }
   },
   "hud": {},
@@ -28,8 +47,12 @@
       "id": "start_from_title",
       "intent": "Leave Press Any Button and reach the main menu",
       "steps": [
-        {"press": "ENTER"},
-        {"wait_ms": 800}
+        {
+          "press": "ENTER"
+        },
+        {
+          "wait_ms": 800
+        }
       ],
       "verify": {
         "ocr_contains": "START"
@@ -39,5 +62,7 @@
   "evidence": [
     "experiments/games/packs/pc.cuphead.t1.md"
   ],
-  "level": 1
+  "level": 1,
+  "origin": "assisted",
+  "interventions": 1
 }

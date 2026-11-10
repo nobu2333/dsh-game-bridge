@@ -8,14 +8,37 @@
     "t2_definition": "5 minutes of meaningful play (progress/interaction/survival), not menu idle"
   },
   "selection": {
-    "primary_t1": ["pc.cuphead", "web.2048", "web.dino"],
-    "t2_candidates": ["web.trex", "web.2048"],
-    "optional": ["nes.battlecity", "pc.supertux", "pc.blockblast"],
+    "primary_t1": [
+      "pc.cuphead",
+      "web.2048",
+      "web.dino"
+    ],
+    "t2_candidates": [
+      "web.trex",
+      "web.2048"
+    ],
+    "optional": [
+      "nes.battlecity",
+      "pc.supertux",
+      "pc.blockblast"
+    ],
     "excluded": [
-      {"id": "pc.overwatch", "reason": "online / anti-cheat"},
-      {"id": "pc.honkai-star-rail", "reason": "online / anti-cheat"},
-      {"id": "pc.wuthering-waves", "reason": "online / anti-cheat"},
-      {"id": "pc.brotato", "reason": "entry-point launch failure; not usable yet"}
+      {
+        "id": "pc.overwatch",
+        "reason": "online / anti-cheat"
+      },
+      {
+        "id": "pc.honkai-star-rail",
+        "reason": "online / anti-cheat"
+      },
+      {
+        "id": "pc.wuthering-waves",
+        "reason": "online / anti-cheat"
+      },
+      {
+        "id": "pc.brotato",
+        "reason": "entry-point launch failure; not usable yet"
+      }
     ]
   },
   "games": [
@@ -25,7 +48,9 @@
       "type": "2d_action_platformer",
       "platform": "pc",
       "process_hint": "Cuphead.exe",
-      "input": ["keyboard"],
+      "input": [
+        "keyboard"
+      ],
       "target": "T2_regression",
       "status": "t1_pass",
       "pack": "experiments/games/packs/pc.cuphead.t1.json",
@@ -37,7 +62,9 @@
       "type": "2d_platformer",
       "platform": "pc",
       "process_hint": null,
-      "input": ["keyboard"],
+      "input": [
+        "keyboard"
+      ],
       "target": "T1_then_T2",
       "status": "t1_partial",
       "notes": "Existing profile and smoke reports; gameplay was misclassified as loading/dialogue; player.track=false in that run."
@@ -48,7 +75,10 @@
       "type": "puzzle_click",
       "platform": "pc/webgl",
       "process_hint": null,
-      "input": ["mouse", "touch"],
+      "input": [
+        "mouse",
+        "touch"
+      ],
       "target": "T1_then_T2",
       "status": "blocked_build",
       "notes": "Local Unity WeChat-mini-game WebGL export: window capture + OCR read 经典模式/关卡模式, force_foreground works, but clicking classic mode throws getGameDataMonitor JS error. Not a standard browser build; no T1 claim."
@@ -59,11 +89,17 @@
       "type": "web_puzzle",
       "platform": "web",
       "process_hint": "chrome.exe",
-      "input": ["keyboard"],
+      "input": [
+        "keyboard"
+      ],
       "target": "T1_then_T2",
       "status": "t2_pass",
       "pack": "experiments/games/packs/web.2048.t1.json",
-      "notes": "Local MIT 2048 served over HTTP; T1 via SCORE/BEST/New Game + arrow keys. T2 via 302.14s autoplay, 340 actions, 5 pack-defined New Game restarts, scores progressed on multiple boards; not a single-board 5-minute claim."
+      "notes": "Local MIT 2048 served over HTTP; T1 via SCORE/BEST/New Game + arrow keys. T2 via 302.14s autoplay, 340 actions, 5 pack-defined New Game restarts, scores progressed on multiple boards; not a single-board 5-minute claim.",
+      "strict_t2": {
+        "valid": false,
+        "reason": "restarts/deaths allowed in current evidence"
+      }
     },
     {
       "id": "web.dino",
@@ -71,7 +107,9 @@
       "type": "web_runner",
       "platform": "web",
       "process_hint": "chrome.exe",
-      "input": ["keyboard"],
+      "input": [
+        "keyboard"
+      ],
       "target": "T1_then_T2",
       "status": "t1_pass",
       "pack": "experiments/games/packs/web.dino.t1.json",
@@ -83,11 +121,17 @@
       "type": "web_runner",
       "platform": "web",
       "process_hint": "chrome.exe",
-      "input": ["keyboard"],
+      "input": [
+        "keyboard"
+      ],
       "target": "T2",
       "status": "t2_pass",
       "pack": "experiments/games/packs/web.trex.t1.json",
-      "notes": "Local open-source T-Rex runner. T1 via probe (00000 + SPACE/UP/DOWN); T2 via 301.55s autoplay, 237 actions, score HI 00053 -> HI 00089, no errors. Deaths/restarts allowed; not a single-life clear."
+      "notes": "Local open-source T-Rex runner. T1 via probe (00000 + SPACE/UP/DOWN); T2 via 301.55s autoplay, 237 actions, score HI 00053 -> HI 00089, no errors. Deaths/restarts allowed; not a single-life clear.",
+      "strict_t2": {
+        "valid": false,
+        "reason": "restarts/deaths allowed in current evidence"
+      }
     },
     {
       "id": "nes.battlecity",
@@ -95,10 +139,22 @@
       "type": "emulator_topdown",
       "platform": "nes",
       "process_hint": "retroarch.exe",
-      "input": ["keyboard"],
+      "input": [
+        "keyboard"
+      ],
       "target": "T1_optional",
       "status": "candidate",
       "notes": "Optional emulator case; verify RetroArch availability and a legal local ROM before use. L2 structured state is possible later."
     }
-  ]
+  ],
+  "coverage": {
+    "t1_total": 4,
+    "t1_auto": 0,
+    "t1_assisted": 4,
+    "t1_human": 0,
+    "t2_total": 2,
+    "strict_t2": [],
+    "interventions": 4,
+    "auto_target_met": false
+  }
 }

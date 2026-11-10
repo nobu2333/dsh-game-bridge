@@ -8,14 +8,28 @@
     "anti_cheat": "none"
   },
   "capabilities": {
-    "observe.screen": {"level": 0},
-    "observe.ui": {"level": 1},
-    "control.keyboard": {"level": 1}
+    "observe.screen": {
+      "level": 0
+    },
+    "observe.ui": {
+      "level": 1
+    },
+    "control.keyboard": {
+      "level": 1
+    }
   },
   "controls": {
-    "confirm": ["SPACE", "UP"],
-    "jump": ["SPACE", "UP"],
-    "duck": ["DOWN"]
+    "confirm": [
+      "SPACE",
+      "UP"
+    ],
+    "jump": [
+      "SPACE",
+      "UP"
+    ],
+    "duck": [
+      "DOWN"
+    ]
   },
   "hud": {},
   "recipes": [
@@ -23,8 +37,12 @@
       "id": "start_run",
       "intent": "Start the Dino run from the ready screen",
       "steps": [
-        {"press": "SPACE"},
-        {"wait_ms": 500}
+        {
+          "press": "SPACE"
+        },
+        {
+          "wait_ms": 500
+        }
       ],
       "verify": {
         "ocr_contains": "000"
@@ -32,12 +50,19 @@
     }
   ],
   "autoplay": {
-    "keys": ["SPACE"],
+    "keys": [
+      "SPACE"
+    ],
     "interval_ms": 800,
-    "stop_phrases": ["GAMEOVER", "广告"]
+    "stop_phrases": [
+      "GAMEOVER",
+      "广告"
+    ]
   },
   "evidence": [
     "experiments/games/packs/web.dino.t1.md"
   ],
-  "level": 1
+  "level": 1,
+  "origin": "assisted",
+  "interventions": 1
 }

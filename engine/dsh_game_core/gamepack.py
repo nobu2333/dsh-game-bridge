@@ -17,6 +17,7 @@ from typing import Any, Mapping
 SCHEMA_VERSION = 1
 CAPABILITY_LEVELS = (0, 1, 2, 3)
 SAFE_ANTI_CHEAT = "none"
+PACK_ORIGINS = ("auto", "assisted", "human")
 
 
 class GamePackError(ValueError):
@@ -71,6 +72,20 @@ def validate_pack(data: Any) -> dict:
     if anti_cheat != SAFE_ANTI_CHEAT:
         raise GamePackError(f"pack.trust.anti_cheat must be '{SAFE_ANTI_CHEAT}' (got '{anti_cheat}')")
     pack["trust"] = {**dict(trust), "anti_cheat": anti_cheat}
+
+    origin = str(pack.get("origin") or "human").strip().lower()
+    if origin not in PACK_ORIGINS:
+        raise GamePackError(f"pack.origin must be one of {PACK_ORIGINS} (got '{origin}')")
+    pack["origin"] = origin
+    try:
+        interventions = int(pack.get("interventions", 0))
+    except (TypeError, ValueError) as error:
+        raise GamePackError("pack.interventions must be an integer") from error
+    if interventions < 0:
+        raise GamePackError("pack.interventions must be >= 0")
+    pack["interventions"] = interventions
+    if pack.get("probe") is not None:
+        pack["probe"] = dict(_mapping(pack.get("probe"), "pack.probe"))
 
     capabilities = _mapping(pack.get("capabilities", {}), "pack.capabilities")
     normalized_capabilities: dict[str, dict] = {}

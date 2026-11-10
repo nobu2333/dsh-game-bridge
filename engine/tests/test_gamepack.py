@@ -98,3 +98,18 @@ def test_profile_from_pack_rejects_non_object_profile():
     pack = validate_pack({**_pack(), "profile": "bad"})
     with pytest.raises(GamePackError):
         profile_from_pack(pack)
+
+from dsh_game_core.gamepack import GamePackError, validate_pack
+
+def test_origin_and_interventions_are_validated():
+    pack = validate_pack({"schema": 1, "id": "x", "title": "X", "trust": {"anti_cheat": "none"}})
+    assert pack["origin"] == "human"
+    assert pack["interventions"] == 0
+    assisted = validate_pack({"schema": 1, "id": "x", "title": "X", "trust": {"anti_cheat": "none"}, "origin": "auto", "interventions": 2, "probe": {"keys": ["SPACE"]}})
+    assert assisted["origin"] == "auto"
+    assert assisted["interventions"] == 2
+    assert assisted["probe"]["keys"] == ["SPACE"]
+    with pytest.raises(GamePackError):
+        validate_pack({"schema": 1, "id": "x", "title": "X", "trust": {"anti_cheat": "none"}, "origin": "magic"})
+    with pytest.raises(GamePackError):
+        validate_pack({"schema": 1, "id": "x", "title": "X", "trust": {"anti_cheat": "none"}, "interventions": -1})
