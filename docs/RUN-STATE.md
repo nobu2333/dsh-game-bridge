@@ -18,9 +18,21 @@
 
 - P0 完成：`evaluate/review` 的 `--game/--level` 改为必填；核心模块无游戏名（新增 `test_no_game_names.py`）；新增 `autoplay.py` T2 有效性检查（时长 + stop phrase）。
 - P1 切片：探针记录按键后 OCR + `menu_transition`，`infer_controls` 增加 `verified_confirm`；完整 controls 自动填充留给下一会话。
-- T1 3/3、T2 2/2（T2 允许死亡/重开，2048 多棋盘 reset）；测试：引擎 **343**、插件 **45**。
+- T1 **4 个不同游戏 / 5 个 pack**（Cuphead/2048/Dino/T-Rex；Dino 有 assisted+auto 两个 pack）、T2 2；**T1-auto=1、strict T2=0**；测试：引擎 **353**、插件 **45**。
 - 交接文档：[HANDOFF.md](HANDOFF.md)。当前 goal 已 complete，没有 active goal。
 - 下一步：完成 P1 自动 controls 填充、严格化 T2、扩到 5+ T1 / 3 T2。
+
+### 2026-11-10 21:25 T1-auto Dino
+
+- 新增 `onboarding.py` / `scripts/auto_onboard.py`：点击 canvas、关广告、自动推断 confirm/jump/方向、验证 gameplay + first action。
+- Dino `time_to_control_s=33.961`、`interventions=0`、`origin=auto`；pack `web.dino.auto.t1.json`；报告 `auto-onboard-dino-2026-11-10.md`。
+- coverage：`t1_auto=1`、`auto_target_met=true`。
+
+### 2026-11-11 00:25 coverage 去重
+
+- `coverage.py` 按 `game_key` 去重；`web.dino` 与 `web.dino.auto` 不再算两个游戏。
+- 当前：`t1_total=4`、`t1_packs=5`、`t1_auto=1`、`t1_assisted=3`、`t2_total=2`、`strict_t2=[]`、`interventions=4`。
+- T2 仍是非严格（restart/多棋盘）；strict T2 需要单局/单棋盘 5 分钟。
 
 ### 2026-11-09 21:55 live probe attempt
 
@@ -144,7 +156,7 @@
 
 ## 当前进度（2026-11-09）
 
-- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **343**、插件 **45**、集成 11/11（本地实测）。
+- HEAD: 最新 `main`（见 `git log`）；测试：引擎 **353**、插件 **45**、集成 11/11（本地实测）。
 - 目标未变：Forest Follies 从大地图 10 局 ≥7 通关；**仍未通关**。
 - 实机 best：7.339 屏（旧）/ 6.812 屏（玩家修复后）/ 11.15 屏（今日离群）；20–30 局平均约 4.1–4.2。
 - 架构：L1 反射 + L2 SituationReport + L3 Intent/arbiter；冷启动/Instant Play 已接线；主模型决策 p95≈9s，不能进 1–2Hz。

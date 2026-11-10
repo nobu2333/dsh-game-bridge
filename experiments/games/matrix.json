@@ -103,6 +103,7 @@
     },
     {
       "id": "web.dino",
+      "game_key": "web.dino",
       "title": "Dinosaur Game",
       "type": "web_runner",
       "platform": "web",
@@ -148,6 +149,7 @@
     },
     {
       "id": "web.dino.auto",
+      "game_key": "web.dino",
       "title": "Dinosaur Game (auto)",
       "type": "web_runner",
       "platform": "web",
@@ -162,9 +164,10 @@
     }
   ],
   "coverage": {
-    "t1_total": 5,
+    "t1_total": 4,
+    "t1_packs": 5,
     "t1_auto": 1,
-    "t1_assisted": 4,
+    "t1_assisted": 3,
     "t1_human": 0,
     "t2_total": 2,
     "strict_t2": [],

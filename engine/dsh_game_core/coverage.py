@@ -53,59 +53,87 @@ def load_pack_origins(pack_paths: list[str | Path]) -> tuple[dict[str, dict], li
     return origins, errors
 
 
+def _game_key(game: Mapping[str, Any]) -> str:
+    """Stable identity for coverage; packs may point at the same game."""
+    return str(game.get("game_key") or game.get("game_id") or game.get("id") or "")
+
+
+def _origin_rank(origin: str) -> int:
+    return {"auto": 3, "assisted": 2, "human": 1}.get(str(origin), 0)
+
+
 def summarize_coverage(
     matrix: dict,
     origins: dict[str, dict],
 ) -> dict:
     games = matrix.get("games") if isinstance(matrix.get("games"), list) else []
-    t1_total = 0
-    t1_auto = 0
-    t1_assisted = 0
-    t1_human = 0
-    t2_total = 0
+    t1_by_game: dict[str, dict] = {}
+    t1_packs = 0
+    t2_by_game: dict[str, dict] = {}
     interventions = 0
     missing_evidence: list[str] = []
-    strict_t2: list[str] = []
     for game in games:
         if not isinstance(game, dict):
             continue
         game_id = str(game.get("id") or "")
+        game_key = _game_key(game) or game_id
         status = str(game.get("status") or "")
         pack_id = str(game.get("pack_id") or game.get("pack") or "")
         meta = origins.get(pack_id) or origins.get(str(game.get("pack") or "")) or {}
         try:
-            meta = meta or origins.get(str(Path(str(game.get("pack") or "")).resolve()))
+            resolved = origins.get(str(Path(str(game.get("pack") or "")).resolve()))
+            if resolved:
+                meta = resolved
         except OSError:
             pass
+        if not isinstance(meta, dict):
+            meta = {}
         # T2 requires T1, so a t2_pass game also satisfies T1 coverage.
         t1_satisfied = status.startswith("t1") or status.startswith("t2")
         if t1_satisfied and status.endswith("pass"):
-            t1_total += 1
+            t1_packs += 1
             origin = str(meta.get("origin") or "human")
-            if origin == "auto":
-                t1_auto += 1
-            elif origin == "assisted":
-                t1_assisted += 1
-            else:
-                t1_human += 1
-            interventions += int(meta.get("interventions") or 0)
+            entry = t1_by_game.setdefault(
+                game_key,
+                {"id": game_id, "origins": [], "interventions": 0, "evidence": False},
+            )
+            entry["origins"].append(origin)
+            entry["interventions"] += int(meta.get("interventions") or 0)
+            entry["evidence"] = bool(entry["evidence"] or meta.get("evidence"))
             if not meta.get("evidence"):
                 missing_evidence.append(game_id)
         if status in ("t2_pass", "t2") or status.startswith("t2_pass"):
-            t2_total += 1
+            entry = t2_by_game.setdefault(game_key, {"id": game_id, "strict": False})
             strict = game.get("strict_t2")
             if isinstance(strict, dict) and strict.get("valid"):
-                strict_t2.append(game_id)
+                entry["strict"] = True
+
+    t1_auto = 0
+    t1_assisted = 0
+    t1_human = 0
+    for entry in t1_by_game.values():
+        # A game with both an auto and an assisted pack counts once, at the
+        # strongest provenance; pack-level counts are reported separately.
+        best = max(entry["origins"], key=_origin_rank)
+        if best == "auto":
+            t1_auto += 1
+        elif best == "assisted":
+            t1_assisted += 1
+        else:
+            t1_human += 1
+        interventions += entry["interventions"]
+    strict_t2 = [entry["id"] for entry in t2_by_game.values() if entry["strict"]]
     return {
-        "t1_total": t1_total,
+        "t1_total": len(t1_by_game),
+        "t1_packs": t1_packs,
         "t1_auto": t1_auto,
         "t1_assisted": t1_assisted,
         "t1_human": t1_human,
-        "t2_total": t2_total,
+        "t2_total": len(t2_by_game),
         "strict_t2": strict_t2,
         "interventions": interventions,
         "missing_evidence": missing_evidence,
-        "target_met": t1_total >= 3 and t2_total >= 2,
+        "target_met": len(t1_by_game) >= 3 and len(t2_by_game) >= 2,
         "auto_target_met": t1_auto >= 1,
     }
 

@@ -281,10 +281,10 @@ Cuphead 可以占一个 T2 名额，但不再做 10/7 的深度调参。
 ## 11. 来源可信度与 coverage（2026-11-10）
 
 - GamePack 新增 `origin`（auto / assisted / human）、`interventions`、可选 `probe`。
-- 新增 `coverage.py`：按矩阵与 packs 统计 `t1_total / t1_auto / t1_assisted / t1_human / t2_total / strict_t2 / interventions / auto_target_met`。
-- 当前矩阵真实结果：T1 4（全部 assisted）、T2 2、**T1-auto=0**、严格 T2=0。
-- 因此“T1 3/3”只证明 assistant pack 可用；下一阶段必须用一款新游戏证明 **T1-auto**（零人工键位/pack）。
-- `autoplay.evaluate_session` 增加 `actions/min_actions`、`resets/max_resets`、`progressed` 参数，用于拒绝“重置/空转刷 5 分钟”的 T2。
+- `coverage.py`：按矩阵与 packs 统计 `t1_total`（不同游戏）/ `t1_packs` / `t1_auto` / `t1_assisted` / `t1_human` / `t2_total` / `strict_t2` / `interventions` / `auto_target_met`。
+- **当前 coverage（2026-11-11 实测）**：T1 **4 个不同游戏 / 5 个 pack**（Dino 有 assisted + auto 两个 pack，按 `game_key` 去重）；`t1_auto=1`、`t1_assisted=3`、`t1_human=0`、T2=2、**strict_t2=0**、interventions=4。
+- 因此 `T1 3/3` 只证明 pack 可用；`T1-auto=1` 是 Dino 的零手写 pack 证据（33.96s、0 interventions）。严格 T2 仍为 0，restart/多棋盘证据不算 strict。
+- `autoplay.evaluate_session` 增加 `actions/min_actions`、`resets/max_resets`、`progressed` 参数，用于拒绝“重置/空转刷 5 分钟”的 T2；矩阵里 2048/T-Rex 的 `strict_t2=false` 是如实记录。
 
 ## 12. T1-auto 实测（2026-11-10）
 
