@@ -39,9 +39,9 @@
 
 ## 下一会话建议（P1/P2）
 
-1. **T1-auto 第二款：2048**  
+1. **T1-auto 第二款：2048**
    本地已有 MIT 2048；用 `auto_onboard.py` 跑，目标 `origin=auto`、`interventions=0`、`time_to_control < 5 分钟`。不要手写 pack。
-2. **strict T2：2048 单局无 reset**  
+2. **strict T2：2048 单局无 reset**
    先试 2048 单棋盘连续 5 分钟；如果 game over，换 **Minetest creative**（免费开源、无失败态）或 **Stardew Valley**（如果本机有）。
 3. **coverage**：`game_key` 去重已完成；下一轮保持 `t1_total`（不同游戏）与 `t1_packs` 分开。
 4. **扩覆盖**：5+ 不同 T1（策略/回合/3D/模拟器），3 款 T2；优先本地合法游戏。
