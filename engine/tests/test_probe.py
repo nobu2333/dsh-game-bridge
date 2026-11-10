@@ -89,3 +89,7 @@ def test_menu_transition_and_verified_confirm():
     suggestions = infer_controls(records)
     assert suggestions["confirm"] == ["ENTER", "Z"]
     assert suggestions["verified_confirm"] == ["ENTER"]
+
+def test_menu_options_ignores_long_description():
+    texts = ["Play the Dinosaur Game online - the Google Chrome Dino from no-internet mode", "START"]
+    assert set(menu_options(texts)) == {"START"}

@@ -145,16 +145,30 @@
       "target": "T1_optional",
       "status": "candidate",
       "notes": "Optional emulator case; verify RetroArch availability and a legal local ROM before use. L2 structured state is possible later."
+    },
+    {
+      "id": "web.dino.auto",
+      "title": "Dinosaur Game (auto)",
+      "type": "web_runner",
+      "platform": "web",
+      "process_hint": "chrome.exe",
+      "input": [
+        "keyboard"
+      ],
+      "target": "T1_auto",
+      "status": "t1_pass",
+      "pack": "experiments/games/packs/web.dino.auto.t1.json",
+      "notes": "Zero-hand-written pack: auto_onboard inferred SPACE confirm/jump and UP first action in 33.96s; checklist pass; interventions=0."
     }
   ],
   "coverage": {
-    "t1_total": 4,
-    "t1_auto": 0,
+    "t1_total": 5,
+    "t1_auto": 1,
     "t1_assisted": 4,
     "t1_human": 0,
     "t2_total": 2,
     "strict_t2": [],
     "interventions": 4,
-    "auto_target_met": false
+    "auto_target_met": true
   }
 }

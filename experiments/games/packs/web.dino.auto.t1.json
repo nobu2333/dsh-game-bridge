@@ -1,0 +1,287 @@
+{
+  "schema": 1,
+  "id": "web.dino.auto",
+  "title": "Dinosaur Game (auto-onboarded)",
+  "platform": "pc",
+  "process": "chrome.exe",
+  "trust": {
+    "anti_cheat": "none"
+  },
+  "capabilities": {
+    "observe.screen": {
+      "level": 0
+    },
+    "observe.ui": {
+      "level": 1
+    },
+    "control.keyboard": {
+      "level": 1
+    }
+  },
+  "controls": {
+    "confirm": [
+      "SPACE"
+    ],
+    "move": {
+      "up": [
+        "UP"
+      ]
+    },
+    "jump": [
+      "SPACE",
+      "UP"
+    ]
+  },
+  "hud": {},
+  "recipes": [
+    {
+      "id": "auto_start",
+      "intent": "Start from the observed menu with the inferred confirm key",
+      "steps": [
+        {
+          "press": "SPACE"
+        },
+        {
+          "wait_ms": 800
+        }
+      ],
+      "verify": {
+        "gameplay_observed": true
+      }
+    }
+  ],
+  "evidence": [
+    "experiments/games/packs/web.dino.auto.t1.md",
+    "experiments/results/auto-onboard-dino-2026-11-10.md"
+  ],
+  "probe": {
+    "window": {
+      "title": "Dinosaur Game — Chrome Dino T-Rex Run Online",
+      "process": "chrome.exe",
+      "width": 886,
+      "height": 593
+    },
+    "ocr_texts": [
+      "Dinosaur Game — Chrome Dino T-Rex Run Online",
+      "Dinosaur Game - Chrome Dino T-Rex Runner",
+      "Play the Dinosaur Game online - the Google Chrome Dino (T-Rex) from no-",
+      "internet mode. Press Space or tap to jump; press I or hold the bottom to duck.",
+      "HI0004500003",
+      "Nickname",
+      "Sound",
+      "α 1x"
+    ],
+    "menu": {
+      "PLAY": [
+        "●PLAYING NOW: 1402"
+      ]
+    },
+    "key_effects": [
+      {
+        "key": "SPACE",
+        "changed": true,
+        "ratio": 0.0087,
+        "center": [
+          0.4921,
+          0.4452
+        ],
+        "ocr_changed": false
+      },
+      {
+        "key": "ENTER",
+        "changed": true,
+        "ratio": 0.0066,
+        "center": [
+          0.4932,
+          0.36
+        ],
+        "ocr_changed": false
+      },
+      {
+        "key": "UP",
+        "changed": true,
+        "ratio": 0.0055,
+        "center": [
+          0.4927,
+          0.36
+        ],
+        "ocr_changed": false
+      },
+      {
+        "key": "X",
+        "changed": true,
+        "ratio": 0.0029,
+        "center": [
+          0.4921,
+          0.36
+        ],
+        "ocr_changed": false
+      },
+      {
+        "key": "Z",
+        "changed": true,
+        "ratio": 0.0026,
+        "center": [
+          0.4881,
+          0.36
+        ],
+        "ocr_changed": false
+      },
+      {
+        "key": "LEFT",
+        "changed": true,
+        "ratio": 0.0021,
+        "center": [
+          0.4921,
+          0.36
+        ],
+        "ocr_changed": false
+      },
+      {
+        "key": "A",
+        "changed": false,
+        "ratio": 0.0,
+        "center": null,
+        "ocr_changed": false
+      },
+      {
+        "key": "RIGHT",
+        "changed": false,
+        "ratio": 0.0,
+        "center": null,
+        "ocr_changed": false
+      }
+    ],
+    "suggested_controls": {
+      "confirm": [
+        "ENTER",
+        "Z",
+        "SPACE",
+        "X"
+      ],
+      "verified_confirm": [],
+      "cancel": [],
+      "move": {
+        "up": [
+          "UP"
+        ],
+        "left": [
+          "LEFT"
+        ]
+      },
+      "ranked": [
+        {
+          "key": "SPACE",
+          "changed": true,
+          "ratio": 0.0087,
+          "center": [
+            0.4921,
+            0.4452
+          ],
+          "ocr_changed": false
+        },
+        {
+          "key": "ENTER",
+          "changed": true,
+          "ratio": 0.0066,
+          "center": [
+            0.4932,
+            0.36
+          ],
+          "ocr_changed": false
+        },
+        {
+          "key": "UP",
+          "changed": true,
+          "ratio": 0.0055,
+          "center": [
+            0.4927,
+            0.36
+          ],
+          "ocr_changed": false
+        },
+        {
+          "key": "X",
+          "changed": true,
+          "ratio": 0.0029,
+          "center": [
+            0.4921,
+            0.36
+          ],
+          "ocr_changed": false
+        },
+        {
+          "key": "Z",
+          "changed": true,
+          "ratio": 0.0026,
+          "center": [
+            0.4881,
+            0.36
+          ],
+          "ocr_changed": false
+        },
+        {
+          "key": "LEFT",
+          "changed": true,
+          "ratio": 0.0021,
+          "center": [
+            0.4921,
+            0.36
+          ],
+          "ocr_changed": false
+        },
+        {
+          "key": "A",
+          "changed": false,
+          "ratio": 0.0,
+          "center": null,
+          "ocr_changed": false
+        },
+        {
+          "key": "RIGHT",
+          "changed": false,
+          "ratio": 0.0,
+          "center": null,
+          "ocr_changed": false
+        }
+      ]
+    },
+    "inferred": {
+      "confidence": 0.7,
+      "reasons": [],
+      "uncertain": [
+        "confirm",
+        "confirm_low_evidence"
+      ],
+      "menu_observed": true,
+      "gameplay_observed": true
+    },
+    "menu_options": [
+      "PLAY"
+    ],
+    "t1": "experiments/results/auto-onboard-dino-2026-11-10.md",
+    "activated": true,
+    "first_action": "UP",
+    "after_confirm_ocr": [
+      "Dinosaur Game — Chrome Dino T-Rex Run Online",
+      "X",
+      "Dinosaur Game - Chrome Dino T-Rex Runner",
+      "Play the Dinosaur Game online - the Google Chrome Dino (T-Rex) from no-",
+      "internet mode. Press Space or tap to jump; press I or hold the bottom to duck.",
+      "HI 0004500001",
+      "Nickname",
+      "Sound",
+      "α1x",
+      "Screenshot",
+      "●Playing now: 1402",
+      "从一而终的强大力量",
+      "朋友可能只是生命中的过客，但一段真正的关系会在正确的基础上成为永恒。"
+    ],
+    "dismissed_overlays": [],
+    "time_to_control_s": 33.961
+  },
+  "origin": "auto",
+  "interventions": 0,
+  "eval": [],
+  "level": 1
+}

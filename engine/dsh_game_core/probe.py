@@ -124,7 +124,7 @@ def menu_options(ocr_texts: list[str] | None) -> dict:
     found: dict[str, list[str]] = {}
     for raw in ocr_texts or []:
         text = str(raw or "").strip().upper()
-        if not text:
+        if not text or len(text) > 48:
             continue
         for word in MENU_WORDS:
             if word in text:

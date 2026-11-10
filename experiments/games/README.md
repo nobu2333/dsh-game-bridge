@@ -22,8 +22,10 @@
 
 ## 当前选择
 
-- **T1 主目标（3/3）**：Cuphead ✅、2048 ✅、Dinosaur Game ✅
+- **T1（5/5）**：Cuphead ✅、2048 ✅、Dinosaur Game ✅、Auto-Dino（T1-auto）✅
 - **T2（2/2）**：T-Rex ✅（301.55s autoplay，score 53→89）；2048 ✅（302.14s，340 actions，5 次 pack restart，多棋盘有得分推进）
+- **T1-auto：1**：`web.dino.auto`，自动探测 33.96s，interventions=0
+- **严格 T2：0**（现有 T2 允许重开/死亡刷时长）
 - **可选**：NES Battle City via RetroArch（需要先确认模拟器与合法 ROM）；SuperTux（二进制缺失）；Block Blast（构建不可玩）
 - **排除**：Overwatch、Honkai: Star Rail、Wuthering Waves（在线/反作弊）；Brotato 暂不可用
 

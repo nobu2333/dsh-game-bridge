@@ -285,3 +285,12 @@ Cuphead 可以占一个 T2 名额，但不再做 10/7 的深度调参。
 - 当前矩阵真实结果：T1 4（全部 assisted）、T2 2、**T1-auto=0**、严格 T2=0。
 - 因此“T1 3/3”只证明 assistant pack 可用；下一阶段必须用一款新游戏证明 **T1-auto**（零人工键位/pack）。
 - `autoplay.evaluate_session` 增加 `actions/min_actions`、`resets/max_resets`、`progressed` 参数，用于拒绝“重置/空转刷 5 分钟”的 T2。
+
+## 12. T1-auto 实测（2026-11-10）
+
+- 新游戏：Chrome 在线 Dino（单机键盘，无反作弊）；
+- 自动 onboarding：点击 canvas 焦点 → 关闭广告覆盖层 → 只探 confirm 候选键 → SPACE 进 gameplay → 探方向键 → 生成 pack；
+- 结果：`confirm=SPACE`、`jump=SPACE/UP`、首个动作 `UP`，`time_to_control_s=33.961`，`interventions=0`；
+- pack：`experiments/games/packs/web.dino.auto.t1.json`（`origin=auto`）；
+- coverage：`t1_auto=1`，`auto_target_met=true`；
+- 边界：游戏窗口由人手动启动；广告层/canvas 焦点由 onboarding 自动处理；不代表应用启动全自动。
