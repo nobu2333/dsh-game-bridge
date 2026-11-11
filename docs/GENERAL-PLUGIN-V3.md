@@ -301,3 +301,9 @@ Cuphead 可以占一个 T2 名额，但不再做 10/7 的深度调参。
 - strict T2：先试 2048 单局/单棋盘连续 5 分钟；失败则换 Minetest creative 或 Stardew Valley；
 - 保持 `t1_total`（不同游戏）与 `t1_packs` 分开；
 - 再做第二款 T1-auto 与更多游戏覆盖。
+
+## 13. T1-auto 第二款尝试：SuperTux（负，2026-11-11）
+
+- 结论：**T1-auto 未通过**；SuperTux 需要多阶段导航（主菜单→地图→关卡→过场→gameplay）。
+- 误判修正：暂停/欢迎页不算 gameplay；首个动作不能由 confirm 兜底。
+- 当前 T1-auto 仍只有 Dino（1 款）；下一步应选单阶段游戏，或先给 SuperTux 做多阶段状态机。

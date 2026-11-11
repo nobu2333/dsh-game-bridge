@@ -93,3 +93,6 @@ def test_menu_transition_and_verified_confirm():
 def test_menu_options_ignores_long_description():
     texts = ["Play the Dinosaur Game online - the Google Chrome Dino from no-internet mode", "START"]
     assert set(menu_options(texts)) == {"START"}
+
+def test_menu_options_chinese():
+    assert set(menu_options(["开始游戏", "选项", "退出"])) == {"开始游戏", "选项", "退出"}

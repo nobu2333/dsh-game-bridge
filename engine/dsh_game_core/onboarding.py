@@ -164,6 +164,7 @@ def auto_pack_draft(
     game_id: str | None = None,
     menu_observed: bool = False,
     gameplay_observed: bool = False,
+    entry_mode: str = "menu",
 ) -> dict:
     """Build a schema-v1 pack with auto-inferred controls and provenance."""
     inferred = infer_auto_controls(records)
@@ -178,6 +179,7 @@ def auto_pack_draft(
         "uncertain": inferred["uncertain"],
         "menu_observed": bool(menu_observed),
         "gameplay_observed": bool(gameplay_observed),
+        "entry_mode": entry_mode,
     }
     pack["probe"]["inferred"] = inferred_meta
     if menu_observed:
@@ -200,16 +202,22 @@ def t1_checklist(
     confirm_key: str | None,
     gameplay_observed: bool,
     first_action_key: str | None,
+    entry_mode: str = "menu",
 ) -> dict:
-    """T1 evidence checklist; no game names or score thresholds."""
+    """T1 evidence checklist; no game names or score thresholds.
+
+    ``entry_mode="direct"`` supports games that start immediately (no menu);
+    then a confirm key is not required, but gameplay and first action still are.
+    """
     checks = {
-        "menu_observed": bool(menu_observed),
-        "confirm_inferred": bool(confirm_key),
+        "entry_screen": bool(menu_observed) or entry_mode == "direct",
+        "confirm_inferred": bool(confirm_key) or entry_mode == "direct",
         "gameplay_observed": bool(gameplay_observed),
         "first_action": bool(first_action_key),
     }
     return {
         "pass": all(checks.values()),
         "checks": checks,
+        "entry_mode": entry_mode,
         "missing": [name for name, ok in checks.items() if not ok],
     }

@@ -71,3 +71,9 @@ def test_find_close_target():
     assert 0.8 < target["x"] < 1.0
     assert 0.2 < target["y"] < 0.3
     assert find_dismiss_target([], width=800, height=600) is None
+
+def test_t1_direct_entry_requires_action():
+    ok = t1_checklist(menu_observed=False, confirm_key=None, gameplay_observed=True, first_action_key="UP", entry_mode="direct")
+    assert ok["pass"] is True
+    bad = t1_checklist(menu_observed=False, confirm_key=None, gameplay_observed=True, first_action_key=None, entry_mode="direct")
+    assert bad["pass"] is False

@@ -1000,3 +1000,11 @@
 - 性能：on#1 median 2.47（vs off promote，+0.946，CI low 0.043）；on#2 median 2.41（vs off no_gain，CI low -0.221）；
 - 结论：追踪修复确定，推进提升不稳定；profile 已切到 tracker=template；
 - 未通关，README 未写；报告 experiments/results/ptracker-validation-2026-11-09.md。
+
+## 2026-11-11 T1-auto 尝试 SuperTux（负）
+
+- SuperTux x64 能启动/attach/OCR/键盘激活；中文菜单可识别。
+- auto_onboard 进入的是暂停/关卡欢迎页，不是 gameplay；修正 off 判定后 first_action 为空，T1 checklist 失败。
+- 未生成 origin=auto pack，coverage 不增加（仍只有 Dino T1-auto=1）。
+- 修复：忽略长描述菜单误判、中文菜单词、支持 direct_start/menu_first、暂停页排除、confirm 不兜底 first_action。
+- 测试 355 passed；报告 experiments/results/auto-onboard-supertux-2026-11-11.md。

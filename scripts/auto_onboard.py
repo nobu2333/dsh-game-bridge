@@ -96,6 +96,11 @@ def _is_menu(texts: list[str]) -> bool:
     return False
 
 
+def _is_pause(texts: list[str]) -> bool:
+    joined = " ".join(texts).upper()
+    return any(word in joined for word in ("PAUSED", "PAUSE", "暂停", "退出世界", "重新开始", "RESUME"))
+
+
 def _has_score(texts: list[str]) -> bool:
     return any(re.search(r"\d{3,}", text) for text in texts)
 
@@ -158,6 +163,7 @@ def main() -> int:
             break
     menu_texts = _texts(initial)
     menu_observed = _is_menu(menu_texts)
+    entry_mode = "menu" if menu_observed else "direct"
     base_frame = _decode(initial)
     records: list[dict] = []
     for key in keys:
@@ -204,7 +210,7 @@ def main() -> int:
         after_frame = _decode(after_confirm)
         no_menu = not _is_menu(after_texts)
         frame_moved = bool((frame_change(confirm_frame, after_frame) or {}).get("changed"))
-        gameplay_observed = bool(_has_score(after_texts) or (no_menu and frame_moved))
+        gameplay_observed = bool((_has_score(after_texts) or (no_menu and frame_moved)) and not _is_pause(after_texts))
         if gameplay_observed:
             for key in MOVE_KEYS:
                 before = session.snapshot(ocr=False)
@@ -230,7 +236,7 @@ def main() -> int:
                 if change.get("changed") and float(change.get("ratio") or 0.0) >= 0.003:
                     first_action = key
                     break
-            if first_action is None and gameplay_observed:
+            if first_action is None and gameplay_observed and _has_score(after_texts):
                 first_action = confirm
             inferred = infer_auto_controls(records)
 
@@ -239,6 +245,7 @@ def main() -> int:
         confirm_key=confirm,
         gameplay_observed=gameplay_observed,
         first_action_key=first_action,
+        entry_mode=entry_mode,
     )
     window = {
         "title": (attached.get("attached") or {}).get("window") or args.window,
@@ -252,6 +259,7 @@ def main() -> int:
         ocr_texts=menu_texts,
         menu_observed=menu_observed,
         gameplay_observed=gameplay_observed,
+        entry_mode=entry_mode,
     )
     pack["evidence"] = [str(out)]
     pack["probe"]["t1"] = checklist
@@ -266,6 +274,7 @@ def main() -> int:
         "menu_observed": menu_observed,
         "inferred": inferred,
         "checklist": checklist,
+        "entry_mode": entry_mode,
         "first_action": first_action,
         "dismissed_overlays": dismissed,
         "time_to_control_s": pack["probe"]["time_to_control_s"],
