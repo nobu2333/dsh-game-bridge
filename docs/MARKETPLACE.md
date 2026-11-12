@@ -7,8 +7,8 @@
 | 字段 | 值 |
 |:--|:--|
 | 包名 | `dsh-game-bridge` |
-| 版本 | `0.0.1`（发布时） |
-| 一句话 | 给 DSH 装上眼睛和手：看得懂屏幕上的游戏，也能用本地 20 Hz 闭环替你操作。 |
+| 版本 | `0.0.2`（待发布；提交前按实际发布版本更新） |
+| 一句话 | 让 DSH 的模型看见并操作慢节奏游戏（益智、回合制、视觉小说、模拟经营）。 |
 | 许可证 | MIT |
 | 平台 | Windows 10/11 x64 |
 | 仓库 | `https://github.com/nobu2333/dsh-game-bridge` |
@@ -17,18 +17,21 @@
 
 ## 长描述（中文）
 
-dsh-game-bridge 让 DSH 具备「看游戏 + 操作游戏」的能力：抓屏与 OCR 把画面变成
-模型可读的图像与文字，本地引擎以 ~20 Hz 运行闭环，模型只负责给目标（绑定窗口、
-看一眼、跑一段有界动作、停下来），不逐拍按键。默认 dry-run（只记录不注入），
-两道安全闸在引擎侧实现：反作弊进程硬阻断、F12 随时夺回；真实注入需 DSH 审批。
+dsh-game-bridge 让 DSH 的模型能玩慢节奏游戏：抓屏与 OCR 把画面变成模型可读的
+图像与文字，键盘、鼠标、虚拟手柄把模型的决定变成输入。适合 2048、扫雷、纸牌、
+视觉小说、回合制策略这类不需要快速反应的游戏，不适合实时动作游戏。
+默认 dry-run（只记录不注入）。安全闸在引擎侧实现：反作弊进程硬阻断、F12 随时夺回；
+真实注入需 DSH 审批，并且只发给前台窗口。
 
 ## Long description (English)
 
-dsh-game-bridge gives DeepSeek Harness eyes and hands on games. Capture and OCR turn
-the screen into images and text the model can read; a local engine runs a bounded
-~20 Hz loop while the model only chooses goals. Control is dry-run by default; two
-hard gates live in the engine: anti-cheat refusal and an F12 takeover latch; real
-injection requires a one-shot DSH approval.
+dsh-game-bridge lets DeepSeek Harness models play slow-paced games. Capture and OCR
+turn the screen into images and text the model can read; keyboard, mouse and a virtual
+gamepad turn the model's decisions into input. It is meant for games like 2048,
+Minesweeper, card games, visual novels and turn-based strategy, not real-time action.
+Control is dry-run by default. The engine enforces anti-cheat refusal and an F12
+takeover latch; real input needs a one-time DSH approval and only goes to the
+foreground window.
 
 ## 风险标记（如实披露）
 
@@ -36,8 +39,8 @@ injection requires a one-shot DSH approval.
 
 - **terminal surface**：插件会 spawn 本地 Python 引擎进程（首次激活时用 `uv` 安装到用户缓存）；
 - **filesystem**：引擎写入缓存目录与可选的 JSONL 审计日志（`DSH_GAME_BRIDGE_AUDIT_LOG`）；
-- **input injection**：`DSH_GAME_BRIDGE_CONTROL=vgamepad` 时会向系统注入虚拟手柄输入
-  （默认 dry-run 不注入）；
+- **input injection**：`DSH_GAME_BRIDGE_CONTROL=keyboard` / `vgamepad` 时会向系统注入
+  键鼠 / 虚拟手柄输入（默认 dry-run 不注入）；
 - **no credentials required**：不需要 API key；模型凭据由 DSH 自身管理。
 
 ## 安全边界（必须让用户一眼看到）
@@ -50,10 +53,10 @@ injection requires a one-shot DSH approval.
 ## 上架前检查
 
 - [x] `npm publish` 后，用真实产物在隔离 profile 装通（2026-10-29：registry tarball 安装 + M1/M3 PASS）；
-- [x] 首次激活自举安装真实引擎（PyPI 上的 `dsh-game-core==0.0.1`）成功；
+- [x] 首次激活自举安装真实引擎（PyPI 上的 `dsh-game-core==0.0.1`）成功；0.0.2 发布后需要重新验证；
 - [x] 无 install/postinstall 脚本（市场硬门槛）；
 - [x] README 写明 Windows-only、dry-run 默认、需要 `uv`；
-- [ ] 录一段 30 秒演示：模型看截图 → 给目标 → 本地闭环执行 → F12 停手；
+- [ ] 录一段演示：模型通过工具玩 2048（看截图 → 按方向键 → 看结果），最后 F12 停手（即 STATUS 的 M5）；
 - [ ] GitHub 仓库加 topic `dsh-plugin`；
 - [ ] 仓库创建满 1 天（2026-10-29 创建，最早 2026-10-30 可投）。
 
@@ -69,8 +72,8 @@ url: https://github.com/nobu2333/dsh-game-bridge
 name: nobu2333/dsh-game-bridge
 category: fun
 description:
-  en: 'Gives DeepSeek Harness eyes and hands on games: window capture, OCR, and a local 20 Hz closed loop with dry-run defaults.'
-  zh: '给 DSH 装上游戏的眼睛和手：窗口抓屏、OCR、本地 20Hz 闭环，默认只记录不注入。'
+  en: 'Lets DeepSeek Harness models play slow-paced games: window capture, OCR, keyboard/mouse/gamepad input, dry-run by default.'
+  zh: '让 DSH 的模型玩慢节奏游戏：窗口抓屏、OCR、键鼠/手柄输入，默认只记录不注入。'
 ```
 
 注意：`description.en` 里有 `: `（冒号+空格）**必须加引号**，否则 YAML 解析失败。

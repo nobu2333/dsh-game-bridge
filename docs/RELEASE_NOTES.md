@@ -1,3 +1,27 @@
+# Unreleased (in the tree after the 0.0.2 local package; version number still 0.0.2)
+
+## Scope change (2026-11-12)
+
+- The project now targets **slow-paced games** (puzzle, turn-based, visual novels, management sims)
+  where the model decides every move. Real-time action play is out of scope; see `docs/STATUS.md`.
+- `game_policy` / `game_intent` and the 60 Hz local policy are **frozen**: still shipped and tested,
+  but no longer developed or advertised.
+- The documentation was rewritten around this scope and the planning documents were removed.
+
+## Added
+
+- Window-level capture via `PrintWindow(PW_RENDERFULLCONTENT)`, opt-in with
+  `DSH_GAME_BRIDGE_CAPTURE=window`; it works when the game window is covered.
+- Mouse clicks: `game_act` accepts `x` / `y` (absolute screen coordinates for now) and `mouse_button`.
+- The keyboard backend sends scan codes alongside virtual-key codes (some SDL games only read scan codes).
+- `game_attach` / `game_policy` accept a data-only GamePack (`pack`); anti-cheat packs are rejected.
+- DPI-aware alignment of Win32 and DXcam coordinates.
+
+## Not yet done before publishing
+
+- Mouse coordinates relative to the snapshot, and the end-to-end model-plays-a-game demo (`docs/STATUS.md`, M5).
+- Re-running the full integration suite (`npm run test:all`); the last 11/11 run predates these changes.
+
 # v0.0.2 (packaged locally, not published yet)
 
 ## Removed: the inherited "no unattended self-play" gate (2026-10-30)

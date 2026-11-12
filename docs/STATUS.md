@@ -1,177 +1,165 @@
-# 现状与交班（STATUS）
+# 现状（STATUS）
 
-> 更新：2026-10-30（第 20 轮，通用玩法基线：WorldState + 60 Hz 状态策略 + 本地档案层）。
-> **2026-11-02 补充：本文的 10-30 状态已落后；当前状态、卡点与测试数字以 `docs/RUN-STATE.md` 为准。**
-> 设计理由看 `docs/DESIGN.md`，数据形状与降级规则看 `docs/STATE.md`，发布步骤看 `docs/RELEASE.md`。
+> 唯一的状态源。更新：2026-11-12。
+> 设计理由看 [DESIGN](DESIGN.md)，键名看 [CONTROLS](CONTROLS.md)，发布看 [RELEASE](RELEASE.md)。
+> 其他文档与本文冲突时，以本文为准。
 
 ## 一句话
 
-`dsh-game-bridge`：给 DeepSeek Harness 装上眼睛和手的 npm 插件（MIT，Windows-only v1）。
-模型只给目标（看一眼 / 绑窗口 / 跑一段有界动作 / 起停策略 / 停），抓屏、OCR、60 Hz 状态策略
-都在本地 Python 引擎里；状态是「视觉保底 + 档案数据 + 可选 provider」；默认 dry-run（只记录不注入）。
+`dsh-game-bridge` 是给 DeepSeek Harness（DSH）用的 npm 插件，提供看游戏（抓屏 + OCR）和
+操作游戏（键盘 / 鼠标 / 虚拟手柄）的工具。**由模型决定怎么玩，插件只负责看清楚、按得准、守住安全边界。**
+仅支持 Windows，默认 dry-run（只记录，不注入）。
 
-## 现在到哪了
+## 方向与范围（2026-11-12 确定）
 
-| 里程碑 | 状态 | 关键证据 |
+**目标游戏：慢节奏游戏**，也就是模型每次决策花 5–10 秒也不影响结果的游戏：
+
+- 回合制 / 益智：2048、扫雷、数独、纸牌、棋类；
+- 菜单重、节奏慢：视觉小说、模拟经营、放置类、回合制策略 / RPG。
+
+**不做：需要实时快速反应的游戏**（动作、平台跳跃、弹幕、竞速、FPS）。原因：
+
+- 模型一次决策实测约 9 秒（2026-11-02），进不了实时控制环；
+- 在 Cuphead 上花了 2026-10-30 到 11-06 一整段时间，用本地启发式视觉 + 60 Hz 策略做实时玩法，
+  三组 10 局对照全部没有收益（见下文「历史结论」）。只靠像素做实时玩法属于研究问题，
+  超出一个插件该承担的范围。
+
+**判断标准**：每一项新工作都要回答「它是否让**模型**通过工具把慢节奏游戏玩得更好」。
+所有玩法证据都要和随机 / 固定按键的对照组比，赢不了对照组就不算。
+
+## 现在有什么（已验证）
+
+| 能力 | 状态 | 证据 |
 |:--|:--|:--|
-| M0 插件壳 | ✅ | 隔离 harness 里工具出现、截图作为 image block 进模型、进程干净退出 |
-| M1 引擎 + 自举 | ✅ | 真实抓屏 1280×800 + 54 行 OCR 进模型；uv 自举装 17 个包约 20 秒 |
-| M2 手 + 安全闸 | ✅（含真实注入） | 两道闸单测；attach→act 端到端；真实后端需审批；手柄 A / 键盘 W 已实机回读 |
-| M3 20 Hz 闭环 | ✅（dry-run 已验证） | 实测 21.3 Hz；逐拍安全复检；stop 一拍内松手；真实后端已接线 |
-| 发布 | ✅ 2026-10-29 | npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`；发布版安装+自举+M1/M3 实测通过 |
-| 0.0.2 本地打包 | ✅ 2026-10-30 | wheel/sdist/tarball 构建校验；桌面 profile 安装 0.0.2（引擎缓存 0.0.2）；`game_selftest` 报 0.0.2；**未发布** |
-| 通用玩法基线 | ✅ 单测通过（真实对局已跑，未通关） | WorldState 视觉提取 + 60 Hz `PolicyRunner` + `game_state`/`game_policy`/`game_intent`/`game_memory` + 本地档案库 + Cuphead 样例 profile；`npm test` 45/45、`pytest engine/tests` 353/353；集成 11/11；memory 已实现（记录/上下文/shadow 只读），API provider 未实现；真实对局最高 11.15 单局，仍未通关 |
-| 策略 v2 / 检测 | 🚧 转型 v2.1（修复感知断路 + 反应式 + 全量留痕） | P4 首批定位出 4 个代码级断路（玩家追踪 `score<0.9` 锁死、`player_stale` 清空威胁、`parry` 漏检、周期盲跳占满状态）；详见 `docs/STRATEGY-V2.md` §16，下一步落地全量轨迹留痕 + 感知修复 + 反应式基线 |
-| 通用插件 v3 | 🚧 方案启动（GamePack + 自动探针 + 分层感知） | 目标从“Cuphead 深度”转为“跨类型覆盖”：3 款游戏 T1、2 款 T2，不靠人示范；Cuphead 降级为 depth regression；详见 [GENERAL-PLUGIN-V3.md](GENERAL-PLUGIN-V3.md) |
-| 市场收录 | ⏳ 待提交 | 仓库已 public，按 MARKETPLACE 提交 |
+| 插件壳：14 个 `game_*` 工具、截图作为 image block 进模型 | ✅ | `npm test`；隔离 harness 集成测试 |
+| 引擎自举：uv 建 venv 并安装 `dsh-game-core` | ✅ | 实测约 20 秒 / 17 个包 |
+| 抓屏：整屏抓取 + 窗口裁剪（默认） | ✅ | 实测；被遮挡时会拍到遮挡物，有 `foreground` / `occluded` 标注 |
+| 抓屏：窗口级 `PrintWindow`（`DSH_GAME_BRIDGE_CAPTURE=window`） | ✅ | 实测 Cuphead / Chrome 窗口被遮挡时也能截到；部分硬件加速窗口可能是黑帧 |
+| OCR（RapidOCR） | ✅ | 实测中英文菜单、分数 |
+| 键盘注入（SendInput，扫描码） | ✅ | 2026-10-29 用 AsyncKeyState 回读；2026-11 在浏览器游戏上实测 |
+| 手柄注入（vgamepad / ViGEmBus） | ✅ | 2026-10-29 用 XInput 回读；槽位可能不是 0 |
+| 鼠标点击（`game_act` 加 `x` / `y`） | ✅（有坑） | 实测能点到窗口；**坐标是屏幕绝对坐标**，见「下一步」第 3 项 |
+| 安全：反作弊拒绝、F12 夺回、真实后端审批、前台校验、审计日志 | ✅ | 引擎单测 + 集成测试 |
+| 发布 | 0.0.1 已发布 | npm `dsh-game-bridge@0.0.1`、PyPI `dsh-game-core==0.0.1`；0.0.2 尚未发布 |
 
-工具面（14 个）：`game_selftest` · `game_snapshot` · `game_controls` · `game_windows` ·
-`game_events` · `game_attach` · `game_state` · `game_policy` · `game_intent` · `game_memory` · `game_act` ·
-`game_plan` · `game_status` · `game_stop`。
+**还没有的证据（最关键）**：从来没有一次是 DSH 模型通过插件工具从头到尾玩完一局游戏。
+到目前为止，所有游玩记录都来自直接调用引擎的 Python 脚本。
 
-## 一次跑完的验证
+## 能力层与代码去向
 
-```powershell
-npm test                                   # 契约 + 版本 + 平台 + 工具/档案库渲染单测
-cd engine; python -m pytest tests -q       # 引擎单测（含 state/policy/grab_raw、前台/遮挡、槽位）
-cd ..
-$env:DSH_HOME='<repo>/.dsh-test'
-$env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'
-npm run test:all                           # 全量 PASS（约 110 秒）
-pwsh -File scripts/release.ps1             # 演练：构建 wheel/sdist + npm tarball 并校验
-```
+插件的能力分 8 层，每层对应不同的文档。2026-11-12 逐层对照代码后的结论如下。
+**先读对应文档再动对应代码**；表里写「保留」不代表已经可用，「现状」一列是实际核对过的。
 
-另外几条已实测：
-- **打包产物真实安装**：`npm pack` → `dsh plugin add <tarball>` → M1/M3 集成 PASS；
-- **真实引擎自举**：本地 wheel + 阿里云镜像，19.9 秒装完，缓存内 Python 直接起引擎。
-- **当前单测**（2026-11-11）：`npm test` 45/45、`pytest engine/tests` 353/353；
-  全量集成 11/11 已跑；真实对局已跑，仍未通关。
+| # | 能力层 | 文档 | 去向 | 现状 |
+|:--|:--|:--|:--|:--|
+| 1 | 基础设施：抓屏、OCR、输入、安全闸、自举、发布 | [DESIGN](DESIGN.md)、[CONTROLS](CONTROLS.md)、[RELEASE](RELEASE.md)、[MARKETPLACE](MARKETPLACE.md)、[FIELD-2026-10-29](FIELD-2026-10-29.md) | **保留，主线** | 已验证（见上表） |
+| 2 | 世界状态与档案：WorldState、GameProfile | [STATE](STATE.md) | **保留**（可选工具 `game_state` / `game_memory`） | 场景 / HP / UI 文字通用；威胁与实体检测偏动作游戏 |
+| 3 | 实时战斗栈：60 Hz 策略、选项仲裁、玩家与实体追踪、地形 | 无现行文档；设计与失败记录见下方「已删除文档」 | **冻结** | 在 Cuphead 上验证无收益 |
+| 4 | 记忆与学习 | [MEMORY](MEMORY.md) | **拆分**：通用部分保留并待重做，动作游戏部分存档 | 架构通用；游戏级记忆（M2–M5）只有读取代码，没有写入 |
+| 5 | 冷启动与自动认键位 | [AI-NATIVE-PLAN](AI-NATIVE-PLAN.md)、[GENERAL-PLUGIN-V3](GENERAL-PLUGIN-V3.md) §5 | **保留，待收敛**（有两代重复实现） | 第一代未接入生产；第二代只在脚本里用 |
+| 6 | GamePack（每款游戏的声明式数据） | [GENERAL-PLUGIN-V3](GENERAL-PLUGIN-V3.md) §4 | **保留合同**，覆盖指标作废 | 合同和校验可用；T1 / T2 计数不代表能力 |
+| 7 | 实验与评测 | [experiments/README](../experiments/README.md) | **存档**，方法论保留 | 实现绑定 Cuphead 的「推进屏数」指标 |
+| 8 | 模型回路：Intent、VLM 观察、模型复盘 | 无现行文档 | **冻结** | 新路线里模型直接读截图，用不上 |
 
-## 安全边界（已实现，不是口号）
+### 各层的代码
 
-1. 反作弊进程（EAC/BattlEye/Vanguard/ACE…）→ 拒绝一切输出；
-2. F12 → 闩锁拒绝，重新 attach 才解除；
-3. 真实后端（`vgamepad` 手柄 / `keyboard` SendInput 键盘）→ `game_attach` 走 DSH 审批；
-   无审批应答者（headless/CI）→ 拒绝（实测报文：`requires approval, but no approval channel is available`）；
-   权限预设 `approval: never` 的部署同样自动拒绝；
-   引擎侧 attach 预检失败 → `BACKEND_UNAVAILABLE` fail-fast（不再等到第一次 act 才炸）；
-4. 真实后端动作前校验前台窗口：attached 窗口不在前台 → `FOREGROUND_MISMATCH` 拒绝；
-   `game_plan` 逐拍检查，丢前台即中止；
-5. 默认 dry-run，不碰设备；审计日志默认关闭、路径用户指定；
-6. 档案边界：被跟踪 profile 只含通用字段（键位/HUD/阈值），不含内存偏移/攻略数据；
-   memory/API provider 默认关闭且**未实现**，将来接入也不得绕开上面 1–5。
+**第 3、8 层（冻结）**：不再开发，不作为能力对外宣传；单测照常运行。
+- `policy.py`、`arbiter.py`、`options.py`、`planner.py`、`situation.py`、`temporal.py`、`world_model.py`、
+  `player_tracker.py`、`tracking.py`、`terrain.py`、`candidates.py`、`observation.py`、`contracts.py`、
+  `mechanisms.py`、`vlm_observation.py`、`instant_play.py`
+- 工具：`game_policy`、`game_intent`
+
+**第 4、5、6 层（保留，待重新对齐）**：
+- 记忆通用部分：`memory_loader.py`、`memory_context.py`、`memory.py` 里的 `GuideStore`
+- 认键位第二代：`probe.py`、`onboarding.py`；GamePack：`gamepack.py`
+- 通用录制：`recorder.py`（把一局记成时间线，M5 的证据需要它）
+- 认键位第一代（**与第二代重复，未接入生产**）：`game_probe.py`、`controls_probe.py`、`effect_classifier.py`、
+  `priors.py`、`coldstart.py`。收敛方案见 [DESIGN § 9](DESIGN.md#9-待定游戏数据与记忆的收敛)，在方案定下之前不要新增代码。
+
+**第 4、7 层里只属于动作游戏的部分（存档，不再开发）**：
+- 记忆：`level_memory.py`、`memory.py` 里的 `KnowledgeStore` / DangerCard / `LevelLocator`、
+  `entity_memory.py`、`learner.py`、`experience.py`
+- 评测：`evaluate.py`、`review.py`（读 DangerCard 和 episode）
+- 通用统计（保留）：`experiment.py`（bootstrap 中位数差、promote / no_gain / regression 判定），M5 的对照组比较可以用它
+- 通用脚本（保留）：`autoplay.py` + `scripts/play_pack.py`（固定节拍按键循环，可作 M5 的固定循环对照）、
+  `scripts/auto_onboard.py`、`scripts/probe_game.py`、`scripts/serve_webgl.py`
+
+### 2026-11-12 清理记录
+
+已删除（没有任何生产调用，全部绑定 Cuphead 实时玩法或已作废的 T1 / T2 指标，对应的单测一并删除）：
+`batch.py`、`mechanism_audit.py`、`experiment_cli.py`、`coverage.py`、`memory_report.py`、`scripts/ab_batch.py`。
+可从提交 `a266676` 取回。
+
+**保留（2026-11-12 决定）**：
+- `evaluate.py`、`review.py`：读 DangerCard，`review` 的「把一局压缩成模型可读的复盘包」思路 M5 之后可能有用；
+  **M5 不使用这两个模块**，也不把它们接进任何工具；
+- `vlm_observation.py`：DSH 的模型可以直接看图（用户确认），这个模块将来是否用得上再说；
+- `game_policy`、`game_intent` 和它们依赖的一整套（`policy.py` 及记忆 / 学习 / 追踪模块）：**先保留，不清理**。
+  这两个工具是「本地 60 Hz 策略 + 低频战术建议」：模型给 Intent（推进 / 撤退 / 避免 / 攻击，带 TTL），
+  本地循环逐拍执行并做闪避、脱困。它们属于已冻结的实时路线，M5 用不到；删它们要拆 `policy.py` 和它的依赖，
+  暂时不动。
+
+### 已删除的文档
+
+下面这些设计 / 规划文档在 2026-11-12 从工作区移除，全部可以从提交 `a266676` 取回，例如
+`git show a266676:docs/PROJECT-STRATEGY.md`：
+
+| 文档 | 内容 | 对应层 |
+|:--|:--|:--|
+| `OPTIMIZATION-PLAN.md`、`OPTIMIZATION-PLAN.v2.md` | Cuphead 实时玩法的优化方案（实体级感知、技能库、阶段路线） | 3 |
+| `STRATEGY-V2.md` | 选项 + 效用 + 承诺的策略设计、量化验证协议、v2.1 复盘 | 3、7 |
+| `PROJECT-STRATEGY.md` | 「看、玩、学」总方案：WorldState、DangerCard、模型复盘 | 2、3、4、8 |
+| `RUN-STATE.md`、`HANDOFF.md` | 逐日运行记录和交班（含大量 Cuphead 实机数据） | 历史 |
+| `AUDIT.md` | 0.0.1 发布前审计 | 1 |
+| `MIGRATION.md` | 把引擎复用到另一个本地项目的建议（结论：不迁移，保持两条独立代码线） | 1 |
+
+`MEMORY.md`、`AI-NATIVE-PLAN.md`、`GENERAL-PLUGIN-V3.md` 保留在工作区，顶部有范围说明，标出哪些部分仍然适用。
+
+## 下一步（M5：模型自己玩完一局）
+
+玩法协议见 [PLAY](PLAY.md)。按顺序做，前一项没完成不开始下一项：
+
+1. **端到端演示（2048，只用方向键）**：真实 DSH 会话加真实模型，只用 `game_attach` / `game_snapshot` /
+   `game_act` / `game_stop`，打完一局并录屏。2048 不需要鼠标，所以不被下面第 3 项阻塞。
+2. **对照组**：同一款游戏上跑随机按键 / 固定循环，各 5 局，比较得分。模型赢过对照组才算 M5 完成。
+3. **点击类游戏的前置缺口**（扫雷、纸牌这类要点击的游戏需要）：
+   - `game_act` 的 `x` / `y` 目前是屏幕绝对坐标，要改成相对截图的坐标，由引擎换算；
+   - `game_snapshot` 只把 OCR 的**文字和置信度**写进文本，**没有文字框坐标**，而且最多 12 行；
+     需要补上归一化的框坐标，模型才能「点那行字」。
+4. **发布 0.0.2**，按 [MARKETPLACE](MARKETPLACE.md) 提交市场收录。
+
+**在做下面这些之前先停下**：新的感知模块、学习层、动作游戏适配、新的游戏覆盖指标，以及任何新的「每款游戏的数据格式」。
+游戏数据与记忆怎么收敛，先在 [DESIGN § 9](DESIGN.md#9-待定游戏数据与记忆的收敛) 定下来。
 
 ## 已知限制
 
-- Windows-only；非 Windows 自举阶段直接拒绝（可 `DSH_GAME_BRIDGE_ALLOW_UNSUPPORTED=1` 开发覆盖）；
-- 多显示器基本支持（显示器枚举 + 分辨率/主屏映射；两块同分辨率非主屏仍可能选错）；
-- **抓屏是「整屏 grab + 窗口矩形裁剪」，不是真正的窗口级抓屏**：别的窗口盖住游戏时
-  snapshot 拍到的是遮盖物。已用 `foreground` / `occluded` 元数据 + `⚠` 标注暴露问题；
-  真窗口抓屏（`PrintWindow(PW_RENDERFULLCONTENT)` / WGC）是后续工作（见 DESIGN §3.5）；
-- **前台/遮挡元数据与拒绝逻辑已通过单元/集成测试**；桌面实机已复核「attach Cuphead 但被
-  DSH 窗口完全遮挡」时 `foreground`/`occluded` 标记正确；前台正向路径（目标窗口在前台）
-  与真实后端拒绝路径仍待真实对局复验；
-- **XInput 槽位只报告、不保证**：虚拟手柄可能落到 slot 1+（= 玩家 2）；会尝试重建
-  最多 2 次并给 warning，不保证游戏接受非 0 槽位。2026-10-30 本机实测（清理幽灵节点后
-  仍）新建手柄落在 slot 1/2，疑似 ViGEmBus 驱动/总线状态，需重启后复验；
-- 真实注入已回读通过（vgamepad / keyboard），但**长闭环尚未在真实游戏里跑**；默认仍 dry-run；
-- **memory/API provider 未实现**：`game_memory` 是本地档案存储，不是内存读取器；
-  `game_state` 的 `player.x/y` 等字段要等 provider 落地才能填；
-- **60 Hz 状态策略只有单测/dry-run 覆盖**（安全中止、闪避冷却、脱困、松手、status 形状），
-  真实后端下的长对局尚未复验；
-- **通用状态语义未逐游戏标定**：场景关键词、HP 区域、弹反颜色、威胁半径都还是通用默认值；
-  Cuphead 样例 profile 只用于 dogfood，不是校准结果；
-- 帧差阈值、OCR 区域未按具体游戏校准。
+- 仅支持 Windows 10/11；
+- 默认抓屏方式在窗口被遮挡时拍到的是遮挡物；窗口级抓屏要手动开，部分游戏会返回黑帧；
+- 真实后端只对前台窗口生效，插件不会自动把游戏切到前台；
+- 虚拟手柄可能落在 XInput 槽位 1 以上（也就是 2P），部分游戏不认；
+- 鼠标坐标是屏幕绝对坐标，`game_snapshot` 不返回 OCR 文字框坐标（见「下一步」第 3 项）；
+- `approval: never` 的部署无法使用真实后端（attach 会被自动拒绝）；
+- 机器上需要安装 `uv`。
 
-## 变更记录
+## 验证
 
-- **2026-10-30（通用玩法基线：WorldState + 60 Hz 状态策略 + 档案层）**：
-  - 引擎新增 `state.py`（WorldState 提取：场景 / HP / 弹反点 / 移动威胁 / UI 文本；
-    坐标归一化、提取器不抛异常）与 `policy.py`（60 Hz `PolicyRunner`：按 profile
-    hold / advance / dodge / stuck，逐拍复检安全闸，退出必 `release_all`）；
-    `engine.py` 增加 `grab_raw()`（单次抓帧、不 OCR）；`session` 接线 `state` /
-    `policy_start` / `policy_stop`。
-  - 插件新增 `game_state` / `game_policy` / `game_memory` 与 `lib/profile-store.js`；
-    `game_attach` 支持可选 `profile`；profile 目录 `$DSH_GAME_BRIDGE_PROFILE_DIR`
-    或缓存根 `profiles/`，id 白名单校验、拒绝路径穿越。
-  - 仓库放入 Cuphead 样例 profile（`profiles/cuphead.json`，只含键位/HUD/阈值，
-    无内存偏移/攻略数据）。
-  - **诚实边界**：memory/API provider 仍是设计位、**未实现**；`game_memory` 只管理本地
-    档案，不读游戏内存；`game_state` 的 `player.x/y` 需要 provider；60 Hz 策略只有
-    单测/dry-run 验证，真实对局未复验；通用状态语义未逐游戏标定。提交前会跑全量回归。
-  - 文档：新增 `docs/STATE.md`（WorldState / GameProfile / provider / 降级 / 安全）；
-    README / README.en 工具表 10→13 并增加「通用玩法基线」；DESIGN 新增 §2.6；本文件同步。
-- **2026-10-30（0.0.2 打包与安装验证）**：版本号在四处 bump 到 0.0.2；本地产出
-  wheel/sdist/npm tarball 并安装进桌面 profile 验证（`game_selftest` 报 plugin/engine
-  0.0.2；dry-run `attach → snapshot → act → plan → stop` 通过；attach 到被 DSH 窗口
-  完全遮挡的 Cuphead 时，`occluded` 标记正确）。修正两处诊断缺口：`lib/index.js` 的
-  `VERSION` 常量漏 bump、桌面宿主不注入 `DSH_PROFILE_DIR` 导致安装来源显示 unknown
-  （现在从安装路径/宿主 argv 推断 profile）。安装来源仍是临时 tarball，发布后应换 registry。
-- **2026-10-30（公开前加固）**：
-  - `game_selftest` 升级为就绪报告：安装来源（`registry` / `local-file` / `link` /
-    `github` / `unknown`）、profile 与依赖、所选后端就绪度（含 `xinput_slot` /
-    `warnings`）、引擎原始自检；`local-file` 指向临时目录时告警；
-  - 引擎自检新增 `foreground` / `backend` / `xinput_slots_connected`，且始终探测
-    `vgamepad` 依赖；`vgamepad` 控制器提供 `backend_info()` / `close()`；
-  - `game_snapshot` 新增 `foreground` / `occluded`（`occluded_ratio` + `covered_by`），
-    attach / act / plan / status 也带前台信息，act 另带 `delivery`；真实后端在 attached
-    窗口不在前台时拒绝 act（`FOREGROUND_MISMATCH`），plan 逐拍检查、丢前台即中止；
-  - `vgamepad` 创建后扫描 XInput 0–3 槽位并记录；槽位非 0 会尝试重建最多 2 次并告警；
-    `session.stop()` / `close()` 会释放并关闭真实控制器，避免幽灵手柄累积；
-  - 文档：README 增加「桌面版 / `dsh web` / `dsh headless`」安装矩阵、后端切换必须重启、
-    `approval: never` 部署的处理方式与 `game_selftest` 字段说明；DESIGN §3.5 修正为
-    「整屏 grab + 窗口矩形裁剪」，并记录真窗口抓屏（PrintWindow/WGC）为后续工作；
-  - 公开版：`docs/FIELD-2026-10-29.md` 与证据包入库（本机用户名/绝对路径已泛化，
-    游戏来源描述改为 Cuphead（Steam 版）；结论与证据未改）；npm 包纳入
-    `README.en.md` / `docs/STATUS.md` / `docs/CONTROLS.md`。
-- **2026-10-30**：移除「无人不自娱」闸（`GetLastInputInfo` 超时 / 无遥测 → 拒绝）。
-  原因：该规则继承自宿主项目的陪伴场景，对本项目不适用——会误杀用手柄的真人玩家，
-  而且 keyboard 后端的注入会刷新时间戳、让闸自我遮蔽。无人值守是否使用由用户决定；
-  真实后端仍有 DSH 审批与 F12 夺回兜底。`DSH_GAME_BRIDGE_UNATTENDED_S` 已删除，
-  工具输出的 `safety.idle_seconds` 同步移除。实机报告 `docs/FIELD-2026-10-29.md`
-  保留为当时实况（其 P2-3 的处置从「修信号」改为「删规则」）。
+```powershell
+npm test                                   # 插件：45/45（2026-11-12 实跑）
+cd engine; python -m pytest tests -q       # 引擎：340/340（2026-11-12 清理后实跑）
+cd ..
+$env:DSH_HOME='<repo>/.dsh-test'
+$env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'
+npm run test:all                           # 集成 11 条；最近一次 11/11 是 2026-10-30，之后没有重跑
+```
 
-## 发布之后剩下的事
+## 历史结论（只记结论，不再展开）
 
-1. ~~建远程仓库~~ ✅ `github.com/nobu2333/dsh-game-bridge`（public，SSH remote）；
-2. ~~npm / PyPI 发布~~ ✅ 2026-10-29，两处都是 0.0.1；
-3. ~~转 public~~ ✅ 仓库已 public；按 `docs/MARKETPLACE.md` 提交市场；
-4. ~~真实注入测试~~ ✅ 2026-10-29 完成（手柄 A + XInput 回读、键盘 W + AsyncKeyState 回读）——
-   完成后把 vgamepad / keyboard 从「未实机验证」改成已验证；
-5. 可选：把 PyPI sdist 补传（0.0.1 当前只有 wheel；下次发布脚本已会同时发 sdist），
-   并把账号级 PyPI token 换成项目级；
-6. 后续：真正的窗口级抓屏（`PrintWindow(PW_RENDERFULLCONTENT)` / Windows Graphics Capture）
-   替代「整屏 grab + 窗口矩形裁剪」，并逐游戏实机复验新的前台/遮挡拒绝路径；
-7. **发布 0.0.2**：wheel/sdist + npm tarball 已本地构建并安装验收；发布后把当前桌面
-   profile 的临时 tarball 换回 registry 来源。
-8. **通用玩法基线的真实对局验证**：在真实游戏里跑 `game_state` → `game_policy` 长对局，
-   标定 Cuphead 样例 profile 的 HP 区域/颜色阈值；在 memory/API provider 落地前，
-   文档必须保持「未实现」的表述。
-
-## 已知环境问题（2026-10-29 实测）
-
-本机 **pnpm 12.11.2 无法连接任何 npm registry**（`os error 10013`，Node/npm/uv 都正常），
-所以 `dsh plugin add <npm 包名>` 在这台机器上会失败。两种绕过：
-
-- 下载 tarball 后 `dsh plugin add file:<tarball>`（本次验收即如此，装的是 registry 上的
-  0.0.1 产物）；
-- 仓库已 public：`dsh plugin add github:nobu2333/dsh-game-bridge`。
-
-这不是包的问题，是 pnpm 的网络栈被本机安全策略拦截；其他用户机器大概率正常。
-
-
-## 关键决策（一句话版）
-
-- **目标级工具**：模型一次调用 3–5 秒，逐拍按键会毁体验；反射留在本地闭环。
-- **图片走 attachment**：不把 base64 塞进会话文本。
-- **引擎独立进程**：Python 的 CV/OCR/手柄生态现成；但必须 `unref` 子进程与管道，
-  否则会挂住 DSH 事件循环（实测 headless 永不退出）。
-- **严格 semver**：`engines.dsh` / peer 必须匹配带预发布标签的运行时版本。
-- **默认 dry-run + 真实后端审批**：最便宜的安全默认。
-- **视觉保底 + 档案数据**：引擎零游戏代码；游戏差异只进 JSON profile，仓库只放通用样例。
-- **内存是可选加速器**：provider 缺失/失败只降级为 `stale` + 视觉状态，基线照常工作；
-  安全闸与状态来源无关，provider 不绕闸。
-
-
-
-
+- **2026-10-29 发布 0.0.1**：真实抓屏 / OCR / 注入链路打通，首次实机记录见 [FIELD-2026-10-29](FIELD-2026-10-29.md)。
+- **2026-10-30 至 11-06，Cuphead 实时玩法**：WorldState、60 Hz 策略、玩家追踪、记忆和学习层都做了。
+  单局最好推进 11.15 屏（离群值；20–30 局平均约 4.1–4.2 屏），从未通关。v2.1 三组各 10 局对照
+  （每局上限 75 秒，中位数 baseline 2.55 屏 / reactive 1.94 / hybrid 2.11），
+  全部没有收益；感知指标改善了，策略表现没有跟着提升。报告见 `experiments/results/v21-*.md`。
+- **2026-11-09 至 11-11，v3「跨游戏覆盖」**：新增 GamePack、窗口级抓屏、鼠标点击、自动探针。
+  宣布的 T1/T2 大多依赖手写 pack；两个「5 分钟游玩」实际是固定节拍按键循环，不代表有玩法能力。
+  唯一一次零手写接入是 Dino（只需按空格），SuperTux 的自动接入失败。该路线已停止。
+  证据在 `experiments/games/`。

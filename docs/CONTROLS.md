@@ -8,8 +8,8 @@
 | 后端 | 开启方式 | 适合 |
 |:--|:--|:--|
 | `dry-run`（默认） | 不设 `DSH_GAME_BRIDGE_CONTROL` | 演练、看画面、验证链路；不碰设备 |
-| `vgamepad` | `DSH_GAME_BRIDGE_CONTROL=vgamepad` | 原生支持手柄的 3D/横版/合作游戏（市场主流） |
-| `keyboard` | `DSH_GAME_BRIDGE_CONTROL=keyboard` | 只吃键鼠的独立游戏、老游戏、模拟器 |
+| `keyboard` | `DSH_GAME_BRIDGE_CONTROL=keyboard` | 键鼠操作的游戏：浏览器小游戏、益智、回合制、视觉小说（本项目主力） |
+| `vgamepad` | `DSH_GAME_BRIDGE_CONTROL=vgamepad` | 只认手柄的游戏（需要 ViGEmBus） |
 
 非 dry-run 后端在 `game_attach` 时会要求 DSH 一次性审批；headless/CI 无应答者时
 fail-closed 拒绝。权限预设是 `approval: never`（如 `danger-full-access`）的部署会对
@@ -33,10 +33,19 @@ fail-closed 拒绝。权限预设是 `approval: never`（如 `danger-full-access
 
 ## 键盘按键（keyboard）
 
-字母：`W` `A` `S` `D` `Q` `E` `F` `R`
+字母：`A`–`Z`
+数字：`0`–`9`
 功能：`SPACE` `ENTER` `ESC` `TAB` `SHIFT` `CTRL` `ALT`
 方向：`UP` `DOWN` `LEFT` `RIGHT`
-数字：`1` `2` `3` `4`
+
+大小写不敏感。以 `game_controls` 的返回为准（来源：`engine/dsh_game_core/control.py` 的 `VK_CODES`）。
+
+## 鼠标点击（keyboard 后端）
+
+`game_act {x, y, mouse_button}`：`mouse_button` 取 `LEFT`（默认）/ `RIGHT` / `MIDDLE`。
+
+**注意：`x` / `y` 目前是屏幕绝对坐标**，不是截图里的坐标。`game_snapshot` 的画面经过窗口裁剪，
+可能还缩放过，模型不能直接用截图像素去点。改成相对截图的坐标，是点击类游戏的前置缺口（见 [STATUS](STATUS.md)「下一步」第 3 项）；2048 这类只用方向键的游戏不受影响。
 
 ## 前台与遮挡（真实后端必读）
 
@@ -48,9 +57,9 @@ fail-closed 拒绝。权限预设是 `approval: never`（如 `danger-full-access
   并在 `delivery` 里说明投递状态——不再出现「返回成功但游戏没收到」；
 - `game_plan` 逐拍检查，前台丢失即中止并把原因写进 `stop_reason`；
 - `game_snapshot` 返回 `foreground` / `occluded`（`occluded_ratio` + `covered_by`），
-  遮挡比例 ≥ 0.5 或不在前台时文本里打 `⚠`。注意抓屏是「整屏 grab + 窗口矩形裁剪」：
-  被别的窗口盖住时画面就是遮盖物，元数据只是把这件事显式化（真窗口抓屏是后续工作，
-  见 DESIGN §3.5）。
+  遮挡比例 ≥ 0.5 或不在前台时文本里打 `⚠`。默认抓屏是「整屏 grab + 窗口矩形裁剪」：
+  被别的窗口盖住时画面就是遮盖物；设 `DSH_GAME_BRIDGE_CAPTURE=window` 改用 PrintWindow
+  窗口级抓屏可以绕开遮挡（部分游戏会黑帧，见 DESIGN §3.5）。
 
 插件不会自己抢焦点：需要游戏回到前台时，先由用户把游戏切到前台，再调用 act / plan。
 
@@ -58,12 +67,13 @@ fail-closed 拒绝。权限预设是 `approval: never`（如 `danger-full-access
 
 | 游戏类型 | 推荐后端 | 典型用法 |
 |:--|:--|:--|
-| 3D 动作 / 开放世界 | `vgamepad` | `advance` 走位 + `A` 交互；`events` 判断是否撞墙 |
-| 2D 横版平台 | `vgamepad` | `DPAD_RIGHT` + `A` 跳；静止即卡住 |
-| 俯视合作（胡闹厨房类） | `vgamepad` | 面向目标 `advance`，到台面 `A` |
-| 弹幕生存（土豆兄弟类） | `vgamepad` | 方向 `advance` 绕场；`events` 感知危险帧 |
-| 只吃键盘的老游戏/模拟器 | `keyboard` | `advance` 用 `RIGHT`；交互 `SPACE`/`ENTER` |
-| 纯观看/解说 | `dry-run` | 只用 `game_snapshot` / `game_events`，不操作 |
+| 方向键益智（2048 类） | `keyboard` | 每步 `game_snapshot` 看棋盘，`game_act` 按 `UP`/`DOWN`/`LEFT`/`RIGHT` |
+| 点击类益智（扫雷、纸牌） | `keyboard` | `game_act {x, y}` 点击（注意坐标限制，见上文） |
+| 视觉小说 / 菜单 | `keyboard` | OCR 读选项，`ENTER`/`SPACE` 推进，方向键选择 |
+| 回合制策略 / RPG | `keyboard` 或 `vgamepad` | 每回合看一眼再操作；长按移动可以用 `game_plan hold` |
+| 纯观看 / 解说 | `dry-run` | 只用 `game_snapshot` / `game_events`，不操作 |
+
+实时动作游戏不在本项目范围内（见 [STATUS](STATUS.md)）。
 
 ## 一个典型回合
 
@@ -73,8 +83,8 @@ game_controls                       → 当前后端支持哪些键
 game_windows                        → 找到目标窗口
 game_attach {window: "<标题子串>"}   → 绑定（真实后端需批准；返回 foreground）
 game_snapshot                       → 看一眼（图 + OCR + foreground/occluded）
-game_plan {mode:"advance", button:"DPAD_RIGHT", duration_ms:1500}
-game_status                         → ticks/hz/escapes + 前台/槽位
+game_act {button:"RIGHT"}           → 走一步
+game_snapshot                       → 看结果，决定下一步（循环）
 game_stop                           → 松手、解绑
 ```
 
@@ -84,7 +94,7 @@ game_stop                           → 松手、解绑
 - 真实后端还要求 attached 窗口在前台：不在前台时 `game_act` 拒绝、`game_plan` 中止；
 - `game_plan` 有上限（最长 120s），不是挂机脚本；
 - 真实注入已于 2026-10-29 实机回读验证（手柄 A + XInput、键盘 W + AsyncKeyState）；
-  新的前台/遮挡元数据与拒绝逻辑已有单测/集成覆盖，但尚未在真实游戏里复验；
-- 抓屏是整屏抓 + 窗口矩形裁剪，不是真正的窗口级抓屏；遮挡/前台状态以
-  `game_snapshot` 的元数据为准。
+  前台/遮挡元数据与拒绝逻辑有单测/集成覆盖；
+- 默认抓屏是整屏抓 + 窗口矩形裁剪，窗口级抓屏需要设 `DSH_GAME_BRIDGE_CAPTURE=window`；
+  遮挡/前台状态以 `game_snapshot` 的元数据为准。
 
