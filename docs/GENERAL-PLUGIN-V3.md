@@ -1,9 +1,20 @@
 # 通用游戏插件 v3：GamePack + 自动探针 + 分层感知
 
+> **范围说明（2026-11-12）**：v3 的方向（「覆盖广度」，用 T1/T2 计数）**已停止**，原因见 [STATUS § 历史结论](STATUS.md)：
+> T1 大多依赖手写 pack，T2 的两份证据是固定节拍按键循环，不代表有玩法能力。
+>
+> 仍然有效的部分：
+> - **§4 GamePack 合同**（schema v1、反作弊 fail-closed、能力词汇、数据只放声明不放代码），对应 `gamepack.py`；
+> - **§5 自动 onboarding** 的思路，对应 `probe.py` / `onboarding.py`；
+> - **§9 风险**里关于窗口抓屏和前台输入的两条。
+>
+> 已作废：§1 的 T1/T2 目标、§2 的 T0–T4 分层、§6 游戏矩阵、§7 阶段与门禁、§8 指标、§11–13 的 coverage 与 T1-auto 记录。
+> 这些数字和 pack 证据保留在 `experiments/games/`，只作存档。
+
 > 状态：**active / 方案稿**（2026-11-09）
 > 目标读者：后续负责实现的模型/开发者。
 > 目标：让 DSH 通过 `dsh-game-bridge` **以尽可能少的游戏专用代码，游玩尽可能多的游戏**。
-> 本文是方向文档；测试数字、实机证据仍以 [RUN-STATE.md](RUN-STATE.md) 和 `experiments/results/` 为准。
+> 本文是方向文档；测试数字、实机证据仍以 `docs/STATUS.md` 和 `experiments/results/` 为准。
 
 ## 0. 先 review 上一版计划
 
@@ -188,7 +199,7 @@
 - 本阶段验收：T1 3/3、T2 2/2；引擎零游戏分支；测试/证据/文档已入库。Cuphead 10/7 未做，也不作为本 goal 条件。
 - P0 收口已完成：`evaluate/review` 的 `--game/--level` 必填、核心无游戏名测试、`autoplay.py` T2 有效性检查。
 - P1 切片：探针记录按键后 OCR + `menu_transition`，`infer_controls` 给出 `verified_confirm`；完整自动 controls 填充留给下一会话。
-- 交接说明：[HANDOFF.md](HANDOFF.md)。
+- 交接说明（已删除，见 STATUS）。
 
 ## 5. 自动 onboarding（不靠人示范）
 

@@ -1,233 +1,108 @@
 # dsh-game-bridge
 
-**Give DeepSeek Harness eyes and hands on your games.**
+**Let DeepSeek Harness models see and play slow-paced games.**
 
-> Status: **released 0.0.1** (npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`).
-> **0.0.2 is packaged and installed locally (not published yet)**; publishing is pending.
-> Verified end to end from the published artifact: install → engine bootstrap from PyPI →
-> real screen capture + OCR → 20 Hz closed loop. Control is **dry-run by default**
-> (it records actions instead of injecting input); real injection was verified on
-> hardware on 2026-10-29 (gamepad A read back via XInput, keyboard W read back via
-> AsyncKeyState), but a long 20 Hz loop has not yet been run on a real game. Windows only.
->
-> **General play baseline** (WorldState visual state + 60 Hz reactive policy + local
-> profile store) has landed; memory / API providers remain design placeholders and are
-> **not implemented** — see [docs/STATE.md](docs/STATE.md).
+[中文](README.md) · [Status](docs/STATUS.md) · [Play protocol](docs/PLAY.md) · [Design](docs/DESIGN.md) · [Controls](docs/CONTROLS.md)
+(the docs under `docs/` are in Chinese)
 
-DSH has a brain (models, tools, sessions) but no eyes or hands: it can read files,
-run commands and browse the web, yet it cannot see the game you are playing or press
-a button. dsh-game-bridge plugs a thin plugin shell into DSH and backs it with a
-local engine:
+> Status: **0.0.1 released** (npm `dsh-game-bridge@0.0.1` + PyPI `dsh-game-core==0.0.1`); 0.0.2 is not published yet.
+> Windows only. **Dry-run by default**: actions are recorded, not injected.
+> Current milestone: the model plays a full game of 2048 through this plugin and beats a random-input baseline (see [STATUS](docs/STATUS.md)).
 
-- **eyes** — screen capture (DXcam), frame differencing, OCR (RapidOCR), and a per-frame
-  WorldState (`game_state`);
-- **hands** — virtual gamepad (XInput via ViGEmBus), keyboard/mouse (keyboard via SendInput;
-  mouse planned);
-- **cerebellum** — local loops: a 20 Hz bounded direction primitive (`game_plan`) and a
-  60 Hz profile-driven policy (`game_policy`); the model picks goals, not keystrokes;
-- **safety** — takeover hotkey, anti-cheat refusal, local audit log;
-- **profiles** — game differences live in JSON (keys/HUD/thresholds); the engine contains
-  no game-specific code.
+## What it is
 
-## Why target-level tools, not per-step tools
+DSH has models, tools and sessions, but it cannot see the game on your screen or press a key.
+This plugin adds both:
 
-A model tool call takes 3–5 seconds. Deciding "move right one step" through tool
-calls makes the companion comatose in-game. Tools therefore expose goals only
-(attach a window, look once, run one bounded loop, stop), while reflexes stay in the
-local loop.
+- **eyes**: screen capture (DXcam, or window-level PrintWindow), OCR (RapidOCR), frame-diff events;
+- **hands**: keyboard (SendInput), mouse clicks, virtual Xbox gamepad (ViGEmBus);
+- **safety**: anti-cheat refusal, F12 takeover, DSH approval for real input, foreground-only input, optional audit log.
 
-## Install (three hosts, three separate profiles)
+**The model decides how to play**: it looks at the screenshot, reads the OCR text, picks an action, then looks again.
 
-A DSH profile is an independent plugin tree: install into the wrong profile and the
-`game_*` tools never show up in a new session. Pick your host:
+## What it is for
 
-| Host | How | Profile | Notes |
-|:--|:--|:--|:--|
-| Desktop app (Electron) | **Settings → Plugins** inside the app | `desktop` (hard-wired) | the CLI cannot manage it: `dsh plugin --profile desktop ...` fails with `profile "desktop" is managed exclusively by the Electron application` |
-| `dsh web` | `dsh plugin --profile web add dsh-game-bridge` | `web` | does not share plugins with the desktop app |
-| `dsh headless` | `dsh plugin --profile headless add dsh-game-bridge` | `headless` | CI / no UI |
+A model decision takes 5–10 seconds, so the plugin **targets slow-paced games only**:
 
-**Restart the host after installing** — plugins load at host startup. Quit and reopen the
-desktop app, or restart the `dsh web` / `dsh headless` process, then call `game_selftest`
-once to confirm the install (see "What `game_selftest` reports now").
-
-Install sources (the commands below are for CLI profiles such as `web` / `headless`; the
-desktop app picks its source in the in-app plugin panel):
-
-```powershell
-# registry (recommended after release)
-dsh plugin --profile web add dsh-game-bridge
-# local directory / tarball (development or offline)
-dsh plugin --profile web add file:<repo>
-# GitHub (the repo is public)
-dsh plugin --profile web add github:nobu2333/dsh-game-bridge
-```
-
-- Requires DSH `>= 0.2.1-rc.2 < 0.3.0`, Node `>= 22`.
-- On first activation the plugin installs its Python engine into a user cache
-  (`uv venv` + `uv pip install dsh-game-core`); no system Python is required,
-  but `uv` must be available.
-- Platform: **Windows 10/11 only** for v1 (capture, virtual gamepad and input
-  injection are Win32).
-- No install/postinstall script and no second install step.
-
-## Switching backends (`DSH_GAME_BRIDGE_CONTROL`)
-
-| Value | Behaviour |
+| Good fit | Out of scope |
 |:--|:--|
-| unset / `dry-run` (default) | records actions, touches no device; capture/OCR/loop demos still work |
-| `vgamepad` | virtual Xbox pad injected through XInput (needs the ViGEmBus driver) |
-| `keyboard` | SendInput keyboard |
+| 2048, Minesweeper, Sudoku, card games, board games | action, platformers, bullet hell |
+| visual novels, management sims, idle games | racing, FPS, fighting games |
+| turn-based strategy / RPG, menu navigation | anything that needs sub-second reactions |
 
-The backend is read **at host startup** (once when the plugin module loads, once when the
-engine process starts); changing the environment mid-session has no effect. To switch:
-set the variable, fully quit the host, restart it, then check `backend.name` and
-`backend.ready` in `game_selftest`.
-
-```powershell
-# CLI (dsh web / dsh headless): set it in the launching shell
-$env:DSH_GAME_BRIDGE_CONTROL='vgamepad'
-dsh web
-
-# Desktop app: persist a user environment variable, then restart the app (setx only
-# affects processes started afterwards)
-setx DSH_GAME_BRIDGE_CONTROL vgamepad
-```
-
-The `vgamepad` backend also needs the ViGEmBus driver and the `vgamepad` package in the
-engine venv; the release bootstrap selects the `[gamepad]` extra for the chosen backend.
-If the cached venv has no pip, install it with
-`uv pip install --python <venv>\Scripts\python.exe vgamepad`.
-The XInput slot (= player index) is reported in `game_attach` / `game_status` /
-`game_selftest` output.
-
-## Approval policy: why real backends get auto-rejected
-
-`game_attach` with a real backend (`vgamepad` / `keyboard`) requires a one-shot **DSH
-approval**. If the deployment's permission preset is `approval: never` (for example
-`danger-full-access`), DSH automatically rejects every action that requires approval, so
-`game_attach` fails instead of prompting.
-
-Two workable options:
-
-1. switch the permission preset to one that asks (`ask`), or run under a deployment that
-   provides an approval responder — then approve attach once;
-2. keep the `dry-run` backend: capture / OCR / loop demos need no approval at all.
-
-Headless / CI hosts have no approver and fail closed the same way (as intended).
-
-## What `game_selftest` reports now
-
-Call it after restarting: it answers both "did I install it into the right place?" and
-"is the selected backend usable?".
-
-| Field | Meaning |
-|:--|:--|
-| text summary | plugin version / platform / engine status; contains `answered` when the engine ping succeeded |
-| `install` | `package_dir`, `profile`, `profile_dir`, `dependency`, `source` (`registry` / `local-file` / `link` / `github` / `unknown`), `warnings` |
-| `backend` | selected backend readiness: `name`, `ready`, `detail`, `xinput_slot`, `warnings` |
-| `report` | raw engine self-test: dependency versions, monitors, OCR, foreground window (`foreground`), connected XInput slots, … |
-
-- `source=local-file` with a dependency path under a temp directory (`/tmp/`, `\tmp\`,
-  `/temp/`, `\temp/`) produces a warning: once the temp artifact is cleaned up the plugin
-  will fail to load on the next host start — switch to a registry / github source;
-- with `backend.name=vgamepad` it creates a virtual pad once and closes it (**no button is
-  pressed**), reports whether creation worked and which XInput slot it landed on; a slot
-  other than 0 (= player 2) triggers re-creation attempts and a `warnings` entry;
-- when the engine or backend is not ready, tool results say so instead of pretending.
+Real-time action games are out of scope; [STATUS](docs/STATUS.md) explains why.
 
 ## Tools
 
-| Tool | Meaning |
+| Tool | Purpose |
 |:--|:--|
-| `game_selftest` | Is the plugin loaded, where is it installed, and is the selected backend ready |
-| `game_snapshot` | One frame as an image + OCR text, with foreground/occlusion metadata |
-| `game_controls` | Button/key names accepted by the current backend |
-| `game_windows` | List visible windows (title, process, size) |
-| `game_events` | Cheap frame-difference event (baseline / static / changed / scene_cut) |
-| `game_attach` | Attach to a window (the user-authorization step; optional `profile` parameter) |
-| `game_state` | Read one general WorldState (scene, HP, entities, UI text) from the current frame |
-| `game_policy` | Start / stop / status the local 60 Hz reactive policy driven by the loaded game profile; `intent_enabled` currently executes jump/dodge/retreat |
-| `game_intent` | Submit a TTL-bound tactical Intent to the running policy (advisory; never presses keys directly) |
-| `game_memory` | Manage local game profiles (list / get / save / delete / use) — data only, **not** OS memory reading |
-| `game_act` | Press one gamepad button (dry-run by default; real backends refuse when the attached window is not foreground) |
-| `game_plan` | Bounded local ~20 Hz loop (hold / tap / advance with stuck-detection sidestep) |
-| `game_status` | Attach state, safety verdict, loop progress, audit tail |
-| `game_stop` | Stop the loop, release everything, detach |
+| `game_selftest` | is the plugin installed, are the engine and backend ready |
+| `game_windows` | list visible windows |
+| `game_attach` | bind a game window (real backends need approval) |
+| `game_snapshot` | screenshot + OCR text + foreground/occlusion info |
+| `game_events` | cheap frame-diff events (static / changed / scene cut) |
+| `game_controls` | key names the current backend accepts |
+| `game_act` | press one key / gamepad button, or click the mouse |
+| `game_plan` | a bounded local input loop (hold / tap / advance with wall escape) |
+| `game_status` | binding, safety verdict, loop progress, audit tail |
+| `game_stop` | stop everything, release inputs, detach |
+| `game_state` | optional: generic visual WorldState ([STATE](docs/STATE.md)) |
+| `game_memory` | optional: local game profile CRUD; **does not read game memory** |
+| `game_policy` / `game_intent` | **frozen**: a 60 Hz local policy left over from the real-time track; no further work |
 
-## General play baseline (WorldState)
+A typical game: `game_selftest` → `game_windows` → `game_attach` → loop `game_snapshot` → `game_act` → `game_stop`.
 
-The plugin ships no game-specific code. It separates "what the screen shows" from "what
-this game means":
+## Install
 
-- **Vision is the floor** — `game_state` turns one captured frame plus OCR into a generic
-  WorldState (scene, HP, threats, parry points, UI text). It works without a profile,
-  without memory access and without a network; coordinates are normalized 0..1, unknown
-  values are `null`, and extractors return defaults instead of raising.
-- **Profiles are data** — keys, HUD boxes, scene keywords and dodge radii live in JSON
-  profiles (`DSH_GAME_BRIDGE_PROFILE_DIR`, default `<cache-root>/profiles`); the engine
-  interprets fields, never game names. `game_memory` manages this local profile store.
-- **Memory / API providers are optional** — the state layer reserves provider slots, but
-  this release only implements the vision provider. The baseline works without them; a
-  future provider must be off by default, explicitly enabled, and must not bypass the
-  safety gates.
-- **Cuphead is the dogfood sample** — the repo ships a generic sample profile
-  (keys/HUD/thresholds) with no memory offsets, cheat tables or guide data. Samples are
-  not loaded automatically: point `DSH_GAME_BRIDGE_PROFILE_DIR` at the repo's `profiles/`
-  directory, or `game_memory save` them into the local store.
+Each DSH profile is an independent plugin tree. Install into the wrong one and the `game_*` tools never appear.
 
-Schemas, provider precedence, confidence/staleness and fallback rules:
-[docs/STATE.md](docs/STATE.md).
+| Host | How | Profile |
+|:--|:--|:--|
+| Desktop app (Electron) | **Settings → Plugins** in the app | `desktop` (the CLI cannot manage it) |
+| `dsh web` | `dsh plugin --profile web add dsh-game-bridge` | `web` |
+| `dsh headless` | `dsh plugin --profile headless add dsh-game-bridge` | `headless` |
 
-## Known limits (v1)
+Other sources: `file:<repo>` (local development), `github:nobu2333/dsh-game-bridge`.
 
-- **Capture is a full-monitor grab cropped to the window rectangle, not true window
-  capture**: when another window covers the game, the snapshot shows the occluder. The
-  `foreground` / `occluded` metadata flags it, but the pixels cannot bypass occlusion.
-  True window capture (`PrintWindow(PW_RENDERFULLCONTENT)` / Windows Graphics Capture) is
-  future work.
-- **Real backends only deliver to the foreground window**: `game_act` refuses with
-  `FOREGROUND_MISMATCH` and `game_plan` aborts when the attached window loses the
-  foreground — no more silent "success" with no delivery.
-- **The XInput slot is reported, not guaranteed**: the virtual pad can land on slot 1+
-  (= player 2); the plugin retries up to 2 times and warns, but some games may still
-  ignore non-zero slots.
-- **`approval: never` deployments cannot use real backends**: attach is auto-rejected
-  (see "Approval policy" above).
-- **The new foreground/occlusion metadata and refusal logic are covered by unit and
-  integration tests, but have not been re-verified on a real game yet** (the field
-  evidence predates the fix).
-- **The 60 Hz reactive policy is not re-verified on a real game yet**: `PolicyRunner` has
-  unit tests (safety abort, dodge cooldown, stuck escape, release-all) but no long
-  real-backend session has been run; the default backend stays dry-run.
-- **Memory / API providers are not implemented**: `game_memory` is a local profile store,
-  not a memory reader; fields such as `game_state`'s `player.x/y` need a provider to be
-  filled.
-- Windows only; multi-monitor edge cases and per-game threshold calibration are still
-  open (see [docs/STATUS.md](docs/STATUS.md)).
+- Requires DSH `>= 0.2.1-rc.2 < 0.3.0`, Node `>= 22`, and **`uv` on the machine**.
+- **Restart the host after installing**, then call `game_selftest` once to confirm.
+- On first activation the plugin uses `uv` to create a venv in the user cache and install the engine (about 20 s). Until the engine is ready, only the self-test tool is registered.
+- The package has no install / postinstall scripts.
 
-## Safety commitments
+## Configuration (environment variables, read at host start; restart the host after changing them)
 
-1. **Always take back control** — a local F12 hotkey latches takeover without the model;
-2. **No anti-cheat games** — EAC / BattlEye / Vanguard / ACE processes hard-block all output;
-3. **Read-only default** — capture + gamepad only; no memory reading, no injection;
-4. **Foreground check** — real backends verify the attached window is in the foreground
-   before acting and refuse otherwise;
-5. **Profiles are data** — the repo only ships generic sample profiles (keys/HUD/thresholds)
-   with no memory offsets or guide tables; user profiles stay local and memory reading
-   stays off.
+| Variable | Values |
+|:--|:--|
+| `DSH_GAME_BRIDGE_CONTROL` | `dry-run` (default) / `keyboard` (SendInput keyboard and mouse) / `vgamepad` (Xbox pad, needs ViGEmBus) |
+| `DSH_GAME_BRIDGE_CAPTURE` | `screen` (default: grab the whole screen, crop to the window) / `window` (PrintWindow, works when the window is covered) |
+| `DSH_GAME_BRIDGE_AUDIT_LOG` | path for the audit JSONL; unset means no audit log |
+| `DSH_GAME_BRIDGE_PROFILE_DIR` | local profile directory |
 
-Unattended play is allowed by design: the "stop when nobody is at the keyboard" guard
-inherited from the host project was removed on 2026-10-30 because it misfires for
-gamepad players and is self-masked by injected keyboard input. Real output backends
-still require a one-shot DSH approval, and F12 still takes control back.
+**Approval**: real backends (`keyboard` / `vgamepad`) need a one-time DSH approval on `game_attach`.
+Deployments with `approval: never`, and headless / CI with no one to approve, refuse outright.
+This fail-closed behavior is intentional. Switch the preset to `ask`, or stay on dry-run.
+
+## Safety promises
+
+1. **Takeover at any time**: F12 latches output off, without going through the model; re-attach to clear it.
+2. **No anti-cheat games**: if EAC / BattlEye / Vanguard / ACE or similar processes are running, all output is refused.
+3. **No memory reading, no process injection**: screen capture and simulated input only.
+4. **Real input needs approval** and only goes to the foreground window (otherwise the call fails with `FOREGROUND_MISMATCH`).
+5. **Auditable**: with the audit log on, every attach / act / plan / stop and every refused attempt is written to a local JSONL file.
 
 ## Development
 
-See [README.md](README.md) (Chinese) for the full test matrix, engine self-check and
-bootstrap verification, and [docs/DESIGN.md](docs/DESIGN.md) for the design decisions.
+```powershell
+npm test                                   # plugin contract tests
+cd engine; python -m pytest tests -q       # engine unit tests
+cd ..
+$env:DSH_HOME='<repo>/.dsh-test'           # isolated DSH home
+$env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'
+npm run test:all                           # full integration (fake model, offline)
+```
+
+Current test counts and the date of the last run are in [STATUS](docs/STATUS.md). The release process is in [RELEASE](docs/RELEASE.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
-
+MIT.

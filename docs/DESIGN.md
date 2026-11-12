@@ -1,7 +1,15 @@
 # 设计决策（dsh-game-bridge）
 
 > 这份文件只记「为什么这样做」以及被证据钉死的约束。改代码前先读它；
-> 与它冲突的实现要么改代码，要么先改这里。
+> 与它冲突的实现要么改代码，要么先改这里。项目现状与方向以 [STATUS](STATUS.md) 为准。
+
+## 0. 范围：只做慢节奏游戏（2026-11-12）
+
+插件给模型提供看和按的能力，**决策由模型做**。模型一次决策实测约 9 秒，所以只针对慢节奏游戏
+（回合制、益智、菜单为主、视觉小说、模拟经营）。实时动作游戏不在范围内：本地启发式视觉加
+60 Hz 策略那条路线在 Cuphead 上验证没有收益，已冻结（见 STATUS「能力层与代码去向」）。
+
+下文 §2.6 描述的 WorldState / PolicyRunner 是那条路线留下的代码，保留是为了记录行为，不代表方向。
 
 ## 1. 形态：两层，中间隔一条稳定缝
 
@@ -15,11 +23,11 @@
                                 │ stdio JSON（MCP 兼容子集）
 ┌───────────────────────────────▼──────────────────────────────────────┐
 │  dsh-game-core（Python 包）                                          │
-│    · 抓屏 / 帧差分 / OCR / 20 Hz 追踪                                │
-│    · 虚拟手柄 / 键鼠 / 窗口焦点 / 输入法看护                          │
-│    · 本地 20 Hz 闭环（导航 / 避障 / 走位 / 弹反）                     │
-│    · 通用世界状态 WorldState + 60 Hz 反射策略（通用玩法基线）          │
-│    · 引擎探针与游戏档案（纯数据）                                     │
+│    · 抓屏（整屏裁剪 / PrintWindow 窗口级）/ 帧差分 / OCR             │
+│    · 虚拟手柄 / 键盘 / 鼠标点击 / 窗口焦点                            │
+│    · 本地 20 Hz 有界按键循环（hold / tap / advance）                  │
+│    · WorldState + 60 Hz 策略（已冻结）                                │
+│    · 游戏档案 profile / GamePack（纯数据）                            │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -44,15 +52,16 @@
 | `game_events` | 帧差分事件（baseline/static/changed/scene_cut） | 稀疏轮询 | M2 ✅ |
 | `game_attach` | 绑定窗口（用户授权步骤） | 一次 | M2 ✅ |
 | `game_state` | 读一次通用世界状态 WorldState（场景 / HP / 实体 / UI） | 模型需要时 | 通用基线 ✅ |
-| `game_policy` | 起停本地 60 Hz 状态策略（按 profile 射击/前进/闪避/脱困） | 一次/战斗阶段 | 通用基线 ✅（dry-run） |
-| `game_intent` | 向运行中的策略提交带 TTL/优先级的战术 Intent（建议性，不直接按键；当前执行 jump/dodge/retreat） | 0.2–1Hz | L3 通道 ✅（默认 advisory） |
+| `game_policy` | 起停本地 60 Hz 状态策略（按 profile 射击/前进/闪避/脱困） | 一次/战斗阶段 | **已冻结** |
+| `game_intent` | 向运行中的策略提交带 TTL/优先级的战术 Intent（建议性，不直接按键；当前执行 jump/dodge/retreat） | 0.2–1Hz | **已冻结** |
 | `game_memory` | 本地游戏档案（profile）CRUD 与选用 | 开局 / 换游戏 | 通用基线 ✅ |
-| `game_act` | 单步按键（默认 dry-run） | 一次/动作 | M2 ✅ |
+| `game_act` | 单步按键 / 手柄按钮，或带 `x`/`y` 的鼠标点击（默认 dry-run） | 一次/动作 | M2 ✅；鼠标坐标目前是屏幕绝对坐标 |
 | `game_stop` | 松手 + 解绑 | 随时，越易越好 | M2 ✅ |
 | `game_plan` | 给目标，启动本地 20 Hz 循环（hold / tap / advance 撞墙侧移脱困） | 一次/目标 | M3 ✅（dry-run 验证） |
 | `game_status` | 轮询进度与事件 | 稀疏 | M3 ✅ |
 
 **判定标准**：任何工具如果要求模型以高于 1 Hz 的频率调用，就说明它设计错了。
+慢节奏游戏里，模型每步一次 `game_snapshot` + `game_act` 是正常用法，不违反这条：游戏本身不要求更快。
 
 闭环实现（`session.plan`）：本地线程按 20 Hz 跑（实测 21.3 Hz），**每一拍重新过
 安全闸**——命中反作弊或 F12 闩锁，都在一拍内释放按键并记录 `stop_reason`；
@@ -78,7 +87,9 @@
 输出后端默认 `dry-run`（只记录动作、不碰设备）；真实手柄必须显式
 `DSH_GAME_BRIDGE_CONTROL=vgamepad`（单次动作已实机回读验证，长闭环尚未在真实游戏里跑）。
 
-## 2.6 通用玩法基线：WorldState / StateProvider / Policy / GameProfile
+## 2.6 通用玩法基线：WorldState / StateProvider / Policy / GameProfile（策略部分已冻结）
+
+> 2026-11-12：本节的 PolicyRunner、Intent 以及 §2.6 末尾的「两个闭环的分工」都已冻结，见 §0。
 
 > 2026-10-30 起。此前引擎只有方向原语（`game_plan`），「游戏里现在发生了什么」没有
 > 通用表示。通用基线把**状态**也抽出来：引擎零游戏代码，游戏差异只进 JSON 档案。
@@ -138,7 +149,12 @@
 `{ type: 'image', attachment: ImageAttachmentRef }`，引用由 `ctx.attachments.saveImage()`
 落盘。会话文本里只留尺寸与来源，字节不进历史。M0 已用合成帧验证这条链路。
 
-## 3.5 抓屏：整屏 grab + 窗口矩形裁剪（不是真正的窗口级抓屏）
+## 3.5 抓屏：默认整屏 grab + 窗口矩形裁剪；可选 PrintWindow 窗口级抓屏
+
+> 2026-11-09 起，`window_capture.py` 提供 `PrintWindow(PW_RENDERFULLCONTENT)` 窗口级抓屏，
+> 用 `DSH_GAME_BRIDGE_CAPTURE=window` 开启。默认仍是下面的整屏裁剪，因为 PrintWindow 对部分
+> 硬件加速窗口会返回黑帧（需要检查帧方差）。被遮挡的窗口（例如 DSH 窗口盖住 Cuphead）实测用
+> window 模式能截到。WGC（Windows Graphics Capture）没有实现。
 
 > 本节于 2026-10-30 修正：旧标题「窗口级抓屏（不是整屏）」与实现不符——实现一直是
 > 整屏 grab 再按窗口矩形裁剪，反例见 `docs/FIELD-2026-10-29.md` P1-2。
@@ -165,9 +181,8 @@ DwmGetWindowAttribute）解析出窗口矩形；之后每次 `snapshot` 重新�
 - `game_attach` / `game_act` / `game_plan` / `game_status` 也带 `foreground`，
   `game_act` 另带 `delivery`。
 
-**真正的窗口级抓屏是后续工作**：`PrintWindow(PW_RENDERFULLCONTENT)` 或
-Windows Graphics Capture（WGC）。它们能绕开遮挡，但对部分游戏/受保护内容仍可能
-返回黑帧，需要逐游戏实机验证；在那之前，文档与工具文本都不得声称支持窗口级抓屏。
+**窗口级抓屏**：`PrintWindow` 已作为可选模式实现（见本节开头）；WGC 未实现。
+两者都可能对部分游戏 / 受保护内容返回黑帧，需要逐个游戏实机验证。
 
 **多显示器**：`EnumDisplayMonitors` + `GetMonitorInfoW` 拿到每块显示器的虚拟桌面
 坐标，`MonitorFromWindow` 找窗口所在屏；`capture.match_output_index` 用分辨率与主屏
@@ -204,7 +219,7 @@ DSH 的兼容性检查是**严格 semver**，而运行时版本常带预发布�
 
 1. **随时可夺回**：F12 本地夺回闩锁，不经模型、不经会话；
 2. **反作弊不接**：命中 EAC/BattlEye/Vanguard 等进程即拒绝一切输出通道；
-3. **默认只读**：发布版只做抓屏 + 手柄，不读内存、不注入；
+3. **默认只读**：只做抓屏和模拟输入（键盘 / 鼠标 / 手柄），不读内存、不注入进程；
 4. **真实后端需批准**：`DSH_GAME_BRIDGE_CONTROL` 不是 dry-run 时，插件注册
    `tools/pre-execute` 钩子，对 `game_attach` 返回 `{kind:'ask'}`，走 DSH
    user-approval 的一次性批准；headless/CI 没有应答者时 fail-closed 拒绝。
@@ -252,3 +267,59 @@ v1 仅 Windows 10/11 x64（DXcam、ViGEmBus、Win32 输入）。抽象层留好�
 但不承诺跨平台；ViGEmBus 已 EOL，长期要给替代路径或退到模拟器键盘通道。
 
 
+
+## 9. 待定：游戏数据与记忆的收敛
+
+> 状态：**方案，尚未决定**。在这里定下来之前，不要新增「每款游戏的数据格式」或记忆层代码。
+> 背景见 [STATUS § 能力层与代码去向](STATUS.md#能力层与代码去向)。
+
+### 9.1 现状：同一款游戏的数据有 4 种格式，目录有两套
+
+| 格式 | 位置 | 谁读 | 谁写 |
+|:--|:--|:--|:--|
+| GameProfile | 用户档案目录 `<cache-root>/profiles/`（`DSH_GAME_BRIDGE_PROFILE_DIR`）；仓库里的 `profiles/*.json` 是样例 | `state.py`、`policy.py`、`game_attach profile=` | `game_memory save` |
+| GamePack | `experiments/games/packs/*.json` | `gamepack.validate_pack`；`game_attach pack=` 经 `profile_from_pack` 转成 profile | `probe.py` / `onboarding.py` 生成草稿，或手写 |
+| 记忆目录的 `game.json` / `ui.json` / `entities.json` / `general.json` / `user/preferences.json` | `<data-root>/memory/`（`DSH_GAME_BRIDGE_MEMORY_DIR`） | `memory_loader.load_game` | **没有任何代码写**（只有 `levels/*.json` 由 level memory 写） |
+| 冷启动 profile | 无固定位置 | `coldstart.py` 合并，`instant_play.py` 转成引擎 profile | 没有生产调用 |
+
+另外，认键位有两代实现（见 [AI-NATIVE-PLAN](AI-NATIVE-PLAN.md) 顶部说明）。
+
+### 9.2 建议方案（待你确认）
+
+**每个游戏一个目录，只有三种内容**：
+
+```text
+<data-root>/games/<game_id>/
+  profile.json    运行时配置：键位、HUD 区域、场景关键词（就是现有 GameProfile，唯一被引擎读取的格式）
+  notes.md        模型写给自己的文字笔记（M2 游戏级记忆 + 攻略事实，每条带来源和日期）
+  runs/           每局的记录与时间线（recorder 的输出、M5 的结果行）
+```
+
+- **GameProfile 是唯一的运行时格式**：它已经有工具（`game_memory`）、存储（`profile-store.js`）、校验和 `game_attach profile=`。
+- **GamePack 退为导入格式**：保留合同和校验（反作弊 fail-closed 必须留着），`game_attach pack=` 继续通过现有适配器转成 profile，
+  不再作为独立的数据层。
+- **笔记用 Markdown，不用结构化 JSON**：读写者是模型，文字最省事。来源 / 日期 / 置信度（M4 元记忆）写成每条笔记的行内标注，
+  不单独建一套 manifest。
+- **记忆目录的 `game.json` / `ui.json` / `entities.json` / `general.json` / `preferences.json` 废弃**：没人写，也没内容。
+  `memory_loader` 的作用域加载思想保留在 `notes.md` 的分节里，代码不保留。
+- **认键位**：第二代（`probe.py` + `onboarding.py`）保留，产物写进 `profile.json`；第一代整条链删除。
+- 目录统一成一个数据根，`DSH_GAME_BRIDGE_PROFILE_DIR` 和 `DSH_GAME_BRIDGE_MEMORY_DIR` 合并或互相兼容（兼容方式待定）。
+
+### 9.3 要你定的事
+
+1. **GameProfile 还是 GamePack 做唯一格式？** 我倾向 GameProfile，理由见上；代价是 GamePack 的 `capabilities` / `recipes`
+   字段在 profile 里没有对应位置，需要决定是丢掉还是并入。
+2. **笔记用 Markdown 还是 JSON？** 我倾向 Markdown。
+3. ~~第一代冷启动链要不要现在就删？~~ **已决定（2026-11-12）：M5 之后再评估，现在不删。** 理由：这批代码不影响 M5。
+   不要整条删，按模块区分（供将来参考）：
+   - 可删：`controls_probe`（与 `probe.py` 重复）、`effect_classifier`（偏动作游戏，`probe.py` 有等价的 `summarize_effects`）、
+     `instant_play`（服务已冻结的 60 Hz 策略）；
+   - 有第二代没有的能力，要评估后再决定：`game_probe`（读游戏配置文件里的键位）、`coldstart.merge_controls`（多来源合并加置信度）、
+     `priors` 里回合制 / 菜单为主两类。
+
+### 9.4 落地顺序
+
+1. 9.3 的第 1、2 条已按建议定下（GameProfile 做唯一运行时格式，笔记用 Markdown），第 3 条推迟到 M5 之后；
+2. 据此修订 [MEMORY](MEMORY.md)（重写 M2–M5 的落点，删掉已作废的目录结构）；
+3. 在 `game_memory` 里加笔记读写（M5 之后，等数据说明需要）；
+4. 最后才删代码：记忆目录的读取代码、动作游戏专用的记忆；第一代冷启动链按 9.3 第 3 条等 M5 之后。

@@ -1,6 +1,6 @@
 # dsh-game-core
 
-`dsh-game-bridge` 的本地引擎：**抓屏 + OCR + 将来的 20 Hz 闭环**。
+`dsh-game-bridge` 的本地引擎：**抓屏 + OCR + 输入注入 + 安全闸**。
 独立进程、stdio JSON 协议、不认识模型也不认识 DSH。
 
 ## 为什么单独一个包
@@ -20,16 +20,18 @@
 {"id": 1, "ok": false, "error": {"code": "ENCODE_FAILED", "message": "..."}}
 ```
 
-方法：`ping` · `selftest` · `snapshot` · `windows` · `events` · `attach` · `act` · `plan` · `status` · `stop`。
+方法：`ping` · `selftest` · `snapshot` · `windows` · `events` · `controls` · `attach` · `act` · `plan` · `state` · `status` · `stop`；
+另有已冻结的 `policy_start` · `policy_stop` · `submit_intent`（60 Hz 策略，不再开发）。
 
-`attach` 接受窗口标题子串（大小写不敏感）：优先后台只截该窗口；找不到时返回
+`attach` 接受窗口标题子串（大小写不敏感），之后的抓屏都限定在该窗口：默认整屏抓取后按窗口
+矩形裁剪，`DSH_GAME_BRIDGE_CAPTURE=window` 时用 PrintWindow 只截该窗口。找不到时返回
 `WINDOW_NOT_FOUND` 并列出当前可见窗口，便于换关键词。传 `unspecified` 退回整屏。
 
 ## 输出后端
 
 - `dry-run`（默认）：只记录动作，不碰设备；
 - `vgamepad`：Xbox 360 虚拟手柄（ViGEmBus）；
-- `keyboard`：Win32 SendInput 键盘（W/A/S/D/SPACE/ENTER/ESC/ARROWS…）。
+- `keyboard`：Win32 SendInput 键盘（A–Z、0–9、SPACE/ENTER/ESC/方向键…）和鼠标点击（屏幕绝对坐标）。
 
 真实后端都必须经过 safety 闸与 DSH 审批；`keyboard` 的 SendInput 路径已于 2026-10-29 实机回读验证。
 
@@ -46,7 +48,7 @@ python -m dsh_game_core serve               # 插件用的 stdio 服务
 
 - RapidOCR 必须 `det_limit_type="max"`、`det_limit_side_len=960`：
   默认 `min` 会把 640×80 的 HUD 区域放大到短边 736px，det 从 ~9ms 变成 ~1.3s。
-- 一次性 `grab()`，不开连续捕获线程：采样只有 2–5 Hz，起线程只会抢游戏帧数。
-- 抓屏是只读操作；任何**输入注入**能力（M2）必须另有夺回热键与反作弊拒绝。
+- 一次性 `grab()`，不开连续捕获线程：模型看图的频率很低，起线程只会抢游戏帧数。
+- 抓屏是只读操作；输入注入必须经过夺回热键（F12）与反作弊拒绝两道闸。
 
 

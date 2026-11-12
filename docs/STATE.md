@@ -3,8 +3,11 @@
 > 本文定义**通用玩法基线**的数据形状与降级规则：WorldState、GameProfile、provider 分层、
 > confidence / stale 语义、安全边界，以及 `game_state` / `game_policy` / `game_memory`
 > 如何映射到它。设计理由见 [DESIGN](DESIGN.md) §2.6；键名清单见 [CONTROLS](CONTROLS.md)。
-> 契约来源是 `tmp/general-state-contract.md`（Lead 所有）；实现以
-> `engine/dsh_game_core/state.py`、`policy.py`、`lib/profile-store.js` 为准。
+> 实现以 `engine/dsh_game_core/state.py`、`policy.py`、`lib/profile-store.js` 为准。
+>
+> **范围说明（2026-11-12）**：`game_policy` / `game_intent` 和本地 60 Hz 策略**已冻结**，不再开发；
+> 关于它们的段落只描述现有代码的行为，不代表项目方向。`game_state` / `game_memory` 保留为可选工具。
+> 项目方向见 [STATUS](STATUS.md)。
 >
 > 公开仓库红线：不写游戏内存偏移、不写本机路径/用户名/密钥、不提交内存转储。
 > 任何游戏特有的键位、HUD 区域、颜色阈值都只能进 profile JSON（见 §3）。
@@ -115,7 +118,7 @@
 
 | 字段 | 说明 |
 |:--|:--|
-| `player.x` / `.y` | 归一化坐标；视觉层通常拿不到，为 `null`（provider 才能填） |
+| `player.x` / `.y` | 归一化坐标；profile 里没有配置 `player`（模板 / 颜色 / 固定位置，见文末）或没找到时为 `null` |
 | `player.hp` / `.max_hp` | HP / OCR 结果；未知为 `null`（`max_hp` 可由 profile/HUD 推断） |
 | `player.state` | `"unknown"`，预留 |
 | `entities[].kind` | 当前实现只有 `parry`（弹反点）与 `threat`（移动威胁）；`enemy` 是保留值 |
@@ -305,7 +308,7 @@ game_attach(window="…", profile="cuphead")
 - 引擎：`engine/tests/test_state.py`（HP 区域/前缀、场景优先级、合成粉色弹反图、
   合成移动威胁、垃圾输入不崩）、`test_policy.py`（安全中止、闪避冷却、脱困、松手、status 形状）。
 - 插件：`test/general-state.test.mjs` 与 `test/m0.test.mjs`（工具列表、渲染路径、档案库）。
-- 全量回归与真实对局验证由 Lead 执行；`docs/STATUS.md` 只记录已验证的事实。
+- 真实对局：只在 Cuphead 上跑过，没有校准，结论见 [STATUS § 历史结论](STATUS.md#历史结论只记结论不再展开)。
 
 ## Player tracking (optional)
 

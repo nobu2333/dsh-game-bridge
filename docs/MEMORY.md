@@ -1,5 +1,21 @@
 # 记忆架构（v0，已接线）
 
+> **范围说明（2026-11-12）**：项目方向已收窄为慢节奏游戏（见 [STATUS](STATUS.md)）。本文的**架构仍然有效**，
+> 但各层适用性不同，且**实现远没有设计完整**：
+>
+> | 层 | 适用于慢节奏游戏 | 实现现状（已对照代码） |
+> |:--|:--|:--|
+> | M0 工作记忆 | ✅ | 没有通用实现；只有动作策略里的 `_learning_recent` 等内部缓冲（`policy.py`） |
+> | M1 关卡/Boss | ❌ 动作游戏专用，已冻结 | `level_memory.py`、`memory.py` 的 DangerCard / `LevelLocator`；按横版卷轴坐标 `scroll_s` 分段 |
+> | M2 游戏级 | ✅ **核心** | `memory_loader.load_game` 只会**读取** `game.json` / `ui.json` / `entities.json`；**没有任何代码写这些文件** |
+> | M3 通识 | ✅ | 只会读 `general.json`，没有内容、没有写入 |
+> | M4 元记忆 | ✅ | 只有 `manifest()` 读取，没有写入 |
+> | M5 用户/环境 | ✅ | 只会读 `user/preferences.json`，没有写入 |
+> | 攻略（§5） | ✅ | `GuideStore` 已实现，数据形状通用 |
+>
+> 下文 §4（Level Memory）和 §7 的待办 1–3、5 属于已冻结的动作游戏路线。其余章节在新路线里要重新对齐，
+> 对齐方案见 [DESIGN § 9](DESIGN.md#9-待定游戏数据与记忆的收敛)。
+
 > 状态：`level_memory.py` / `memory_loader.py` / `memory_context.py` / `memory_report.py` 已实现，并接入 Session/PolicyRunner（记录、上下文、shadow 只读）；目前不改变动作。
 > 原则：引擎不认游戏名/关卡名；`game_id` / `level_id` 由 session 传入，数据按作用域懒加载。
 

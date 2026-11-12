@@ -1,7 +1,7 @@
 {
   "name": "dsh-game-bridge",
   "version": "0.0.2",
-  "description": "Give DeepSeek Harness eyes and hands on your games: candidate-level tools backed by a local capture + control engine, so the model picks goals while a 20 Hz loop plays.",
+  "description": "Let DeepSeek Harness models see and play slow-paced games: screen capture, OCR, and keyboard/mouse/gamepad input backed by a local engine, dry-run by default.",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
