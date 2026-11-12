@@ -81,8 +81,8 @@
   `entity_memory.py`、`learner.py`、`experience.py`
 - 评测：`evaluate.py`、`review.py`（读 DangerCard 和 episode）
 - 通用统计（保留）：`experiment.py`（bootstrap 中位数差、promote / no_gain / regression 判定），M5 的对照组比较可以用它
-- 通用脚本（保留）：`autoplay.py` + `scripts/play_pack.py`（固定节拍按键循环，可作 M5 的固定循环对照）、
-  `scripts/auto_onboard.py`、`scripts/probe_game.py`、`scripts/serve_webgl.py`
+- 通用脚本（保留）：`baseline.py` + `scripts/run_baseline.py`（M5 对照组）、`scripts/record_model_run.py`（模型局记分）、
+  `autoplay.py` + `scripts/play_pack.py`、`scripts/auto_onboard.py`、`scripts/probe_game.py`、`scripts/serve_webgl.py`
 
 ### 2026-11-12 清理记录
 
@@ -121,7 +121,11 @@
 
 1. **端到端演示（2048，只用方向键）**：真实 DSH 会话加真实模型，只用 `game_attach` / `game_snapshot` /
    `game_act` / `game_stop`，打完一局并录屏。2048 不需要鼠标，所以不被下面第 3 项阻塞。
+   **这一步需要你本人跑 DSH**，操作步骤和给模型的提示词在 [M5-RUNBOOK](M5-RUNBOOK.md)。
 2. **对照组**：同一款游戏上跑随机按键 / 固定循环，各 5 局，比较得分。模型赢过对照组才算 M5 完成。
+   工具已就绪：`scripts/run_baseline.py`（随机 / 固定循环，每局新开浏览器 profile），
+   `scripts/record_model_run.py`（从模型那局的窗口 OCR 读分，和基线用同一个解析器）。
+   2026-11-12 已在本机用真实键盘注入跑通（每步约 0.2–0.3 秒，分数读取稳定）。
 3. **点击类游戏的前置缺口**（扫雷、纸牌这类要点击的游戏需要）：
    - `game_act` 的 `x` / `y` 目前是屏幕绝对坐标，要改成相对截图的坐标，由引擎换算；
    - `game_snapshot` 只把 OCR 的**文字和置信度**写进文本，**没有文字框坐标**，而且最多 12 行；
@@ -145,7 +149,7 @@
 
 ```powershell
 npm test                                   # 插件：45/45（2026-11-12 实跑）
-cd engine; python -m pytest tests -q       # 引擎：340/340（2026-11-12 清理后实跑）
+cd engine; python -m pytest tests -q       # 引擎：351/351（2026-11-12 实跑）
 cd ..
 $env:DSH_HOME='<repo>/.dsh-test'
 $env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'
