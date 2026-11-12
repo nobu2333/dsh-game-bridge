@@ -46,6 +46,7 @@ class GameSession:
         control_backend: str | None = None,
         audit: AuditLog | None = None,
         window_resolver=None,
+        window_by_hwnd_resolver=None,
         window_rect_source=None,
         window_monitor_source=None,
         foreground_source=None,
@@ -58,6 +59,7 @@ class GameSession:
         self._capture_mode = str(capture_mode or os.environ.get("DSH_GAME_BRIDGE_CAPTURE", "screen")).lower()
         self.audit = audit or AuditLog(os.environ.get("DSH_GAME_BRIDGE_AUDIT_LOG") or None)
         self._window_resolver = window_resolver
+        self._window_by_hwnd_resolver = window_by_hwnd_resolver
         self._window_rect_source = window_rect_source
         self._window_monitor_source = window_monitor_source
         self._foreground_source = foreground_source
@@ -97,6 +99,29 @@ class GameSession:
         from .windows import resolve_window
 
         return resolve_window(match)
+
+    def _window_by_hwnd(self, hwnd: int) -> dict | None:
+        """Look up a window by handle (pinned handle beats title ambiguity)."""
+        if self._window_by_hwnd_resolver is not None:
+            return self._window_by_hwnd_resolver(hwnd)
+        from .windows import list_windows, window_rect
+
+        for window in list_windows():
+            if int(window.get("hwnd") or 0) == int(hwnd):
+                return window
+        rect = window_rect(int(hwnd))
+        if not rect:
+            return None
+        left, top, right, bottom = rect
+        return {
+            "hwnd": int(hwnd),
+            "title": f"hwnd:{int(hwnd)}",
+            "process": "",
+            "left": left,
+            "top": top,
+            "width": right - left,
+            "height": bottom - top,
+        }
 
     def _window_rect(self, hwnd: int):
         if self._window_rect_source is not None:
@@ -271,10 +296,20 @@ class GameSession:
         params = params or {}
         pack = self._load_pack(params)
         match = str(params.get("window") or "").strip()
-        if not match and isinstance(pack, dict):
+        requested_hwnd = params.get("hwnd")
+        if not match and not requested_hwnd and isinstance(pack, dict):
             # Window resolution is title-based; prefer the pack title over the exe name.
             match = str(pack.get("title") or pack.get("process") or "").strip()
-        if match and match.lower() != "unspecified":
+        window = None
+        if requested_hwnd:
+            try:
+                hwnd_value = int(requested_hwnd)
+            except (TypeError, ValueError) as error:
+                raise EngineError("BAD_HWND", f"hwnd 不是整数：{requested_hwnd!r}") from error
+            window = self._window_by_hwnd(hwnd_value)
+            if window is None:
+                raise EngineError("WINDOW_NOT_FOUND", f"找不到窗口句柄 {hwnd_value}")
+        elif match and match.lower() != "unspecified":
             window = self._resolve_window(match)
             if window is None:
                 titles = self._window_titles()
@@ -282,6 +317,7 @@ class GameSession:
                     "WINDOW_NOT_FOUND",
                     f"找不到标题包含 {match!r} 的窗口；当前可见窗口（前 8 个）：{titles}",
                 )
+        if window is not None:
             self.attached = {
                 "window": window["title"],
                 "hwnd": window["hwnd"],

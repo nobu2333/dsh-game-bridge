@@ -42,15 +42,19 @@ class BrotliHandler(http.server.SimpleHTTPRequestHandler):
 def main() -> int:
     parser = argparse.ArgumentParser(description="Serve a local Unity/WebGL build")
     parser.add_argument("--root", required=True)
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int, default=8765, help="0 picks a free port")
     parser.add_argument("--bind", default="127.0.0.1")
     args = parser.parse_args()
     root = Path(args.root).resolve()
     if not root.is_dir():
         raise SystemExit(f"not a directory: {root}")
     handler = functools.partial(BrotliHandler, directory=str(root))
-    server = http.server.ThreadingHTTPServer((args.bind, args.port), handler)
-    print(f"serving {root} at http://{args.bind}:{args.port}/", flush=True)
+    try:
+        server = http.server.ThreadingHTTPServer((args.bind, args.port), handler)
+    except OSError as error:
+        raise SystemExit(f"cannot listen on {args.bind}:{args.port}: {error}") from error
+    port = server.server_address[1]
+    print(f"serving {root} at http://{args.bind}:{port}/", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

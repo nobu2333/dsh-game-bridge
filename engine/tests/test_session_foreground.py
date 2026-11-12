@@ -109,6 +109,7 @@ def make_session(*, backend="dry-run", controller=None, fg_state=None, occlusion
         gate=allowed_gate(),
         control_backend=backend,
         window_resolver=lambda match: window(),
+        window_by_hwnd_resolver=lambda hwnd: {**window(), "hwnd": hwnd} if hwnd == 100 else None,
         window_rect_source=lambda hwnd: (0, 0, 800, 600),
         window_monitor_source=lambda hwnd: {"left": 0, "top": 0, "width": 1920, "height": 1080, "primary": True},
         foreground_source=lambda: fg_state["value"],
@@ -127,6 +128,16 @@ def test_attach_reports_control_and_foreground():
     assert result["control"]["backend"] == "dry-run"
     assert result["control"]["ready"] is True
     assert result["foreground"]["title"] == "DSH"
+
+
+def test_attach_by_hwnd_pins_that_window():
+    session, fg_state = make_session(fg_state={"value": foreground(999, "DSH")})
+    result = session.attach({"hwnd": 100})
+    assert result["attached"]["hwnd"] == 100
+
+    with pytest.raises(EngineError) as error:
+        session.attach({"hwnd": 555})
+    assert error.value.code == "WINDOW_NOT_FOUND"
 
 
 def test_attach_fails_fast_when_real_backend_unavailable():
