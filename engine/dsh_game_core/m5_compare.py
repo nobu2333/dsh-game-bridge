@@ -1,4 +1,4 @@
-"""M5 comparison: model vs random/cycle baselines (2048 protocol).
+"""M5 comparison: model vs random/cycle baselines (slow-game protocol).
 
 Pure data reduction; no screen, input, or game calls. The rule is from
 docs/PLAY.md §9: the model median must beat both control medians, and the
