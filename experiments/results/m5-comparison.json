@@ -1,0 +1,47 @@
+{
+  "status": "insufficient_model_runs",
+  "criteria": {
+    "model_runs": false,
+    "random_runs": true,
+    "cycle_runs": true,
+    "model_beats_random": false,
+    "model_beats_cycle": false,
+    "worst_not_below_half": false
+  },
+  "model": {
+    "n": 1,
+    "median": 640.0,
+    "min": 640.0,
+    "max": 640.0,
+    "scores": [
+      640.0
+    ]
+  },
+  "random": {
+    "n": 5,
+    "median": 1352.0,
+    "min": 720.0,
+    "max": 2108.0,
+    "scores": [
+      2108.0,
+      720.0,
+      1788.0,
+      1352.0,
+      1024.0
+    ]
+  },
+  "cycle": {
+    "n": 5,
+    "median": 1584.0,
+    "min": 680.0,
+    "max": 2760.0,
+    "scores": [
+      1068.0,
+      2760.0,
+      2608.0,
+      680.0,
+      1584.0
+    ]
+  },
+  "rule": "model median > random median and > cycle median; model min >= 0.5 * max(control medians); >=3 model and >=5 each control"
+}
