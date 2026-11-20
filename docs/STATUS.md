@@ -149,12 +149,12 @@
 ## 验证
 
 ```powershell
-npm test                                   # 插件：45/45（2026-11-12 实跑）
-cd engine; python -m pytest tests -q       # 引擎：351/351（2026-11-12 实跑）
+npm test                                   # 插件：46/46（2026-11-20 实跑）
+cd engine; python -m pytest tests -q       # 引擎：358/358（2026-11-20 实跑）
 cd ..
 $env:DSH_HOME='<repo>/.dsh-test'
 $env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'
-npm run test:all                           # 集成 11 条；最近一次 11/11 是 2026-10-30，之后没有重跑
+npm run test:all                           # 集成 11/11（2026-11-20 实跑通过）
 ```
 
 ## 历史结论（只记结论，不再展开）
