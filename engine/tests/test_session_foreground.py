@@ -229,3 +229,116 @@ def test_status_includes_control_and_foreground():
     status = session.status()
     assert status["control"]["backend"] == "dry-run"
     assert status["foreground"]["title"] == "DSH"
+    assert status["attach_actions"] == 0
+    assert status["auto_focus"] is False
+
+
+def test_attach_actions_resets_per_attach_while_actions_total_accumulates():
+    session, fg_state = make_session()
+    fg_state["value"] = foreground(100, "Game")
+    session.attach({"window": "Game"})
+    r1 = session.act({"button": "A", "duration_ms": 10})
+    r2 = session.act({"button": "B", "duration_ms": 10})
+    assert r1["attach_actions"] == 1
+    assert r2["attach_actions"] == 2
+    assert r2["actions_total"] == 2
+    assert session.status()["attach_actions"] == 2
+
+    stopped = session.stop()
+    assert stopped["attach_actions"] == 2
+    assert stopped["actions_total"] == 2
+
+    session.attach({"window": "Game"})
+    assert session.status()["attach_actions"] == 0
+    r3 = session.act({"button": "A", "duration_ms": 10})
+    assert r3["attach_actions"] == 1
+    assert r3["actions_total"] == 3
+
+
+def test_relative_mouse_click_maps_normalized_coordinates_to_attached_rect():
+    session = GameSession(
+        engine=FakeEngine(),
+        gate=allowed_gate(),
+        control_backend="dry-run",
+        window_resolver=lambda match: {"hwnd": 100, "title": "Game", "process": "game.exe", "left": 100, "top": 200, "width": 801, "height": 601},
+        window_by_hwnd_resolver=lambda hwnd: {"hwnd": 100, "title": "Game", "process": "game.exe", "left": 100, "top": 200, "width": 801, "height": 601},
+        window_rect_source=lambda hwnd: (100, 200, 901, 801),
+        window_monitor_source=lambda hwnd: {"left": 0, "top": 0, "width": 1920, "height": 1080, "primary": True},
+        foreground_source=lambda: foreground(100, "Game"),
+        occlusion_source=lambda hwnd: {"available": True, "occluded_ratio": 0.0, "occluded": False, "covered_by": []},
+    )
+    session.attach({"window": "Game"})
+    result = session.act({"rx": 0.5, "ry": 0.25, "mouse_button": "RIGHT"})
+    assert result["action"]["mouse_click"] is True
+    assert result["action"]["x"] == 500
+    assert result["action"]["y"] == 350
+    assert result["action"]["rx"] == 0.5
+    assert result["action"]["ry"] == 0.25
+    assert result["action"]["button"] == "RIGHT"
+
+    with pytest.raises(EngineError) as out_of_range:
+        session.act({"rx": 1.2, "ry": 0.5})
+    assert out_of_range.value.code == "BAD_MOUSE"
+
+    with pytest.raises(EngineError) as missing_ry:
+        session.act({"rx": 0.5})
+    assert missing_ry.value.code == "BAD_MOUSE"
+
+
+def test_auto_focus_restores_foreground_only_when_authorized_and_safe():
+    fg_state = {"value": foreground(999, "DSH")}
+    focus_calls = []
+    takeover = {"active": False}
+    gate = SafetyGate(process_source=lambda: [], takeover_source=lambda: takeover["active"], process_ttl_s=0)
+
+    def focus_succeeds():
+        focus_calls.append("focus")
+        fg_state["value"] = foreground(100, "Game")
+        return True
+
+    controller = FakeVGamepad()
+    session = GameSession(
+        engine=FakeEngine(),
+        gate=gate,
+        control_backend="vgamepad",
+        window_resolver=lambda match: window(),
+        window_rect_source=lambda hwnd: (0, 0, 800, 600),
+        window_monitor_source=lambda hwnd: {"left": 0, "top": 0, "width": 1920, "height": 1080, "primary": True},
+        foreground_source=lambda: fg_state["value"],
+        occlusion_source=lambda hwnd: {"available": True, "occluded_ratio": 0.0, "occluded": False, "covered_by": []},
+        focus_source=focus_succeeds,
+    )
+    session._controller = controller
+
+    # Default auto_focus=False keeps refusal behavior and never steals focus.
+    attached_default = session.attach({"window": "Game"})
+    assert attached_default["auto_focus"] is False
+    with pytest.raises(EngineError) as err:
+        session.act({"button": "A", "duration_ms": 10})
+    assert err.value.code == "FOREGROUND_MISMATCH"
+    assert focus_calls == []
+
+    # Explicit auto_focus=True restores focus when SafetyGate allows.
+    attached_auto = session.attach({"window": "Game", "auto_focus": True})
+    assert attached_auto["auto_focus"] is True
+    ok = session.act({"button": "A", "duration_ms": 10})
+    assert focus_calls == ["focus"]
+    assert ok["delivery"]["foreground"] is True
+    assert controller.pressed == [("A", 10)]
+
+    # F12 takeover must block BEFORE auto_focus can run.
+    fg_state["value"] = foreground(999, "DSH")
+    takeover["active"] = True
+    with pytest.raises(EngineError) as blocked:
+        session.act({"button": "B", "duration_ms": 10})
+    assert blocked.value.code == "SAFETY_BLOCKED"
+    assert focus_calls == ["focus"]
+
+    # If focus restoration fails, real backend still refuses with FOREGROUND_MISMATCH.
+    takeover["active"] = False
+    session._focus_source = lambda: False
+    fg_state["value"] = foreground(999, "DSH")
+    session.attach({"window": "Game", "auto_focus": True})
+    with pytest.raises(EngineError) as still_wrong:
+        session.act({"button": "B", "duration_ms": 10})
+    assert still_wrong.value.code == "FOREGROUND_MISMATCH"

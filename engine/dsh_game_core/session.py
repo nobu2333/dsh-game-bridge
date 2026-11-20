@@ -51,6 +51,7 @@ class GameSession:
         window_monitor_source=None,
         foreground_source=None,
         occlusion_source=None,
+        focus_source=None,
         capture_mode: str | None = None,
     ):
         self.engine = engine or GameEngine()
@@ -64,9 +65,12 @@ class GameSession:
         self._window_monitor_source = window_monitor_source
         self._foreground_source = foreground_source
         self._occlusion_source = occlusion_source
+        self._focus_source = focus_source
         self._controller = None
         self.attached: dict | None = None
         self.history: list[dict] = []
+        self._attach_actions: int = 0
+        self._auto_focus: bool = False
         self._plan: dict | None = None
         self._plan_thread: threading.Thread | None = None
         self._plan_stop = threading.Event()
@@ -350,7 +354,17 @@ class GameSession:
         if self._foreground_required() and not control.get("ready"):
             self.attached = None
             raise EngineError("BACKEND_UNAVAILABLE", self._backend_hint(control))
-        # 重新 attach 视为用户重新授权：清掉夺权闩锁，并丢掉旧的帧差基线。
+        # 重新 attach 视为用户重新授权：清掉夺权闩锁，重置本局动作计数，并丢掉旧的帧差基线。
+        self._attach_actions = 0
+        if "auto_focus" in params and params.get("auto_focus") is not None:
+            self._auto_focus = bool(params.get("auto_focus"))
+        else:
+            self._auto_focus = os.environ.get("DSH_GAME_BRIDGE_AUTO_FOCUS", "").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            )
         self.gate.reset_takeover()
         reset_diff = getattr(self.engine, "reset_diff", None)
         if callable(reset_diff):
@@ -366,6 +380,7 @@ class GameSession:
                 "window": self.attached["window"],
                 "hwnd": self.attached.get("hwnd"),
                 "backend": self.backend,
+                "auto_focus": self._auto_focus,
                 "safety": safety,
                 "foreground": foreground,
             }
@@ -373,11 +388,70 @@ class GameSession:
         return {
             "attached": self.attached,
             "backend": self.backend,
+            "auto_focus": self._auto_focus,
             "safety": safety,
             "control": control,
             "foreground": foreground,
             "pack": self._pack_summary(),
         }
+
+    def _ensure_foreground_if_authorized(self, foreground: dict | None, delivery: dict) -> tuple[dict | None, dict]:
+        """Restore focus to the user-approved attached window when auto_focus is enabled.
+
+        Callers MUST have already checked SafetyGate (F12 takeover + anti-cheat).
+        """
+        if not self._auto_focus or not self._foreground_required():
+            return foreground, delivery
+        if not (delivery.get("checked") and delivery.get("foreground") is False):
+            return foreground, delivery
+        if self._focus_source is not None:
+            self._focus_source()
+        else:
+            self._focus_attached()
+        new_foreground = self._foreground()
+        return new_foreground, self._delivery(new_foreground)
+
+    def _attached_bounds(self) -> tuple[int, int, int, int] | None:
+        attached = self.attached or {}
+        hwnd = attached.get("hwnd")
+        if hwnd:
+            rect = self._window_rect(int(hwnd))
+            if rect is not None:
+                return tuple(int(v) for v in rect)
+        if all(attached.get(key) is not None for key in ("left", "top", "width", "height")):
+            left = int(attached["left"])
+            top = int(attached["top"])
+            width = int(attached["width"])
+            height = int(attached["height"])
+            if width > 0 and height > 0:
+                return (left, top, left + width, top + height)
+        monitor = attached.get("monitor")
+        if isinstance(monitor, dict) and all(monitor.get(k) is not None for k in ("left", "top", "width", "height")):
+            left = int(monitor["left"])
+            top = int(monitor["top"])
+            width = int(monitor["width"])
+            height = int(monitor["height"])
+            if width > 0 and height > 0:
+                return (left, top, left + width, top + height)
+        return None
+
+    def _resolve_relative_xy(self, raw_rx, raw_ry) -> tuple[int, int, float, float]:
+        try:
+            rx = float(raw_rx)
+            ry = float(raw_ry)
+        except (TypeError, ValueError) as error:
+            raise EngineError("BAD_MOUSE", f"rx/ry 不是数字：{raw_rx!r},{raw_ry!r}") from error
+        if not (0.0 <= rx <= 1.0 and 0.0 <= ry <= 1.0):
+            raise EngineError("BAD_MOUSE", f"rx/ry 必须在 0..1 之间（收到 {rx!r},{ry!r}）")
+        bounds = self._attached_bounds()
+        if bounds is None:
+            raise EngineError("BAD_MOUSE", "当前没有窗口矩形，无法将归一化坐标 (rx, ry) 换算为屏幕坐标")
+        left, top, right, bottom = bounds
+        width = max(1, right - left)
+        height = max(1, bottom - top)
+        x = max(left, min(right - 1, int(round(left + rx * (width - 1)))))
+        y = max(top, min(bottom - 1, int(round(top + ry * (height - 1)))))
+        return x, y, round(rx, 4), round(ry, 4)
 
     def act(self, params: dict | None = None) -> dict:
         params = params or {}
@@ -395,10 +469,50 @@ class GameSession:
         duration = max(1, min(duration, MAX_BUTTON_DURATION_MS))
         foreground = self._foreground()
         delivery = self._delivery(foreground)
+        foreground, delivery = self._ensure_foreground_if_authorized(foreground, delivery)
         if self._foreground_required() and delivery["checked"] and not delivery["foreground"]:
             self.audit.write({"event": "act_blocked", "reasons": ["foreground mismatch"], "foreground": foreground})
             raise EngineError("FOREGROUND_MISMATCH", self._foreground_message(foreground))
-        if params.get("x") is not None and params.get("y") is not None:
+        has_rel = params.get("rx") is not None or params.get("ry") is not None
+        has_abs = params.get("x") is not None or params.get("y") is not None
+        if has_rel:
+            if params.get("rx") is None or params.get("ry") is None:
+                raise EngineError("BAD_MOUSE", "rx 和 ry 必须同时提供")
+            x, y, rx, ry = self._resolve_relative_xy(params["rx"], params["ry"])
+            controller = self._controller_instance()
+            click = getattr(controller, "click", None)
+            if not callable(click):
+                raise EngineError("BACKEND_UNSUPPORTED", f"后端 {self.backend} 不支持鼠标点击")
+            mouse_button = str(params.get("mouse_button") or params.get("button") or "LEFT").upper()
+            action = click(x, y, button=mouse_button)
+            action = {**action, "rx": rx, "ry": ry}
+            entry = {**action, "at_ms": int(time.time() * 1000)}
+            self.history.append(entry)
+            self._attach_actions += 1
+            self.audit.write(
+                {
+                    "event": "mouse_click",
+                    "x": x,
+                    "y": y,
+                    "rx": rx,
+                    "ry": ry,
+                    "button": mouse_button,
+                    "backend": action.get("backend"),
+                    "dry_run": action.get("dry_run"),
+                    "delivery": delivery,
+                }
+            )
+            return {
+                "action": action,
+                "safety": report.to_dict(),
+                "attached": self.attached,
+                "actions_total": len(self.history),
+                "attach_actions": self._attach_actions,
+                "delivery": delivery,
+            }
+        if has_abs:
+            if params.get("x") is None or params.get("y") is None:
+                raise EngineError("BAD_MOUSE", "x 和 y 必须同时提供")
             try:
                 x = int(params["x"])
                 y = int(params["y"])
@@ -412,6 +526,7 @@ class GameSession:
             action = click(x, y, button=mouse_button)
             entry = {**action, "at_ms": int(time.time() * 1000)}
             self.history.append(entry)
+            self._attach_actions += 1
             self.audit.write(
                 {
                     "event": "mouse_click",
@@ -428,11 +543,13 @@ class GameSession:
                 "safety": report.to_dict(),
                 "attached": self.attached,
                 "actions_total": len(self.history),
+                "attach_actions": self._attach_actions,
                 "delivery": delivery,
             }
         action = self._controller_instance().press(button, duration)
         entry = {**action, "at_ms": int(time.time() * 1000)}
         self.history.append(entry)
+        self._attach_actions += 1
         self.audit.write(
             {
                 "event": "act",
@@ -448,6 +565,7 @@ class GameSession:
             "safety": report.to_dict(),
             "attached": self.attached,
             "actions_total": len(self.history),
+            "attach_actions": self._attach_actions,
             "delivery": delivery,
         }
 
@@ -480,6 +598,7 @@ class GameSession:
         # 真实后端：闭环开始前先确认目标窗口在前台；运行中每拍再复检（下面 _run_plan）。
         foreground = self._foreground()
         delivery = self._delivery(foreground)
+        foreground, delivery = self._ensure_foreground_if_authorized(foreground, delivery)
         if self._foreground_required() and delivery["checked"] and not delivery["foreground"]:
             self.audit.write({"event": "plan_blocked", "reasons": ["foreground mismatch"], "foreground": foreground})
             raise EngineError("FOREGROUND_MISMATCH", self._foreground_message(foreground))
@@ -1089,16 +1208,24 @@ class GameSession:
                     pass
                 self._controller = None
         self.attached = None
+        self._auto_focus = False
         self.gate.reset_takeover()
-        self.audit.write({"event": "stop", "actions_total": len(self.history)})
-        return {"stopped": True, "actions_total": len(self.history), "plan": self._plan_snapshot()}
+        self.audit.write({"event": "stop", "actions_total": len(self.history), "attach_actions": self._attach_actions})
+        return {
+            "stopped": True,
+            "actions_total": len(self.history),
+            "attach_actions": self._attach_actions,
+            "plan": self._plan_snapshot(),
+        }
 
     def status(self) -> dict:
         return {
             "attached": self.attached,
             "backend": self.backend,
+            "auto_focus": self._auto_focus,
             "safety": self.gate.evaluate().to_dict(),
             "actions_total": len(self.history),
+            "attach_actions": self._attach_actions,
             "last_action": self.history[-1] if self.history else None,
             "plan": self._plan_snapshot(),
             "audit": {"path": self.audit.path, "tail": self.audit.tail(5)},

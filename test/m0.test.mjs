@@ -18,7 +18,7 @@ import { join } from 'node:path'
 // 单元测试不许触发真实引擎自举（会去建 venv / 装包）：显式关掉。
 process.env.DSH_GAME_BRIDGE_PYTHON = 'off'
 
-const { apply, inject, name } = await import('../lib/index.js')
+const { apply, inject, name, normalizeOcrBoxes } = await import('../lib/index.js')
 
 function fakeCtx() {
   const registered = []
@@ -320,6 +320,11 @@ test('real backend asks approval before attach and passes other tools through', 
     assert.match(asked.displayReason.en, /real input control/)
     assert.match(asked.displayReason.zh, /真实输入后端/)
 
+    const askedAutoFocus = await hook({ name: 'game_attach', arguments: { auto_focus: true } }, async () => ({ kind: 'allow' }))
+    assert.equal(askedAutoFocus.kind, 'ask')
+    assert.match(askedAutoFocus.displayReason.en, /auto_focus enabled/)
+    assert.match(askedAutoFocus.displayReason.zh, /自动恢复窗口前台/)
+
     let nextCalled = false
     const passed = await hook({ name: 'game_act' }, async () => {
       nextCalled = true
@@ -330,4 +335,62 @@ test('real backend asks approval before attach and passes other tools through', 
   } finally {
     delete process.env.DSH_GAME_BRIDGE_CONTROL
   }
+})
+
+test('status, stop, act and snapshot render/validate relative coords, attach_actions and auto_focus', async () => {
+  const ctx = fakeCtx()
+  apply(ctx)
+
+  const [statusBlock] = tool(ctx, 'game_status').output.render(
+    {},
+    {
+      attached: { window: 'Minesweeper' },
+      backend: 'keyboard',
+      auto_focus: true,
+      safety: { allowed: true, reasons: [] },
+      actions_total: 12,
+      attach_actions: 4,
+    },
+  )
+  assert.match(statusBlock.text, /backend: keyboard;/)
+  assert.match(statusBlock.text, /auto_focus: on;/)
+  assert.match(statusBlock.text, /actions: 4 \(total 12\);/)
+
+  const [stopBlock] = tool(ctx, 'game_stop').output.render(
+    {},
+    { stopped: true, actions_total: 12, attach_actions: 4 },
+  )
+  assert.match(stopBlock.text, /actions this attach: 4/)
+  assert.match(stopBlock.text, /total actions this session: 12/)
+
+  const [relClickBlock] = tool(ctx, 'game_act').output.render(
+    {},
+    {
+      action: { backend: 'keyboard', button: 'LEFT', duration_ms: 0, dry_run: false, mouse_click: true, x: 500, y: 350, rx: 0.5, ry: 0.25 },
+      safety: { allowed: true, reasons: [] },
+      actions_total: 12,
+      attach_actions: 4,
+    },
+  )
+  assert.match(relClickBlock.text, /Clicked LEFT at rel \(0\.5, 0\.25\) -> \(500, 350\)/)
+  assert.match(relClickBlock.text, /\(this attach: 4\)/)
+
+  // Schema compiles parameters under .properties; check rx/ry and snapshot controls are exposed.
+  const actDef = tool(ctx, 'game_act')
+  assert.ok(actDef.parameters.properties.rx && actDef.parameters.properties.ry)
+  const snapDef = tool(ctx, 'game_snapshot')
+  assert.ok(
+    snapDef.parameters.properties.max_width &&
+      snapDef.parameters.properties.ocr &&
+      snapDef.parameters.properties.ocr_limit,
+  )
+  const attachDef = tool(ctx, 'game_attach')
+  assert.ok(attachDef.parameters.properties.auto_focus)
+
+  const boxes = normalizeOcrBoxes(
+    [{ text: 'New Game', score: 0.98, left: 300, top: 200, right: 500, bottom: 240 }],
+    1000,
+    500,
+  )
+  assert.deepEqual(boxes, [{ text: 'New Game', score: 0.98, cx: 0.4, cy: 0.44, box: [0.3, 0.4, 0.5, 0.48] }])
 })

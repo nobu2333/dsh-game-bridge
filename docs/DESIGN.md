@@ -46,16 +46,16 @@
 | 工具 | 语义 | 频率 | 状态 |
 |:--|:--|:--|:--|
 | `game_selftest` | 装没装上、引擎在哪一步 | 一次 | M1 ✅ |
-| `game_snapshot` | 看一眼（图 + OCR） | 模型需要时 | M1 ✅ |
+| `game_snapshot` | 看一眼（图 + OCR 归一化坐标；支持 `max_width`/`ocr` 控体积） | 模型需要时 | M1 ✅；坐标已单测 |
 | `game_windows` | 列出可见窗口（标题/进程/尺寸） | 一次/局 | M2 ✅ |
 | `game_controls` | 当前后端支持的按钮/按键 | 一次/局 | M2 ✅ |
 | `game_events` | 帧差分事件（baseline/static/changed/scene_cut） | 稀疏轮询 | M2 ✅ |
-| `game_attach` | 绑定窗口（用户授权步骤） | 一次 | M2 ✅ |
+| `game_attach` | 绑定窗口（用户授权步骤，可选 `auto_focus`） | 一次 | M2 ✅ |
 | `game_state` | 读一次通用世界状态 WorldState（场景 / HP / 实体 / UI） | 模型需要时 | 通用基线 ✅ |
 | `game_policy` | 起停本地 60 Hz 状态策略（按 profile 射击/前进/闪避/脱困） | 一次/战斗阶段 | **已冻结** |
 | `game_intent` | 向运行中的策略提交带 TTL/优先级的战术 Intent（建议性，不直接按键；当前执行 jump/dodge/retreat） | 0.2–1Hz | **已冻结** |
 | `game_memory` | 本地游戏档案（profile）CRUD 与选用 | 开局 / 换游戏 | 通用基线 ✅ |
-| `game_act` | 单步按键 / 手柄按钮，或带 `x`/`y` 的鼠标点击（默认 dry-run） | 一次/动作 | M2 ✅；鼠标坐标目前是屏幕绝对坐标 |
+| `game_act` | 单步按键 / 手柄按钮，或相对 `rx`/`ry`（0..1）/ 绝对 `x`/`y` 鼠标点击（默认 dry-run） | 一次/动作 | M2 ✅；相对坐标已单测 |
 | `game_stop` | 松手 + 解绑 | 随时，越易越好 | M2 ✅ |
 | `game_plan` | 给目标，启动本地 20 Hz 循环（hold / tap / advance 撞墙侧移脱困） | 一次/目标 | M3 ✅（dry-run 验证） |
 | `game_status` | 轮询进度与事件 | 稀疏 | M3 ✅ |

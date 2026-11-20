@@ -42,10 +42,11 @@ fail-closed 拒绝。权限预设是 `approval: never`（如 `danger-full-access
 
 ## 鼠标点击（keyboard 后端）
 
-`game_act {x, y, mouse_button}`：`mouse_button` 取 `LEFT`（默认）/ `RIGHT` / `MIDDLE`。
+`game_act {rx, ry, mouse_button}`（推荐）或 `game_act {x, y, mouse_button}`：`mouse_button` 取 `LEFT`（默认）/ `RIGHT` / `MIDDLE`。
 
-**注意：`x` / `y` 目前是屏幕绝对坐标**，不是截图里的坐标。`game_snapshot` 的画面经过窗口裁剪，
-可能还缩放过，模型不能直接用截图像素去点。改成相对截图的坐标，是点击类游戏的前置缺口（见 [STATUS](STATUS.md)「下一步」第 3 项）；2048 这类只用方向键的游戏不受影响。
+- **推荐用归一化相对坐标 `rx` / `ry`（0..1）**：相对于当前绑定窗口 / `game_snapshot` 截图（`(0, 0)` 为左上角，`(1, 1)` 为右下角），引擎自动按窗口矩形换算为屏幕像素坐标；
+- `game_snapshot` 的 OCR 文本里每行都会带出中心点坐标（如 `New Game (0.98 @ 0.400,0.440)`）以及结构化 `ocr_boxes`，可直接喂给 `rx`/`ry`；
+- `x` / `y` 仍保留作为屏幕绝对坐标兜底。
 
 ## 前台与遮挡（真实后端必读）
 
@@ -53,22 +54,22 @@ fail-closed 拒绝。权限预设是 `approval: never`（如 `danger-full-access
 
 - `game_attach` 返回 `foreground`（当前前台窗口的 `hwnd` / `title` / 进程；与
   `attached.hwnd` 对比即可知道目标是否在前台）；
-- `game_act` 在 attached 窗口不在前台时直接拒绝（`FOREGROUND_MISMATCH`），
+- `game_attach` 默认 `auto_focus=false`：不在前台时 `game_act` 直接拒绝（`FOREGROUND_MISMATCH`），
   并在 `delivery` 里说明投递状态——不再出现「返回成功但游戏没收到」；
+- 在 `game_attach {window, auto_focus: true}`（或设 `DSH_GAME_BRIDGE_AUTO_FOCUS=1`）经用户审批授权后，`game_act` / `game_plan` 在通过安全闸（F12 夺回与反作弊）后、真正注入前会自动把已绑定的游戏窗口切回前台；**F12 或反作弊命中时绝不抢焦点**；
 - `game_plan` 逐拍检查，前台丢失即中止并把原因写进 `stop_reason`；
 - `game_snapshot` 返回 `foreground` / `occluded`（`occluded_ratio` + `covered_by`），
   遮挡比例 ≥ 0.5 或不在前台时文本里打 `⚠`。默认抓屏是「整屏 grab + 窗口矩形裁剪」：
   被别的窗口盖住时画面就是遮盖物；设 `DSH_GAME_BRIDGE_CAPTURE=window` 改用 PrintWindow
   窗口级抓屏可以绕开遮挡（部分游戏会黑帧，见 DESIGN §3.5）。
-
-插件不会自己抢焦点：需要游戏回到前台时，先由用户把游戏切到前台，再调用 act / plan。
+  对多步长对话，可通过 `game_snapshot {max_width: 640}` 或 `ocr: false` 控制上下文大小。
 
 ## 按游戏类型的建议
 
 | 游戏类型 | 推荐后端 | 典型用法 |
 |:--|:--|:--|
 | 方向键益智（2048 类） | `keyboard` | 每步 `game_snapshot` 看棋盘，`game_act` 按 `UP`/`DOWN`/`LEFT`/`RIGHT` |
-| 点击类益智（扫雷、纸牌） | `keyboard` | `game_act {x, y}` 点击（注意坐标限制，见上文） |
+| 点击类益智（扫雷、纸牌） | `keyboard` | 读 `game_snapshot` OCR 坐标（`@ cx,cy`），用 `game_act {rx, ry}` 点击 |
 | 视觉小说 / 菜单 | `keyboard` | OCR 读选项，`ENTER`/`SPACE` 推进，方向键选择 |
 | 回合制策略 / RPG | `keyboard` 或 `vgamepad` | 每回合看一眼再操作；长按移动可以用 `game_plan hold` |
 | 纯观看 / 解说 | `dry-run` | 只用 `game_snapshot` / `game_events`，不操作 |

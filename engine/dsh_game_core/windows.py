@@ -310,6 +310,7 @@ def force_foreground(hwnd: int, *, settle_s: float = 0.35) -> bool:
             pass
         user32.ShowWindow(hwnd, 9)
         user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0043)  # TOPMOST | SHOW
+        user32.SetWindowPos(hwnd, -2, 0, 0, 0, 0, 0x0043)  # NOTOPMOST (bring to top without sticking)
         # Attach all relevant input queues to this thread.
         current = int(kernel32.GetCurrentThreadId())
         foreground_thread = int(user32.GetWindowThreadProcessId(foreground, None) or 0)
