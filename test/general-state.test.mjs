@@ -20,13 +20,19 @@ process.env.DSH_GAME_BRIDGE_PYTHON = 'off'
 
 import {
   ProfileStoreError,
+  appendGameNote,
+  appendGameRun,
   cacheRoot,
   deleteProfile,
   isValidProfileId,
+  listGameRuns,
   listProfiles,
   profilesDir,
+  readGameNotes,
   readProfile,
+  redactSecrets,
   validateProfileId,
+  writeGameNotes,
   writeProfile,
 } from '../lib/profile-store.js'
 
@@ -429,6 +435,76 @@ test('game_memory save rejects a non-object payload and a missing id', async () 
       () => tool('game_memory').execute({ action: 'get', id: '../escape' }, {}),
       /invalid profile id/,
     )
+  } finally {
+    delete process.env.DSH_GAME_BRIDGE_PROFILE_DIR
+    store.cleanup()
+  }
+})
+
+test('game notes and compact run summaries support M2/M4 metadata, budget, and secret redaction', async () => {
+  const tool = toolset()
+  const store = tempStore()
+  try {
+    process.env.DSH_GAME_BRIDGE_PROFILE_DIR = store.dir
+    const memory = tool('game_memory')
+
+    // Redact tokens/passwords automatically when writing notes.
+    const clean = redactSecrets('api_key=super_secret_12345 and sk-abcdefghijklmnop')
+    assert.doesNotMatch(clean, /super_secret_12345|sk-abcdefgh/)
+    assert.match(clean, /«redacted»/)
+
+    const emptyNotes = await memory.execute({ action: 'notes_get', id: 'boardgame' }, {})
+    assert.equal(emptyNotes.result.found, false)
+
+    await memory.execute(
+      {
+        action: 'notes_append',
+        id: 'boardgame',
+        note: 'Keep center control; api_key=abc1234567 should never persist',
+        source: 'outcome',
+        confidence: 0.92,
+      },
+      {},
+    )
+    const got = await memory.execute({ action: 'notes_get', id: 'boardgame' }, {})
+    assert.equal(got.result.found, true)
+    assert.match(got.result.text, /source:outcome \| conf:0\.92/)
+    assert.doesNotMatch(got.result.text, /abc1234567/)
+    const [notesBlock] = memory.output.render({}, got)
+    assert.match(notesBlock.text, /Notes for boardgame:/)
+
+    // Line budget truncation works without throwing.
+    const manyLines = Array.from({ length: 10 }, (_, idx) => `line ${idx + 1}`).join('\n')
+    writeGameNotes(store.env, 'boardgame', manyLines)
+    const truncated = readGameNotes(store.env, 'boardgame', { maxLines: 3 })
+    assert.equal(truncated.truncated, true)
+    assert.equal(truncated.total_lines, 10)
+    assert.equal(truncated.text, 'line 1\nline 2\nline 3')
+
+    // Run summaries write compactly and list newest first.
+    await memory.execute(
+      {
+        action: 'run_save',
+        id: 'boardgame',
+        data: { run_id: 'r1', result: 'loss', score: 12, steps: 18, summary: 'missed lethal', lessons: ['check burst first'] },
+      },
+      {},
+    )
+    await memory.execute(
+      {
+        action: 'run_save',
+        id: 'boardgame',
+        data: { run_id: 'r2', result: 'win', score: 24, steps: 14, summary: 'cleared cleanly' },
+      },
+      {},
+    )
+    const listed = await memory.execute({ action: 'runs_list', id: 'boardgame', limit: 5 }, {})
+    assert.equal(listed.result.total, 2)
+    assert.deepEqual(listed.result.runs.map((r) => r.run_id), ['r2', 'r1'])
+    const [runsBlock] = memory.output.render({}, listed)
+    assert.match(runsBlock.text, /Recent runs for boardgame \(2\/2\):/)
+    assert.match(runsBlock.text, /r2 .* result=win/)
+    assert.throws(() => listGameRuns(store.env, '../escape'), /invalid profile id/)
   } finally {
     delete process.env.DSH_GAME_BRIDGE_PROFILE_DIR
     store.cleanup()
