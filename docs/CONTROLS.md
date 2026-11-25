@@ -40,10 +40,14 @@ fail-closed 拒绝。权限预设是 `approval: never`（如 `danger-full-access
 
 大小写不敏感。以 `game_controls` 的返回为准（来源：`engine/dsh_game_core/control.py` 的 `VK_CODES`）。
 
-## 鼠标点击（keyboard 后端）
+## 鼠标与批量动作（keyboard 后端）
 
-`game_act {rx, ry, mouse_button}`（推荐）或 `game_act {x, y, mouse_button}`：`mouse_button` 取 `LEFT`（默认）/ `RIGHT` / `MIDDLE`。
+- **点击**：`game_act {rx, ry, mouse_button}`（推荐）或 `game_act {x, y, mouse_button}`；`mouse_button` 取 `LEFT`（默认）/ `RIGHT` / `MIDDLE`。
+- **悬停**：`game_act {action_type: "hover", rx, ry}`（或 `x, y`）：只移动光标到目标上方，不点击（用于看悬浮提示/卡牌详情）。
+- **拖拽**：`game_act {action_type: "drag", rx, ry, to_rx, to_ry, duration_ms}`（或 `x/y -> to_x/to_y`）：按下起点、平滑移动到终点后松开。
+- **批量回合动作**：`game_act_batch {steps: [...]}`（1..12 步，支持混合 `press`/`click`/`hover`/`drag` 与 `wait_ms`）。**每一步执行前都会重过安全闸（反作弊 / F12 夺回）与前台/授权 `auto_focus` 校验**；任一步被拦截立即中止后续动作。
 
+坐标说明：
 - **推荐用归一化相对坐标 `rx` / `ry`（0..1）**：相对于当前绑定窗口 / `game_snapshot` 截图（`(0, 0)` 为左上角，`(1, 1)` 为右下角），引擎自动按窗口矩形换算为屏幕像素坐标；
 - `game_snapshot` 的 OCR 文本里每行都会带出中心点坐标（如 `New Game (0.98 @ 0.400,0.440)`）以及结构化 `ocr_boxes`，可直接喂给 `rx`/`ry`；
 - `x` / `y` 仍保留作为屏幕绝对坐标兜底。

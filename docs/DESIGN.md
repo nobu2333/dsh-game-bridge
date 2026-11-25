@@ -54,8 +54,9 @@
 | `game_state` | 读一次通用世界状态 WorldState（场景 / HP / 实体 / UI） | 模型需要时 | 通用基线 ✅ |
 | `game_policy` | 起停本地 60 Hz 状态策略（按 profile 射击/前进/闪避/脱困） | 一次/战斗阶段 | **已冻结** |
 | `game_intent` | 向运行中的策略提交带 TTL/优先级的战术 Intent（建议性，不直接按键；当前执行 jump/dodge/retreat） | 0.2–1Hz | **已冻结** |
-| `game_memory` | 本地游戏档案（profile）CRUD 与选用 | 开局 / 换游戏 | 通用基线 ✅ |
-| `game_act` | 单步按键 / 手柄按钮，或相对 `rx`/`ry`（0..1）/ 绝对 `x`/`y` 鼠标点击（默认 dry-run） | 一次/动作 | M2 ✅；相对坐标已单测 |
+| `game_memory` | 本地游戏档案 CRUD、Markdown 游戏笔记（`notes_get/save/append`）与紧凑单局摘要（`run_save/runs_list`） | 开局 / 复盘 / 换游戏 | 通用基线 ✅ |
+| `game_act` | 单步按键 / 手柄按钮，或鼠标 `click` / `hover` / `drag`（支持相对 `rx`/`ry` 与绝对 `x`/`y`） | 一次/动作 | M2 ✅；实机点击/悬停/拖拽已验证 |
+| `game_act_batch` | 1..12 步连续动作（含 `wait_ms`），每步前重过安全闸与前台校验 | 回合级多步操作 | ✅ 已实机验证 |
 | `game_stop` | 松手 + 解绑 | 随时，越易越好 | M2 ✅ |
 | `game_plan` | 给目标，启动本地 20 Hz 循环（hold / tap / advance 撞墙侧移脱困） | 一次/目标 | M3 ✅（dry-run 验证） |
 | `game_status` | 轮询进度与事件 | 稀疏 | M3 ✅ |
@@ -268,9 +269,9 @@ v1 仅 Windows 10/11 x64（DXcam、ViGEmBus、Win32 输入）。抽象层留好�
 
 
 
-## 9. 待定：游戏数据与记忆的收敛
+## 9. 游戏数据与记忆收敛（2026-11-26 已落地增量）
 
-> 状态：**方案，尚未决定**。在这里定下来之前，不要新增「每款游戏的数据格式」或记忆层代码。
+> 状态：**M2 Markdown 笔记、`runs.jsonl` 单局摘要、`handoff.py` 跨局接力包与通用 L2 `log_observer.py` 已落地**；旧冻结模块先保持不动。
 > 背景见 [STATUS § 能力层与代码去向](STATUS.md#能力层与代码去向)。
 
 ### 9.1 现状：同一款游戏的数据有 4 种格式，目录有两套

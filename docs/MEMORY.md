@@ -5,12 +5,12 @@
 >
 > | 层 | 适用于慢节奏游戏 | 实现现状（已对照代码） |
 > |:--|:--|:--|
-> | M0 工作记忆 | ✅ | 没有通用实现；只有动作策略里的 `_learning_recent` 等内部缓冲（`policy.py`） |
+> | M0 工作记忆 | ✅ | `handoff.py` 组装当前回合摘要 + L2 状态 + 最近单局摘要；`game_memory run_save / runs_list` 写入 `games/<id>/runs.jsonl` |
 > | M1 关卡/Boss | ❌ 动作游戏专用，已冻结 | `level_memory.py`、`memory.py` 的 DangerCard / `LevelLocator`；按横版卷轴坐标 `scroll_s` 分段 |
-> | M2 游戏级 | ✅ **核心** | `memory_loader.load_game` 只会**读取** `game.json` / `ui.json` / `entities.json`；**没有任何代码写这些文件** |
-> | M3 通识 | ✅ | 只会读 `general.json`，没有内容、没有写入 |
-> | M4 元记忆 | ✅ | 只有 `manifest()` 读取，没有写入 |
-> | M5 用户/环境 | ✅ | 只会读 `user/preferences.json`，没有写入 |
+> | M2 游戏级 | ✅ **核心** | `game_memory notes_get / notes_save / notes_append` 读写 `games/<id>/notes.md`（带脱敏、行/字节预算与 M4 行内元信息）；旧 `memory_loader` JSON 仅保留兼容 |
+> | M3 通识 | ✅ | 保留 `general.json` 只读骨架；慢游戏优先放进通用提示/文档 |
+> | M4 元记忆 | ✅ | `notes_append` 行内带 `date / source / confidence` 标注 |
+> | M5 用户/环境 | ✅ | 审批/安全/控制配置由宿主环境与 profile 承担 |
 > | 攻略（§5） | ✅ | `GuideStore` 已实现，数据形状通用 |
 >
 > 下文 §4（Level Memory）和 §7 的待办 1–3、5 属于已冻结的动作游戏路线。其余章节在新路线里要重新对齐，

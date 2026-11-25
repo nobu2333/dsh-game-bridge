@@ -31,14 +31,14 @@
 
 | 能力 | 状态 | 证据 |
 |:--|:--|:--|
-| 插件壳：14 个 `game_*` 工具、截图作为 image block 进模型 | ✅ | `npm test`；隔离 harness 集成测试 |
+| 插件壳：15 个 `game_*` 工具、截图作为 image block 进模型 | ✅ | `npm test`（47/47）；隔离 harness 集成测试（11/11） |
 | 引擎自举：uv 建 venv 并安装 `dsh-game-core` | ✅ | 实测约 20 秒 / 17 个包 |
 | 抓屏：整屏抓取 + 窗口裁剪（默认） | ✅ | 实测；被遮挡时会拍到遮挡物，有 `foreground` / `occluded` 标注 |
 | 抓屏：窗口级 `PrintWindow`（`DSH_GAME_BRIDGE_CAPTURE=window`） | ✅ | 实测 Cuphead / Chrome 窗口被遮挡时也能截到；部分硬件加速窗口可能是黑帧 |
 | OCR（RapidOCR） | ✅ | 实测中英文菜单、分数 |
 | 键盘注入（SendInput，扫描码） | ✅ | 2026-10-29 用 AsyncKeyState 回读；2026-11 在浏览器游戏上实测 |
 | 手柄注入（vgamepad / ViGEmBus） | ✅ | 2026-10-29 用 XInput 回读；槽位可能不是 0 |
-| 鼠标点击（`game_act` 加 `rx`/`ry` 或 `x`/`y`） | ✅ | 绝对 `x`/`y` 与相对 `rx`/`ry` + OCR `@ cx,cy` 均已实机验证（4×4 扫雷 10/10 击中，见 `experiments/results/click-minesweeper-smoke-2026-11-25.md`） |
+| 鼠标与批量动作（`click` / `hover` / `drag` / `game_act_batch`） | ✅ | `rx`/`ry` 扫雷 10/10 实机命中；`hover` + `drag` + `act_batch` 在本地交互页实机跑通（`experiments/results/drag-hover-batch-smoke-2026-11-26.md`） |
 | 安全：反作弊拒绝、F12 夺回、真实后端审批、前台校验、审计日志 | ✅ | 引擎单测 + 集成测试 |
 | 发布 | 0.0.1 已发布 | npm `dsh-game-bridge@0.0.1`、PyPI `dsh-game-core==0.0.1`；0.0.2 尚未发布 |
 
@@ -55,7 +55,7 @@
 | 1 | 基础设施：抓屏、OCR、输入、安全闸、自举、发布 | [DESIGN](DESIGN.md)、[CONTROLS](CONTROLS.md)、[RELEASE](RELEASE.md)、[MARKETPLACE](MARKETPLACE.md)、[FIELD-2026-10-29](FIELD-2026-10-29.md) | **保留，主线** | 已验证（见上表） |
 | 2 | 世界状态与档案：WorldState、GameProfile | [STATE](STATE.md) | **保留**（可选工具 `game_state` / `game_memory`） | 场景 / HP / UI 文字通用；威胁与实体检测偏动作游戏 |
 | 3 | 实时战斗栈：60 Hz 策略、选项仲裁、玩家与实体追踪、地形 | 无现行文档；设计与失败记录见下方「已删除文档」 | **冻结** | 在 Cuphead 上验证无收益 |
-| 4 | 记忆与学习 | [MEMORY](MEMORY.md) | **拆分**：通用部分保留并待重做，动作游戏部分存档 | 架构通用；游戏级记忆（M2–M5）只有读取代码，没有写入 |
+| 4 | 记忆与跨局上下文 | [MEMORY](MEMORY.md)、[DESIGN §9](DESIGN.md#9-游戏数据与记忆收敛2026-11-26-已落地增量) | **主线可用**（动作级冻结） | `game_memory` 已补齐 `notes.md` 与 `runs.jsonl` 读写（脱敏+预算）；`handoff.py` 组装有界跨局接力包；`log_observer.py` 提供通用 L2 增量日志提取；动作级 `level_memory` 已冻结 |
 | 5 | 冷启动与自动认键位 | [AI-NATIVE-PLAN](AI-NATIVE-PLAN.md)、[GENERAL-PLUGIN-V3](GENERAL-PLUGIN-V3.md) §5 | **保留，待收敛**（有两代重复实现） | 第一代未接入生产；第二代只在脚本里用 |
 | 6 | GamePack（每款游戏的声明式数据） | [GENERAL-PLUGIN-V3](GENERAL-PLUGIN-V3.md) §4 | **保留合同**，覆盖指标作废 | 合同和校验可用；T1 / T2 计数不代表能力 |
 | 7 | 实验与评测 | [experiments/README](../experiments/README.md) | **存档**，方法论保留 | 实现绑定 Cuphead 的「推进屏数」指标 |
@@ -148,12 +148,12 @@
 ## 验证
 
 ```powershell
-npm test                                   # 插件：46/46（2026-11-20 实跑）
-cd engine; python -m pytest tests -q       # 引擎：358/358（2026-11-20 实跑）
+npm test                                   # 插件：47/47（2026-11-26 实跑）
+cd engine; python -m pytest tests -q       # 引擎：362/362（2026-11-26 实跑）
 cd ..
 $env:DSH_HOME='<repo>/.dsh-test'
 $env:DSH_GAME_BRIDGE_PYTHON='<python-with-deps>'
-npm run test:all                           # 集成 11/11（2026-11-20 实跑通过）
+npm run test:all                           # 集成 11/11（2026-11-26 实跑通过）
 ```
 
 ## 历史结论（只记结论，不再展开）
