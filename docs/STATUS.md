@@ -38,7 +38,7 @@
 | OCR（RapidOCR） | ✅ | 实测中英文菜单、分数 |
 | 键盘注入（SendInput，扫描码） | ✅ | 2026-10-29 用 AsyncKeyState 回读；2026-11 在浏览器游戏上实测 |
 | 手柄注入（vgamepad / ViGEmBus） | ✅ | 2026-10-29 用 XInput 回读；槽位可能不是 0 |
-| 鼠标点击（`game_act` 加 `rx`/`ry` 或 `x`/`y`） | ✅（相对坐标已实现） | 绝对 `x`/`y` 实测能点到窗口；新增 0..1 相对坐标 `rx`/`ry` + `game_snapshot` OCR `@ cx,cy`（已单测，待实机点击验证） |
+| 鼠标点击（`game_act` 加 `rx`/`ry` 或 `x`/`y`） | ✅ | 绝对 `x`/`y` 与相对 `rx`/`ry` + OCR `@ cx,cy` 均已实机验证（4×4 扫雷 10/10 击中，见 `experiments/results/click-minesweeper-smoke-2026-11-25.md`） |
 | 安全：反作弊拒绝、F12 夺回、真实后端审批、前台校验、审计日志 | ✅ | 引擎单测 + 集成测试 |
 | 发布 | 0.0.1 已发布 | npm `dsh-game-bridge@0.0.1`、PyPI `dsh-game-core==0.0.1`；0.0.2 尚未发布 |
 
@@ -126,11 +126,10 @@
    工具已就绪：`scripts/run_baseline.py`（随机 / 固定循环，每局新开浏览器 profile），
    `scripts/record_model_run.py`（从模型那局的窗口 OCR 读分，和基线用同一个解析器）。
    2026-11-12 已在本机用真实键盘注入跑通（每步约 0.2–0.3 秒，分数读取稳定）。
-3. **点击类游戏的前置缺口（代码已补齐，待低步数实机验证）**：
-   - `game_act` 已支持相对绑定窗口/截图的归一化坐标 `rx`/`ry`（0..1），保留绝对 `x`/`y` 兼容；
-   - `game_snapshot` 已在 OCR 文本与 `ocr_boxes` 返回归一化坐标（`@ cx,cy`），并支持可选 `max_width`（320..1280）/ `ocr` / `ocr_limit` 控制上下文开销；
-   - `game_attach` 支持显式授权 `auto_focus`（F12 与反作弊检查永远先于聚焦），`game_status` 现展示本次 `attach_actions`；
-   - 下一步是在低步数点击类/益智小游戏（如扫雷、数独、井字棋）上做真实端到端验证。
+3. **点击类游戏的前置缺口（已完成基础验证，待真实 DSH 模型试玩）**：
+   - `game_act` 相对坐标 `rx`/`ry` + `game_snapshot` OCR 归一化坐标 + `max_width=640` 已在本地 4×4 扫雷实机跑通（10/10 击中）；
+   - `game_attach { auto_focus: true }` 已单测并在管线测试验证，`game_status` schema 修复并重跑 11/11 集成通过；
+   - 下一步是用真实 DSH 模型端到端试玩低步数点击益智游戏（扫雷/数独），验证模型在 `max_width=640` + `ocr_limit=32` 下的上下文占用与决策质量。
 4. **发布 0.0.2**，按 [MARKETPLACE](MARKETPLACE.md) 提交市场收录。
 
 **在做下面这些之前先停下**：新的感知模块、学习层、动作游戏适配、新的游戏覆盖指标，以及任何新的「每款游戏的数据格式」。
