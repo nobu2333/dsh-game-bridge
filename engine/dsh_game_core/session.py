@@ -453,6 +453,23 @@ class GameSession:
         y = max(top, min(bottom - 1, int(round(top + ry * (height - 1)))))
         return x, y, round(rx, 4), round(ry, 4)
 
+    def _resolve_point(self, params: dict, *, rx_key: str = "rx", ry_key: str = "ry", x_key: str = "x", y_key: str = "y"):
+        has_rel = params.get(rx_key) is not None or params.get(ry_key) is not None
+        has_abs = params.get(x_key) is not None or params.get(y_key) is not None
+        if has_rel:
+            if params.get(rx_key) is None or params.get(ry_key) is None:
+                raise EngineError("BAD_MOUSE", f"{rx_key} 和 {ry_key} 必须同时提供")
+            x, y, rx, ry = self._resolve_relative_xy(params[rx_key], params[ry_key])
+            return x, y, rx, ry
+        if has_abs:
+            if params.get(x_key) is None or params.get(y_key) is None:
+                raise EngineError("BAD_MOUSE", f"{x_key} 和 {y_key} 必须同时提供")
+            try:
+                return int(params[x_key]), int(params[y_key]), None, None
+            except (TypeError, ValueError) as error:
+                raise EngineError("BAD_MOUSE", f"{x_key}/{y_key} 不是整数：{params.get(x_key)!r},{params.get(y_key)!r}") from error
+        return None
+
     def act(self, params: dict | None = None) -> dict:
         params = params or {}
         if self.attached is None:
@@ -462,10 +479,11 @@ class GameSession:
             self.audit.write({"event": "act_blocked", "reasons": report.reasons})
             raise EngineError("SAFETY_BLOCKED", "；".join(report.reasons))
         button = str(params.get("button") or "A")
+        raw_duration = params.get("duration_ms")
         try:
-            duration = int(params.get("duration_ms") or DEFAULT_BUTTON_DURATION_MS)
+            duration = int(raw_duration if raw_duration is not None else DEFAULT_BUTTON_DURATION_MS)
         except (TypeError, ValueError) as error:
-            raise EngineError("BAD_DURATION", f"duration_ms 不是整数：{params.get('duration_ms')!r}") from error
+            raise EngineError("BAD_DURATION", f"duration_ms 不是整数：{raw_duration!r}") from error
         duration = max(1, min(duration, MAX_BUTTON_DURATION_MS))
         foreground = self._foreground()
         delivery = self._delivery(foreground)
@@ -473,19 +491,116 @@ class GameSession:
         if self._foreground_required() and delivery["checked"] and not delivery["foreground"]:
             self.audit.write({"event": "act_blocked", "reasons": ["foreground mismatch"], "foreground": foreground})
             raise EngineError("FOREGROUND_MISMATCH", self._foreground_message(foreground))
-        has_rel = params.get("rx") is not None or params.get("ry") is not None
-        has_abs = params.get("x") is not None or params.get("y") is not None
-        if has_rel:
-            if params.get("rx") is None or params.get("ry") is None:
-                raise EngineError("BAD_MOUSE", "rx 和 ry 必须同时提供")
-            x, y, rx, ry = self._resolve_relative_xy(params["rx"], params["ry"])
+
+        raw_type = str(params.get("action_type") or "").strip().lower()
+        has_start = any(params.get(k) is not None for k in ("rx", "ry", "x", "y"))
+        has_end = any(params.get(k) is not None for k in ("to_rx", "to_ry", "to_x", "to_y"))
+        if not raw_type:
+            if has_end:
+                action_type = "drag"
+            elif has_start:
+                action_type = "click"
+            else:
+                action_type = "press"
+        else:
+            action_type = raw_type
+        if action_type not in ("press", "click", "hover", "drag"):
+            raise EngineError("BAD_ACTION", f"未知 action_type：{action_type!r}（只支持 press / click / hover / drag）")
+
+        if action_type == "hover":
+            start = self._resolve_point(params)
+            if start is None:
+                raise EngineError("BAD_MOUSE", "hover 需要 (rx, ry) 或 (x, y) 坐标")
+            x, y, rx, ry = start
+            controller = self._controller_instance()
+            hover_fn = getattr(controller, "hover", None)
+            if not callable(hover_fn):
+                raise EngineError("BACKEND_UNSUPPORTED", f"后端 {self.backend} 不支持鼠标悬停")
+            action = hover_fn(x, y)
+            if rx is not None:
+                action = {**action, "rx": rx, "ry": ry}
+            entry = {**action, "at_ms": int(time.time() * 1000)}
+            self.history.append(entry)
+            self._attach_actions += 1
+            self.audit.write(
+                {
+                    "event": "mouse_hover",
+                    "x": x,
+                    "y": y,
+                    **({"rx": rx, "ry": ry} if rx is not None else {}),
+                    "backend": action.get("backend"),
+                    "dry_run": action.get("dry_run"),
+                    "delivery": delivery,
+                }
+            )
+            return {
+                "action": action,
+                "safety": report.to_dict(),
+                "attached": self.attached,
+                "actions_total": len(self.history),
+                "attach_actions": self._attach_actions,
+                "delivery": delivery,
+            }
+
+        if action_type == "drag":
+            start = self._resolve_point(params)
+            end = self._resolve_point(params, rx_key="to_rx", ry_key="to_ry", x_key="to_x", y_key="to_y")
+            if start is None or end is None:
+                raise EngineError("BAD_MOUSE", "drag 需要起点 (rx/ry 或 x/y) 和终点 (to_rx/to_ry 或 to_x/to_y)")
+            x1, y1, rx1, ry1 = start
+            x2, y2, rx2, ry2 = end
+            controller = self._controller_instance()
+            drag_fn = getattr(controller, "drag", None)
+            if not callable(drag_fn):
+                raise EngineError("BACKEND_UNSUPPORTED", f"后端 {self.backend} 不支持鼠标拖拽")
+            mouse_button = str(params.get("mouse_button") or params.get("button") or "LEFT").upper()
+            drag_ms = int(raw_duration) if raw_duration is not None else 200
+            action = drag_fn(x1, y1, x2, y2, button=mouse_button, duration_ms=drag_ms)
+            if rx1 is not None:
+                action = {**action, "rx": rx1, "ry": ry1}
+            if rx2 is not None:
+                action = {**action, "to_rx": rx2, "to_ry": ry2}
+            entry = {**action, "at_ms": int(time.time() * 1000)}
+            self.history.append(entry)
+            self._attach_actions += 1
+            self.audit.write(
+                {
+                    "event": "mouse_drag",
+                    "x": x1,
+                    "y": y1,
+                    "to_x": x2,
+                    "to_y": y2,
+                    **({"rx": rx1, "ry": ry1} if rx1 is not None else {}),
+                    **({"to_rx": rx2, "to_ry": ry2} if rx2 is not None else {}),
+                    "button": mouse_button,
+                    "duration_ms": action.get("duration_ms"),
+                    "backend": action.get("backend"),
+                    "dry_run": action.get("dry_run"),
+                    "delivery": delivery,
+                }
+            )
+            return {
+                "action": action,
+                "safety": report.to_dict(),
+                "attached": self.attached,
+                "actions_total": len(self.history),
+                "attach_actions": self._attach_actions,
+                "delivery": delivery,
+            }
+
+        if action_type == "click":
+            start = self._resolve_point(params)
+            if start is None:
+                raise EngineError("BAD_MOUSE", "click 需要 (rx, ry) 或 (x, y) 坐标")
+            x, y, rx, ry = start
             controller = self._controller_instance()
             click = getattr(controller, "click", None)
             if not callable(click):
                 raise EngineError("BACKEND_UNSUPPORTED", f"后端 {self.backend} 不支持鼠标点击")
             mouse_button = str(params.get("mouse_button") or params.get("button") or "LEFT").upper()
             action = click(x, y, button=mouse_button)
-            action = {**action, "rx": rx, "ry": ry}
+            if rx is not None:
+                action = {**action, "rx": rx, "ry": ry}
             entry = {**action, "at_ms": int(time.time() * 1000)}
             self.history.append(entry)
             self._attach_actions += 1
@@ -494,8 +609,7 @@ class GameSession:
                     "event": "mouse_click",
                     "x": x,
                     "y": y,
-                    "rx": rx,
-                    "ry": ry,
+                    **({"rx": rx, "ry": ry} if rx is not None else {}),
                     "button": mouse_button,
                     "backend": action.get("backend"),
                     "dry_run": action.get("dry_run"),
@@ -510,42 +624,7 @@ class GameSession:
                 "attach_actions": self._attach_actions,
                 "delivery": delivery,
             }
-        if has_abs:
-            if params.get("x") is None or params.get("y") is None:
-                raise EngineError("BAD_MOUSE", "x 和 y 必须同时提供")
-            try:
-                x = int(params["x"])
-                y = int(params["y"])
-            except (TypeError, ValueError) as error:
-                raise EngineError("BAD_MOUSE", f"x/y 不是整数：{params.get('x')!r},{params.get('y')!r}") from error
-            controller = self._controller_instance()
-            click = getattr(controller, "click", None)
-            if not callable(click):
-                raise EngineError("BACKEND_UNSUPPORTED", f"后端 {self.backend} 不支持鼠标点击")
-            mouse_button = str(params.get("mouse_button") or params.get("button") or "LEFT").upper()
-            action = click(x, y, button=mouse_button)
-            entry = {**action, "at_ms": int(time.time() * 1000)}
-            self.history.append(entry)
-            self._attach_actions += 1
-            self.audit.write(
-                {
-                    "event": "mouse_click",
-                    "x": x,
-                    "y": y,
-                    "button": mouse_button,
-                    "backend": action.get("backend"),
-                    "dry_run": action.get("dry_run"),
-                    "delivery": delivery,
-                }
-            )
-            return {
-                "action": action,
-                "safety": report.to_dict(),
-                "attached": self.attached,
-                "actions_total": len(self.history),
-                "attach_actions": self._attach_actions,
-                "delivery": delivery,
-            }
+
         action = self._controller_instance().press(button, duration)
         entry = {**action, "at_ms": int(time.time() * 1000)}
         self.history.append(entry)
@@ -567,6 +646,77 @@ class GameSession:
             "actions_total": len(self.history),
             "attach_actions": self._attach_actions,
             "delivery": delivery,
+        }
+
+    def act_batch(self, params: dict | None = None) -> dict:
+        """Execute a bounded sequence (1..12) of actions, re-checking SafetyGate before each step."""
+        params = params or {}
+        if self.attached is None:
+            raise EngineError("NOT_ATTACHED", "还没有 attach 任何窗口：先调 game_attach，再调 game_act_batch")
+        steps = params.get("steps")
+        if not isinstance(steps, list) or not (1 <= len(steps) <= 12):
+            raise EngineError("BAD_BATCH", "steps 必须是 1..12 个动作对象组成的列表")
+        results: list[dict] = []
+        stopped_reason: str | None = None
+        executed = 0
+        for idx, raw_step in enumerate(steps):
+            if not isinstance(raw_step, dict):
+                if idx == 0:
+                    raise EngineError("BAD_BATCH", f"steps[{idx}] 必须是对象")
+                stopped_reason = f"BAD_BATCH: steps[{idx}] is not an object"
+                break
+            report = self.gate.evaluate()
+            if not report.allowed:
+                self.audit.write({"event": "act_batch_blocked", "step": idx, "reasons": report.reasons})
+                if idx == 0:
+                    raise EngineError("SAFETY_BLOCKED", "；".join(report.reasons))
+                stopped_reason = f"SAFETY_BLOCKED: {'；'.join(report.reasons)}"
+                break
+            wait_raw = raw_step.get("wait_ms")
+            has_action = any(
+                raw_step.get(k) is not None
+                for k in ("action_type", "button", "rx", "ry", "x", "y", "to_rx", "to_ry", "to_x", "to_y")
+            )
+            if not has_action and wait_raw is not None:
+                try:
+                    wait_ms = max(0, min(int(wait_raw), 2000))
+                except (TypeError, ValueError) as error:
+                    if idx == 0:
+                        raise EngineError("BAD_BATCH", f"wait_ms 不是整数：{wait_raw!r}") from error
+                    stopped_reason = f"BAD_BATCH: invalid wait_ms {wait_raw!r}"
+                    break
+                if wait_ms:
+                    time.sleep(wait_ms / 1000.0)
+                executed += 1
+                results.append({"step": idx, "wait_ms": wait_ms, "ok": True})
+                continue
+            try:
+                outcome = self.act(raw_step)
+            except EngineError as error:
+                if idx == 0:
+                    raise
+                stopped_reason = f"{error.code}: {error.message}"
+                break
+            executed += 1
+            entry: dict = {"step": idx, "ok": True, "action": outcome["action"]}
+            if wait_raw is not None:
+                try:
+                    wait_ms = max(0, min(int(wait_raw), 2000))
+                except (TypeError, ValueError):
+                    wait_ms = 0
+                if wait_ms:
+                    time.sleep(wait_ms / 1000.0)
+                    entry["wait_ms"] = wait_ms
+            results.append(entry)
+        return {
+            "executed": executed,
+            "requested": len(steps),
+            "stopped_reason": stopped_reason,
+            "results": results,
+            "actions_total": len(self.history),
+            "attach_actions": self._attach_actions,
+            "safety": self.gate.evaluate().to_dict(),
+            "attached": self.attached,
         }
 
     # ── 小脑：20 Hz 闭环 ──────────────────────────────────────────────

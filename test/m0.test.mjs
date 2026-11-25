@@ -64,6 +64,7 @@ test('apply() registers the current tool surface', () => {
     ctx.registered.map((definition) => definition.name).sort(),
     [
       'game_act',
+      'game_act_batch',
       'game_attach',
       'game_controls',
       'game_events',
@@ -378,6 +379,44 @@ test('status, stop, act and snapshot render/validate relative coords, attach_act
   // Schema compiles parameters under .properties; check rx/ry and snapshot controls are exposed.
   const actDef = tool(ctx, 'game_act')
   assert.ok(actDef.parameters.properties.rx && actDef.parameters.properties.ry)
+  assert.ok(actDef.parameters.properties.to_rx && actDef.parameters.properties.to_ry)
+  assert.ok(actDef.parameters.properties.action_type)
+  const batchDef = tool(ctx, 'game_act_batch')
+  assert.ok(batchDef.parameters.properties.steps)
+  const [hoverBlock] = actDef.output.render(
+    {},
+    {
+      action: { backend: 'keyboard', button: 'NONE', duration_ms: 0, dry_run: false, mouse_hover: true, x: 400, y: 300, rx: 0.5, ry: 0.5 },
+      safety: { allowed: true, reasons: [] },
+      actions_total: 13,
+      attach_actions: 5,
+    },
+  )
+  assert.match(hoverBlock.text, /Hovered at rel \(0\.5, 0\.5\) -> \(400, 300\)/)
+  const [dragBlock] = actDef.output.render(
+    {},
+    {
+      action: { backend: 'keyboard', button: 'LEFT', duration_ms: 200, dry_run: false, mouse_drag: true, x: 200, y: 500, rx: 0.25, ry: 0.8, to_x: 400, to_y: 300, to_rx: 0.5, to_ry: 0.5 },
+      safety: { allowed: true, reasons: [] },
+      actions_total: 14,
+      attach_actions: 6,
+    },
+  )
+  assert.match(dragBlock.text, /Dragged LEFT from rel \(0\.25, 0\.8\) -> \(200, 500\) to rel \(0\.5, 0\.5\) -> \(400, 300\)/)
+  const [batchBlock] = batchDef.output.render(
+    {},
+    {
+      executed: 2,
+      requested: 3,
+      stopped_reason: 'SAFETY_BLOCKED: F12 takeover',
+      results: [],
+      actions_total: 16,
+      attach_actions: 8,
+      safety: { allowed: false, reasons: ['F12 takeover'] },
+    },
+  )
+  assert.match(batchBlock.text, /Batch: executed 2\/3 steps/)
+  assert.match(batchBlock.text, /Stopped early: SAFETY_BLOCKED/)
   const snapDef = tool(ctx, 'game_snapshot')
   assert.ok(
     snapDef.parameters.properties.max_width &&

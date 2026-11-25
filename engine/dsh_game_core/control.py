@@ -204,6 +204,26 @@ class DryRunController:
         self.actions.append(action)
         return action
 
+    def hover(self, x: int, y: int) -> dict:
+        action = {"backend": self.backend, "mouse_hover": True, "x": int(x), "y": int(y), "button": "NONE", "duration_ms": 0, "dry_run": True}
+        self.actions.append(action)
+        return action
+
+    def drag(self, x1: int, y1: int, x2: int, y2: int, button: str = "LEFT", duration_ms: int = 200) -> dict:
+        action = {
+            "backend": self.backend,
+            "mouse_drag": True,
+            "x": int(x1),
+            "y": int(y1),
+            "to_x": int(x2),
+            "to_y": int(y2),
+            "button": str(button).upper(),
+            "duration_ms": max(50, min(int(duration_ms), 2000)),
+            "dry_run": True,
+        }
+        self.actions.append(action)
+        return action
+
 
 class VGamepadController:
     """Xbox 360 虚拟手柄（ViGEmBus）。只有用户显式选择时才加载。
@@ -423,6 +443,43 @@ def send_mouse_click(x: int, y: int, button: str = "LEFT", hold_ms: int = 40) ->
     user32.mouse_event(_MOUSE_UP[name], 0, 0, 0, 0)
 
 
+def send_mouse_hover(x: int, y: int) -> None:
+    """Move the cursor to (x, y) without pressing any button (tooltip/card inspection)."""
+    ctypes.windll.user32.SetCursorPos(int(x), int(y))
+    time.sleep(0.03)
+
+
+def send_mouse_drag(
+    x1: int,
+    y1: int,
+    x2: int,
+    y2: int,
+    button: str = "LEFT",
+    duration_ms: int = 200,
+) -> None:
+    """Press at (x1, y1), move smoothly to (x2, y2), and release."""
+    name = str(button or "LEFT").upper()
+    if name not in _MOUSE_DOWN:
+        raise ValueError(f"unknown mouse button: {button}")
+    user32 = ctypes.windll.user32
+    user32.SetCursorPos(int(x1), int(y1))
+    time.sleep(0.025)
+    user32.mouse_event(_MOUSE_DOWN[name], 0, 0, 0, 0)
+    try:
+        time.sleep(0.035)
+        steps = 10
+        total_s = max(50, min(int(duration_ms), 2000)) / 1000.0
+        for step in range(1, steps + 1):
+            t = step / float(steps)
+            cx = int(round(x1 + (x2 - x1) * t))
+            cy = int(round(y1 + (y2 - y1) * t))
+            user32.SetCursorPos(cx, cy)
+            time.sleep(total_s / steps)
+        time.sleep(0.035)
+    finally:
+        user32.mouse_event(_MOUSE_UP[name], 0, 0, 0, 0)
+
+
 class SendInputController:
     """键盘后端（SendInput）。只有用户显式选择 `keyboard` 并批准后才加载。
 
@@ -432,9 +489,11 @@ class SendInputController:
 
     backend = "keyboard"
 
-    def __init__(self, inject=None, mouse_inject=None):
+    def __init__(self, inject=None, mouse_inject=None, hover_inject=None, drag_inject=None):
         self._inject = inject or send_virtual_key
         self._mouse_inject = mouse_inject or send_mouse_click
+        self._hover_inject = hover_inject or send_mouse_hover
+        self._drag_inject = drag_inject or send_mouse_drag
         self._held: set[str] = set()
 
     @staticmethod
@@ -490,5 +549,33 @@ class SendInputController:
             "y": int(y),
             "button": name,
             "duration_ms": 0,
+            "dry_run": False,
+        }
+
+    def hover(self, x: int, y: int) -> dict:
+        self._hover_inject(int(x), int(y))
+        return {
+            "backend": self.backend,
+            "mouse_hover": True,
+            "x": int(x),
+            "y": int(y),
+            "button": "NONE",
+            "duration_ms": 0,
+            "dry_run": False,
+        }
+
+    def drag(self, x1: int, y1: int, x2: int, y2: int, button: str = "LEFT", duration_ms: int = 200) -> dict:
+        name = str(button or "LEFT").upper()
+        dur = max(50, min(int(duration_ms), 2000))
+        self._drag_inject(int(x1), int(y1), int(x2), int(y2), button=name, duration_ms=dur)
+        return {
+            "backend": self.backend,
+            "mouse_drag": True,
+            "x": int(x1),
+            "y": int(y1),
+            "to_x": int(x2),
+            "to_y": int(y2),
+            "button": name,
+            "duration_ms": dur,
             "dry_run": False,
         }

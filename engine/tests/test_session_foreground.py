@@ -342,3 +342,68 @@ def test_auto_focus_restores_foreground_only_when_authorized_and_safe():
     with pytest.raises(EngineError) as still_wrong:
         session.act({"button": "B", "duration_ms": 10})
     assert still_wrong.value.code == "FOREGROUND_MISMATCH"
+
+
+def test_hover_drag_and_batch_respect_relative_coords_and_mid_batch_safety():
+    events = []
+    takeover = {"active": False}
+    gate = SafetyGate(process_source=lambda: [], takeover_source=lambda: takeover["active"], process_ttl_s=0)
+
+    class _MouseController:
+        backend = "keyboard"
+
+        def backend_info(self):
+            return {"backend": "keyboard", "ready": True, "detail": "SendInput", "xinput_slot": None, "warnings": []}
+
+        def click(self, x, y, button="LEFT"):
+            events.append(("click", x, y, button))
+            return {"backend": "keyboard", "mouse_click": True, "x": x, "y": y, "button": button, "duration_ms": 0, "dry_run": False}
+
+        def hover(self, x, y):
+            events.append(("hover", x, y))
+            return {"backend": "keyboard", "mouse_hover": True, "x": x, "y": y, "button": "NONE", "duration_ms": 0, "dry_run": False}
+
+        def drag(self, x1, y1, x2, y2, button="LEFT", duration_ms=200):
+            events.append(("drag", x1, y1, x2, y2, button, duration_ms))
+            if len(events) >= 2:
+                # Simulate F12 takeover triggered right after the drag step!
+                takeover["active"] = True
+            return {"backend": "keyboard", "mouse_drag": True, "x": x1, "y": y1, "to_x": x2, "to_y": y2, "button": button, "duration_ms": duration_ms, "dry_run": False}
+
+        def press(self, button, duration_ms):
+            events.append(("press", button, duration_ms))
+            return {"backend": "keyboard", "button": button, "duration_ms": duration_ms, "dry_run": False}
+
+        def release_all(self):
+            pass
+
+    session = GameSession(
+        engine=FakeEngine(),
+        gate=gate,
+        control_backend="keyboard",
+        window_resolver=lambda match: {"hwnd": 100, "title": "Game", "process": "game.exe", "left": 100, "top": 200, "width": 801, "height": 601},
+        window_rect_source=lambda hwnd: (100, 200, 901, 801),
+        window_monitor_source=lambda hwnd: {"left": 0, "top": 0, "width": 1920, "height": 1080, "primary": True},
+        foreground_source=lambda: foreground(100, "Game"),
+        occlusion_source=lambda hwnd: {"available": True, "occluded_ratio": 0.0, "occluded": False, "covered_by": []},
+    )
+    session._controller = _MouseController()
+    session.attach({"window": "Game"})
+
+    batch = session.act_batch(
+        {
+            "steps": [
+                {"action_type": "hover", "rx": 0.5, "ry": 0.25},
+                {"action_type": "drag", "rx": 0.25, "ry": 0.75, "to_rx": 0.5, "to_ry": 0.5, "duration_ms": 120},
+                {"action_type": "click", "rx": 0.9, "ry": 0.9},
+            ]
+        }
+    )
+    assert batch["executed"] == 2
+    assert batch["requested"] == 3
+    assert batch["stopped_reason"] and "SAFETY_BLOCKED" in batch["stopped_reason"]
+    assert batch["attach_actions"] == 2
+    assert events == [
+        ("hover", 500, 350),
+        ("drag", 300, 650, 500, 500, "LEFT", 120),
+    ]

@@ -223,6 +223,8 @@ def serve(stdin=None, stdout=None) -> int:
                 result = session.attach(params)
             elif method == "act":
                 result = session.act(params)
+            elif method == "act_batch":
+                result = session.act_batch(params)
             elif method == "plan":
                 result = session.plan(params)
             elif method == "state":
